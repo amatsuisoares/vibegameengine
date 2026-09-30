@@ -8,9 +8,9 @@ export const IdSchema = z
 export const TransformSchema = z.strictObject({
   x: z.number().default(0).describe('Center x in world pixels.'),
   y: z.number().default(0).describe('Center y in world pixels (y grows downward).'),
-  rotation: z.number().default(0),
-  scaleX: z.number().default(1),
-  scaleY: z.number().default(1),
+  rotation: z.number().default(0).describe('Visual rotation in degrees, clockwise. Does not rotate the collider.'),
+  scaleX: z.number().default(1).describe('Visual scale of the sprite; negative mirrors it. Does not scale the collider.'),
+  scaleY: z.number().default(1).describe('Visual scale of the sprite; negative mirrors it. Does not scale the collider.'),
 });
 
 export const EntitySchema = z.strictObject({
@@ -50,8 +50,8 @@ export const AssetSchema = z.strictObject({
   id: IdSchema,
   type: z.enum(['image', 'spritesheet', 'audio']),
   path: z.string().describe('Path relative to the project assets/ folder.'),
-  frameWidth: z.number().int().positive().optional(),
-  frameHeight: z.number().int().positive().optional(),
+  frameWidth: z.number().int().positive().optional().describe('Spritesheet frame width in pixels (required for spritesheets).'),
+  frameHeight: z.number().int().positive().optional().describe('Spritesheet frame height in pixels (required for spritesheets).'),
 });
 
 export const DEFAULT_ACTIONS: Record<string, string[]> = {

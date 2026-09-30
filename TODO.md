@@ -10,12 +10,15 @@
 - [x] Projeto demo `projects/demo-platformer`
 - [x] 45 testes
 
-## Etapa 2 — Renderer + runtime no browser
-- [ ] Renderer Canvas2D (formas, sprites, spritesheets, texto/HUD, camadas, câmera)
-- [ ] Loader de assets (imagens, spritesheets)
-- [ ] Página runtime (Vite) que carrega um projeto e roda em tempo real com teclado/mouse
-- [ ] API `window.__vibe` (step, input, getState, events, console) para controle externo
-- [ ] Overlay de vitória/derrota; modo debug (colliders, ids)
+## ✅ Etapa 2 — Renderer + runtime no browser (concluída)
+- [x] Renderer Canvas2D (formas, sprites, spritesheets, texto/HUD, camadas, câmera, rotação/escala, pixel art)
+- [x] Loader de assets (imagens, spritesheets; SVG suportado) + validação de assets
+- [x] Página runtime (Vite) que carrega um projeto e roda em tempo real com teclado/mouse
+- [x] API `window.__vibe` (step, input, getState, events, console) para controle externo
+- [x] Overlay de vitória/derrota/crash; modo debug (colliders, ids, status)
+- [x] Hot reload ao editar arquivos do projeto; erros de validação no console
+- [x] Demo com sprites animados (herói e moedas) e teste "o demo é vencível"
+- [x] 92 testes unitários + 4 testes e2e no Chromium (pixels, API, teclado real, hot reload)
 
 ## Etapa 3 — ProjectStore + tools de edição
 - [ ] Leitura/gravação de projeto em disco, com escrita atômica
@@ -54,6 +57,9 @@
 - [ ] Agente cria sozinho o jogo de plataforma do enunciado, testa e corrige
 
 ## Limitações conhecidas
+- Áudio é declarado mas não carregado (Etapa 8).
+- Hot reload reinicia o jogo do começo (não preserva estado).
+- O servidor de projetos existe só no dev server do Vite; build de produção do runtime ainda não existe.
 - Física sem colisão contínua: sólidos finos (< 16 px) podem ser atravessados em queda rápida.
 - Corpos dinâmicos não colidem entre si (inimigos se sobrepõem).
 - Kinematic não carrega entidades em cima (plataforma móvel).

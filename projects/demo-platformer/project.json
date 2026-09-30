@@ -5,5 +5,20 @@
   "height": 450,
   "gravity": 1400,
   "startScene": "level1",
-  "assets": []
+  "assets": [
+    {
+      "id": "hero",
+      "type": "spritesheet",
+      "path": "hero.svg",
+      "frameWidth": 24,
+      "frameHeight": 32
+    },
+    {
+      "id": "coin",
+      "type": "spritesheet",
+      "path": "coin.svg",
+      "frameWidth": 16,
+      "frameHeight": 16
+    }
+  ]
 }

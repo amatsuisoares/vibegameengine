@@ -68,6 +68,27 @@ describe('project schema', () => {
     expect(r.errors.join('\n')).toContain('scene "level9" does not exist');
   });
 
+  it('checks asset declarations', () => {
+    const raw = {
+      config: {
+        name: 'p',
+        startScene: 'main',
+        assets: [
+          { id: 'sheet', type: 'spritesheet', path: 'hero.png' },
+          { id: 'evil', type: 'image', path: '../secret.png' },
+          { id: 'ok', type: 'spritesheet', path: 'sprites/coin.png', frameWidth: 16, frameHeight: 16 },
+        ],
+      },
+      scenes: { main: { id: 'main' } },
+    };
+    const r = parseProject(raw);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors).toHaveLength(2);
+    expect(r.errors[0]).toContain('config.assets(sheet): spritesheets need frameWidth and frameHeight');
+    expect(r.errors[1]).toContain('config.assets(evil).path');
+  });
+
   it('warns about suspicious setups without failing', () => {
     const r = parseScene({ id: 's', entities: [{ id: 'p', components: { Body: {} } }] });
     expect(r.ok).toBe(true);

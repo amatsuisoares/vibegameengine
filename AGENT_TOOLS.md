@@ -62,6 +62,27 @@ Exemplo de `run_test`:
 }
 ```
 
+## Runtime no browser (`window.__vibe`)
+
+Implementado na Etapa 2. É a superfície que o RuntimeHost (Etapa 4) vai usar via Playwright
+(`page.evaluate`). Tudo que retorna é JSON puro (cópias; alterar o retorno não altera o jogo).
+Para execuções determinísticas, abra a página com `?paused=1`.
+
+| Método | Retorno | Observação |
+|---|---|---|
+| `info()` | `{project, scenes, scene, width, height, paused, debug}` | |
+| `pause()` / `resume()` | — | pausa só o loop de tempo real |
+| `step(frames=1)` / `advance(ms)` / `perform(steps)` | `{frame, status, scene}` | redesenha em seguida |
+| `keyDown(key)` / `keyUp(key)` | — | mesmo `normalizeKey` da engine |
+| `mouseMove(x, y)` / `mouseDown(btn)` / `mouseUp(btn)` | — | coordenadas do viewport |
+| `getState(query?)` | `GameState` | igual a `game.getState` |
+| `events(sinceFrame?, type?)` / `console(since?, level?)` | listas | |
+| `restart()` / `loadScene(id)` | `{frame, status, scene}` | |
+| `setDebug(on)` / `render()` | — | debug desenha colliders e ids (útil antes de screenshot) |
+
+`window.__vibeError` (lista de mensagens) é definido quando o projeto não carrega ou uma edição o deixa inválido.
+`take_screenshot` = `setDebug(annotate)` + `render()` + screenshot do elemento `canvas`.
+
 ## Memória
 
 | Tool | Parâmetros |

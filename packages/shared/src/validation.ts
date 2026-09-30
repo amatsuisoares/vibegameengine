@@ -84,6 +84,12 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
   for (const a of project.config.assets) {
     if (assetIds.has(a.id)) errors.push(`config.assets: duplicate asset id "${a.id}"`);
     assetIds.add(a.id);
+    if (a.type === 'spritesheet' && (!a.frameWidth || !a.frameHeight)) {
+      errors.push(`config.assets(${a.id}): spritesheets need frameWidth and frameHeight`);
+    }
+    if (a.path.startsWith('/') || a.path.split(/[\\/]/).includes('..')) {
+      errors.push(`config.assets(${a.id}).path: must be relative to the assets/ folder, without ".."`);
+    }
   }
   for (const [key, scene] of Object.entries(project.scenes)) {
     if (key !== scene.id) errors.push(`scenes.${key}: key does not match scene id "${scene.id}"`);

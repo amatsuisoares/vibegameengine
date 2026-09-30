@@ -21,7 +21,7 @@
 └───────────────────────────────────────────┘
 ```
 
-Implementado até agora: `shared` e `engine` (Etapa 1).
+Implementado até agora: `shared` e `engine` (Etapa 1), `runtime` no browser (Etapa 2).
 
 ## Princípios
 
@@ -52,6 +52,9 @@ Project
 Em disco: `projects/<nome>/project.json` (config) + `scenes/<id>.json`.
 
 - Coordenadas em pixels, **y cresce para baixo**, `transform.x/y` é o **centro** da entidade.
+- `rotation` (graus, horário) e `scaleX/scaleY` são **só visuais**: não mudam o collider. Escala negativa espelha.
+- Assets (`config.assets`) ficam em `projects/<nome>/assets/`; caminho relativo, sem `..`. Spritesheets exigem
+  `frameWidth/frameHeight`; frames contam da esquerda para a direita, de cima para baixo. SVG funciona como imagem.
 - Componentes são um mapa `tipo → dados` (no máximo um de cada tipo por entidade), o que torna
   `modify_component(entity, "Body", {...})` trivial.
 - Todos os campos têm default no schema; o JSON só precisa conter o que difere.
@@ -107,6 +110,41 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).
 - **Troca de cena:** variáveis são mantidas; frame/tempo/eventos continuam acumulando.
 
+## Runtime no browser (`packages/runtime`)
+
+```
+app/main.ts ── busca /api/projects/<nome> ─▶ parseProject ─▶ AssetStore.loadAll
+     │
+     ▼
+Runtime ── Game (a mesma engine headless)
+  ├─ FixedLoop      requestAnimationFrame → acumula tempo real → game.step(n) (máx. 5 frames/tick)
+  ├─ attachDomInput teclado (KeyboardEvent.code) e ponteiro → Input virtual
+  ├─ render()       buildDrawList(world) → paint(ctx) → paintDebug? → paintStatusOverlay
+  └─ window.__vibe  controle externo (pause/step/perform/getState/...)
+```
+
+- **Renderização em duas fases.** `buildDrawList(world)` é pura: converte entidades em comandos em
+  coordenadas de tela (câmera, zoom, escala, rotação, flip), descarta o que está fora da tela e ordena por
+  `layer` (estável: empate mantém a ordem da cena). `paint(ctx, cmds)` só faz chamadas Canvas2D. Testes usam
+  um contexto falso que grava as chamadas.
+- **Formas e sprites.** Sem `asset`, desenha `rect`/`circle`/`triangle` com `color`. Com `asset`, desenha o
+  frame no tamanho `width×height` do Sprite. Asset ausente/frame inválido → retângulo magenta + aviso único no
+  console do jogo (`source: renderer`), para o agente perceber.
+- **Texto.** `screenSpace: true` ancora no canto superior (HUD); `false` centraliza no mundo e segue a câmera.
+  `
+` quebra linha.
+- **pixelArt.** Sem suavização de imagem, cantos alinhados ao pixel, CSS `image-rendering: pixelated`.
+- **Fim de jogo.** `won/lost/crashed` desenham um banner (aparece também em screenshots); **R** reinicia.
+- **Debug.** Colliders por cor (verde sólido, amarelo one-way, azul trigger, magenta dinâmico), ids e linha de
+  status (frame, status, cena, fps, PAUSED).
+- **Tempo real × controle externo.** Os dois chamam `game.step`. Com `?paused=1` o loop só redesenha, e o
+  host avança o jogo explicitamente — mesma sequência de input ⇒ mesmo estado que no modo headless (testado).
+- **Dev server.** Plugin Vite (`vite/projects-plugin.ts`) serve `GET /api/projects`, `GET /api/projects/<nome>`
+  (JSON cru; a página valida) e `GET /projects/<nome>/assets/<arquivo>` (bloqueia `..`). Observa `projects/` e
+  envia `vibe:project-changed` pelo WebSocket do Vite; a página recarrega o projeto (debounce de 80 ms, só o
+  reload mais recente vale). Projeto inválido: a versão anterior continua rodando e os erros vão para o console
+  e para `window.__vibeError`. Arquivos em `.vibe/` são ignorados.
+
 ## Comunicação agente ↔ runtime (planejada, etapas 4–6)
 
 ```
@@ -115,7 +153,8 @@ Agent ──tool call──▶ Server/ToolRegistry ──▶ RuntimeHost ──�
 ```
 
 - Modo **headless**: a instância `Game` roda no próprio servidor; input do agente = `game.perform()`.
-- Modo **visual**: página `runtime` carrega o mesmo projeto em Chromium headless; o servidor envia input
-  e lê estado por `page.evaluate(window.__vibe...)`, captura PNG por `page.screenshot()`. Como a simulação
+- Modo **visual**: página `runtime` (`?paused=1`) carrega o mesmo projeto em Chromium headless; o servidor
+  envia input e lê estado por `page.evaluate(window.__vibe...)`, captura PNG por `locator('canvas').screenshot()`.
+  Esse caminho já é exercitado pelos testes e2e (`packages/runtime/e2e`). Como a simulação
   é determinística e o tempo é controlado pelo host, os dois modos produzem o mesmo estado.
 - O agente só alcança o que as tools expõem: arquivos dentro do diretório do projeto e o runtime.

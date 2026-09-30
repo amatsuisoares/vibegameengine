@@ -6,3 +6,5 @@ coverage/
 .env.*
 # runtime artifacts produced by agent runs (screenshots, run logs)
 projects/*/.vibe/runs/
+# temporary copy made by the e2e tests
+projects/e2e-tmp/

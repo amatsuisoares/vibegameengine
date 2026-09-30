@@ -285,4 +285,23 @@ describe('demo project', () => {
     const r = game.waitUntil((g) => g.world.vars.coins === 1, 3000);
     expect(r.ok).toBe(true);
   });
+
+  it('can be won by a simple bot that walks right and jumps over enemies and gaps', () => {
+    const game = Game.fromRaw(readProjectDir(dir));
+    game.input.keyDown('D');
+    let lastJump = -99;
+    for (let f = 0; f < 60 * 25 && game.status === 'running'; f++) {
+      const p = game.entity('player')!;
+      const enemyAhead = game.world.withTag('enemy').some((e) => e.x > p.x && e.x - p.x < 90 && Math.abs(e.y - p.y) < 40);
+      const gapAhead = !game.world.withTag('ground').some((g) => Math.abs(g.x - (p.x + 22)) < g.components.Collider!.width / 2);
+      if ((enemyAhead || gapAhead) && p.grounded && f - lastJump > 20) {
+        game.input.keyDown('Space');
+        lastJump = f;
+      }
+      if (f - lastJump === 14) game.input.keyUp('Space');
+      game.step(1);
+    }
+    expect(game.status).toBe('won');
+    expect(game.events(0, 'goal')).toHaveLength(1);
+  });
 });

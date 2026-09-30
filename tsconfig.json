@@ -16,8 +16,18 @@
     "baseUrl": ".",
     "paths": {
       "@vibe/shared": ["packages/shared/src/index.ts"],
-      "@vibe/engine": ["packages/engine/src/index.ts"]
+      "@vibe/engine": ["packages/engine/src/index.ts"],
+      "@vibe/runtime": ["packages/runtime/src/index.ts"]
     }
   },
-  "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "vitest.config.ts"]
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "packages/*/e2e/**/*.ts",
+    "packages/*/app/**/*.ts",
+    "packages/*/vite/**/*.ts",
+    "packages/*/vite.config.ts",
+    "vitest.config.ts",
+    "vitest.e2e.config.ts"
+  ]
 }

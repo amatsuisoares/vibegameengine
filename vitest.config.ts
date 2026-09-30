@@ -8,6 +8,7 @@ export default defineConfig({
     alias: {
       '@vibe/shared': pkg('shared'),
       '@vibe/engine': pkg('engine'),
+      '@vibe/runtime': pkg('runtime'),
     },
   },
   test: {
