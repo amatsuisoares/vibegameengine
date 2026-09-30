@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+# runtime artifacts produced by agent runs (screenshots, run logs)
+projects/*/.vibe/runs/

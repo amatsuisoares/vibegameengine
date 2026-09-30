@@ -1,0 +1,9 @@
+{
+  "formatVersion": 1,
+  "name": "Demo Platformer",
+  "width": 800,
+  "height": 450,
+  "gravity": 1400,
+  "startScene": "level1",
+  "assets": []
+}

@@ -1,0 +1,85 @@
+import type { Components, EntityData } from '@vibe/shared';
+import type { AABB } from './math';
+
+/** Runtime instance of an entity. Component data is a deep copy of the scene data and may be mutated. */
+export class Entity {
+  readonly id: string;
+  name: string;
+  tags: Set<string>;
+  enabled: boolean;
+  x: number;
+  y: number;
+  prevX: number;
+  prevY: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+  components: Components;
+  destroyed = false;
+
+  // Runtime state maintained by systems (not part of the scene file).
+  readonly spawnX: number;
+  readonly spawnY: number;
+  grounded = false;
+  groundId: string | null = null;
+  onWallLeft = false;
+  onWallRight = false;
+  coyoteTimer = 0;
+  jumpBufferTimer = 0;
+  jumpsUsed = 0;
+  stunTimer = 0;
+  invulnTimer = 0;
+  patrolDir: number;
+  animName: string | null = null;
+  animTime = 0;
+
+  constructor(data: EntityData) {
+    this.id = data.id;
+    this.name = data.name ?? data.id;
+    this.tags = new Set(data.tags);
+    this.enabled = data.enabled;
+    this.x = this.prevX = this.spawnX = data.transform.x;
+    this.y = this.prevY = this.spawnY = data.transform.y;
+    this.rotation = data.transform.rotation;
+    this.scaleX = data.transform.scaleX;
+    this.scaleY = data.transform.scaleY;
+    this.components = structuredClone(data.components);
+    const h = this.components.Health;
+    if (h && h.current === undefined) h.current = h.max;
+    this.patrolDir = this.components.Patrol?.startDirection ?? 1;
+  }
+
+  get active() {
+    return this.enabled && !this.destroyed;
+  }
+
+  hasTag(tag: string) {
+    return this.tags.has(tag);
+  }
+
+  hasAnyTag(tags: readonly string[]) {
+    return tags.some((t) => this.tags.has(t));
+  }
+
+  /** Collider box at the current position (or at a given center). */
+  aabb(cx = this.x, cy = this.y): AABB | null {
+    const c = this.components.Collider;
+    if (!c) return null;
+    return { x: cx + c.offsetX - c.width / 2, y: cy + c.offsetY - c.height / 2, w: c.width, h: c.height };
+  }
+
+  prevAabb(): AABB | null {
+    return this.aabb(this.prevX, this.prevY);
+  }
+
+  /** Whether this entity blocks dynamic bodies. */
+  get isSolid() {
+    const c = this.components.Collider;
+    if (!c || c.isTrigger) return false;
+    return this.components.Body?.type !== 'dynamic';
+  }
+
+  get health() {
+    return this.components.Health?.current;
+  }
+}

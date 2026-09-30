@@ -1,0 +1,60 @@
+{
+  "id": "level1",
+  "name": "Level 1",
+  "background": "#1d2b53",
+  "width": 2400,
+  "height": 450,
+  "killY": 520,
+  "camera": { "follow": "player" },
+  "vars": { "coins": 0 },
+  "entities": [
+    {
+      "id": "player",
+      "tags": ["player"],
+      "transform": { "x": 80, "y": 402 },
+      "components": {
+        "Sprite": { "width": 24, "height": 32, "color": "#ffcc00", "layer": 10 },
+        "Body": {},
+        "Collider": { "width": 24, "height": 32 },
+        "PlatformerController": {},
+        "Health": { "max": 3, "onDeath": "lose" }
+      }
+    },
+    { "id": "ground1", "tags": ["ground"], "transform": { "x": 400, "y": 434 },
+      "components": { "Sprite": { "width": 800, "height": 32, "color": "#5a3a22" }, "Collider": { "width": 800, "height": 32 } } },
+    { "id": "ground2", "tags": ["ground"], "transform": { "x": 1250, "y": 434 },
+      "components": { "Sprite": { "width": 700, "height": 32, "color": "#5a3a22" }, "Collider": { "width": 700, "height": 32 } } },
+    { "id": "ground3", "tags": ["ground"], "transform": { "x": 2050, "y": 434 },
+      "components": { "Sprite": { "width": 700, "height": 32, "color": "#5a3a22" }, "Collider": { "width": 700, "height": 32 } } },
+    { "id": "platform1", "tags": ["platform"], "transform": { "x": 1100, "y": 346 },
+      "components": { "Sprite": { "width": 128, "height": 16, "color": "#8b5a2b" }, "Collider": { "width": 128, "height": 16, "oneWay": true } } },
+    { "id": "platform2", "tags": ["platform"], "transform": { "x": 1900, "y": 330 },
+      "components": { "Sprite": { "width": 128, "height": 16, "color": "#8b5a2b" }, "Collider": { "width": 128, "height": 16, "oneWay": true } } },
+    { "id": "coin1", "tags": ["coin"], "transform": { "x": 400, "y": 390 },
+      "components": { "Sprite": { "width": 16, "height": 16, "shape": "circle", "color": "#ffd700" }, "Collider": { "width": 16, "height": 16, "isTrigger": true }, "Collectible": { "score": 100 } } },
+    { "id": "coin2", "tags": ["coin"], "transform": { "x": 1100, "y": 318 },
+      "components": { "Sprite": { "width": 16, "height": 16, "shape": "circle", "color": "#ffd700" }, "Collider": { "width": 16, "height": 16, "isTrigger": true }, "Collectible": { "score": 100 } } },
+    { "id": "coin3", "tags": ["coin"], "transform": { "x": 1900, "y": 300 },
+      "components": { "Sprite": { "width": 16, "height": 16, "shape": "circle", "color": "#ffd700" }, "Collider": { "width": 16, "height": 16, "isTrigger": true }, "Collectible": { "score": 100 } } },
+    { "id": "enemy1", "tags": ["enemy"], "transform": { "x": 600, "y": 406 },
+      "components": {
+        "Sprite": { "width": 28, "height": 24, "color": "#e04040", "layer": 5 },
+        "Body": {}, "Collider": { "width": 28, "height": 24 },
+        "Patrol": { "speed": 60, "distance": 200 },
+        "Damage": { "amount": 1 }, "Stompable": {}
+      } },
+    { "id": "enemy2", "tags": ["enemy"], "transform": { "x": 1400, "y": 406 },
+      "components": {
+        "Sprite": { "width": 28, "height": 24, "color": "#e04040", "layer": 5 },
+        "Body": {}, "Collider": { "width": 28, "height": 24 },
+        "Patrol": { "speed": 80, "distance": 240 },
+        "Damage": { "amount": 1 }, "Stompable": {}
+      } },
+    { "id": "checkpoint1", "tags": ["checkpoint"], "transform": { "x": 950, "y": 394 },
+      "components": { "Sprite": { "width": 8, "height": 48, "color": "#66ccff" }, "Collider": { "width": 16, "height": 48, "isTrigger": true }, "Checkpoint": {} } },
+    { "id": "flag", "tags": ["goal"], "transform": { "x": 2320, "y": 386 },
+      "components": { "Sprite": { "width": 12, "height": 64, "color": "#33dd66" }, "Collider": { "width": 24, "height": 64, "isTrigger": true }, "Goal": {} } },
+    { "id": "hud", "tags": ["ui"], "transform": { "x": 12, "y": 12 },
+      "components": { "Text": { "text": "Coins: {coins}/3   HP: {player.health}   Score: {score}", "fontSize": 16 } } }
+  ]
+}
