@@ -21,7 +21,8 @@
 └───────────────────────────────────────────┘
 ```
 
-Implementado até agora: `shared` e `engine` (Etapa 1), `runtime` no browser (Etapa 2).
+Implementado até agora: `shared` e `engine` (Etapa 1), `runtime` no browser (Etapa 2), `server` com
+ProjectStore + tools de edição (Etapa 3).
 
 ## Princípios
 
@@ -144,6 +145,34 @@ Runtime ── Game (a mesma engine headless)
   envia `vibe:project-changed` pelo WebSocket do Vite; a página recarrega o projeto (debounce de 80 ms, só o
   reload mais recente vale). Projeto inválido: a versão anterior continua rodando e os erros vão para o console
   e para `window.__vibeError`. Arquivos em `.vibe/` são ignorados.
+
+## ProjectStore e tools (`packages/server`)
+
+```
+ToolRegistry.call(name, input, {store, author})
+  └─ zod valida input ─▶ tool.run ─▶ store.edit(meta, tx => ...)
+                                        │ Transaction: leituras veem escritas pendentes
+                                        ▼
+                                  commit: descarta no-ops
+                                        → valida o projeto com as mudanças aplicadas
+                                        → recusa se surgir erro novo (nada é gravado)
+                                        → grava cada arquivo (tmp + rename; rollback se falhar)
+                                        → acrescenta entrada em .vibe/history.jsonl
+                                        → { seq, diff, warnings, remainingErrors }
+```
+
+- **Edita o JSON cru**, não o normalizado: arquivos continuam mínimos (sem defaults). A resposta das tools pode
+  mostrar a versão efetiva (`get_game_object.effective`).
+- **Relê o disco a cada operação**, então edições feitas fora (editor de texto) são sempre vistas — só não
+  entram no histórico. Undo/redo verificam que os arquivos estão como a entrada deixou; se não, recusam.
+- **Histórico só-acréscimo** (`.vibe/history.jsonl`, fora do git): cada entrada guarda autor (`user`/`agent`),
+  tool, motivo, e o conteúdo completo antes/depois de cada arquivo. Undo e redo também são entradas; as pilhas
+  são derivadas relendo o log (sobrevive a reinícios; linha final corrompida é ignorada).
+- **Validação incremental:** só bloqueia erros *introduzidos* pela mudança, para o agente poder consertar um
+  projeto quebrado aos poucos.
+- **Formato canônico** (`formatJson`): containers que cabem em 110 colunas ficam numa linha.
+- **Escrita atômica** com retry em `EPERM/EBUSY` (Windows: watchers e antivírus seguram arquivos).
+- O runtime (`npm run dev`) observa `projects/` e recarrega a cada commit — o agente vê o efeito na hora.
 
 ## Comunicação agente ↔ runtime (planejada, etapas 4–6)
 

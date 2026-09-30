@@ -20,10 +20,13 @@
 - [x] Demo com sprites animados (herói e moedas) e teste "o demo é vencível"
 - [x] 92 testes unitários + 4 testes e2e no Chromium (pixels, API, teclado real, hot reload)
 
-## Etapa 3 — ProjectStore + tools de edição
-- [ ] Leitura/gravação de projeto em disco, com escrita atômica
-- [ ] Histórico: cada alteração com diff, autor (user/agent), motivo; undo/redo
-- [ ] Tools de cena/entidade/componente/arquivo + JSON Schema para o LLM
+## ✅ Etapa 3 — ProjectStore + tools de edição (concluída)
+- [x] Leitura/gravação de projeto em disco, com escrita atômica e rollback
+- [x] Histórico: cada alteração com diff, autor (user/agent), tool, motivo; undo/redo com detecção de conflito
+- [x] 23 tools de projeto/cena/entidade/componente/arquivo/histórico + JSON Schema no formato de tool use
+- [x] Validação do projeto inteiro a cada alteração (só bloqueia erros novos)
+- [x] JSON canônico (diffs mínimos); CLI `npm run vibe`
+- [x] 122 testes unitários + e2e: edição por tool aparece ao vivo no browser e é desfeita
 
 ## Etapa 4 — RuntimeHost
 - [ ] Sessões de jogo headless (run/stop/restart/input/wait/state/console/events)
@@ -60,6 +63,10 @@
 - Áudio é declarado mas não carregado (Etapa 8).
 - Hot reload reinicia o jogo do começo (não preserva estado).
 - O servidor de projetos existe só no dev server do Vite; build de produção do runtime ainda não existe.
+- Leitura de projeto duplicada: `runtime/vite/project-files.ts` e `ProjectStore` (unificar quando o server
+  passar a servir o runtime, Etapa 4).
+- Ids de entidade não são renomeáveis (duplicar + apagar). Edições feitas fora do store não entram no histórico.
+- Sem trava entre processos: dois processos escrevendo no mesmo projeto ao mesmo tempo podem conflitar.
 - Física sem colisão contínua: sólidos finos (< 16 px) podem ser atravessados em queda rápida.
 - Corpos dinâmicos não colidem entre si (inimigos se sobrepõem).
 - Kinematic não carrega entidades em cima (plataforma móvel).

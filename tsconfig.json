@@ -17,7 +17,8 @@
     "paths": {
       "@vibe/shared": ["packages/shared/src/index.ts"],
       "@vibe/engine": ["packages/engine/src/index.ts"],
-      "@vibe/runtime": ["packages/runtime/src/index.ts"]
+      "@vibe/runtime": ["packages/runtime/src/index.ts"],
+      "@vibe/server": ["packages/server/src/index.ts"]
     }
   },
   "include": [

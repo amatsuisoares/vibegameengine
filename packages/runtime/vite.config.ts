@@ -11,6 +11,7 @@ export default defineConfig({
       '@vibe/shared': repo('packages/shared/src/index.ts'),
       '@vibe/engine': repo('packages/engine/src/index.ts'),
       '@vibe/runtime': repo('packages/runtime/src/index.ts'),
+      '@vibe/server': repo('packages/server/src/index.ts'),
     },
   },
   plugins: [vibeProjects(repo('projects'))],

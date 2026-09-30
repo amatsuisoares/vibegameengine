@@ -9,6 +9,7 @@ export default defineConfig({
       '@vibe/shared': pkg('shared'),
       '@vibe/engine': pkg('engine'),
       '@vibe/runtime': pkg('runtime'),
+      '@vibe/server': pkg('server'),
     },
   },
   test: {

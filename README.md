@@ -2,8 +2,8 @@
 
 Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa, joga, observa e corrige** o próprio jogo.
 
-> Status: **Etapa 2 concluída** — engine headless determinística + runtime no browser (Canvas2D) controlável
-> por teclado/mouse e por `window.__vibe`.
+> Status: **Etapa 3 concluída** — engine headless determinística, runtime no browser (Canvas2D) e
+> ProjectStore com histórico/undo + tools de edição para o agente (com CLI).
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos
@@ -19,7 +19,21 @@ npm run dev         # runtime no browser: http://localhost:5173
 npm test            # vitest (todos os pacotes)
 npm run typecheck   # tsc --noEmit
 npm run test:e2e    # testes no Chromium headless (requer: npx playwright install chromium)
+npm run vibe -- tools   # CLI das tools de edição (ver abaixo)
 ```
+
+### Tools de edição pela CLI
+
+```bash
+npm run vibe -- call demo-platformer get_project_summary
+npm run vibe -- call demo-platformer modify_component @patch.json --as agent   # JSON inline, @arquivo ou - (stdin)
+npm run vibe -- history demo-platformer
+npm run vibe -- undo demo-platformer
+npm run vibe -- schema modify_game_object      # JSON Schema no formato de tool use
+npm run vibe -- format demo-platformer         # normaliza o JSON do projeto
+```
+
+Com `npm run dev` aberto, cada alteração aparece no jogo na hora (hot reload).
 
 ### Runtime no browser
 
@@ -36,6 +50,7 @@ Com `paused=1` nada avança sozinho — o jogo só anda por `window.__vibe` (mod
 packages/
   shared/   schemas (zod) do projeto, cenas, entidades e componentes + validação
   engine/   engine 2D headless: física, input virtual, gameplay, câmera, estado
+  server/   ProjectStore (disco, escrita atômica, histórico, undo/redo), tools do agente, CLI
   runtime/  runtime no browser: renderer Canvas2D, assets, loop, teclado/mouse, window.__vibe
     app/    página Vite (index.html + main.ts)
     vite/   plugin do dev server: serve projects/ e avisa a página quando arquivos mudam
@@ -46,7 +61,7 @@ docs/
   PROMPT_ORIGINAL.md pedido original do projeto (escopo e prioridades)
 ```
 
-Pacotes planejados: `server` (ferramentas do agente, runtime host, API), `editor` (React).
+Pacotes planejados: `editor` (React). O `server` ganha RuntimeHost, agente e API nas próximas etapas.
 
 ## Uso da engine (headless)
 

@@ -156,6 +156,24 @@ export const ComponentSchemas = {
 } as const;
 
 export type ComponentType = keyof typeof ComponentSchemas;
+
+/** One-line summaries shown to the agent when listing component types. */
+export const COMPONENT_DOCS: Record<ComponentType, string> = {
+  Sprite: 'Drawing: an asset frame or a colored shape (rect/circle/triangle), layer, flip, opacity.',
+  Body: 'Physics body: dynamic (gravity + collisions), static, or kinematic (moves by velocity).',
+  Collider: 'Axis-aligned box; isTrigger detects without blocking; oneWay = jump-through platform.',
+  PlatformerController: 'Walk and jump from input actions; acceleration, coyote time, jump buffer, double jump.',
+  Patrol: 'Walks back and forth; turns at walls, ledges and a distance limit.',
+  FollowTarget: 'Chases an entity (by id or nearest with a tag) within a range; horizontal or flying.',
+  Health: 'Hit points, invulnerability after damage, and what happens on death (destroy/lose/respawn).',
+  Damage: 'Hurts entities with target tags on contact, with knockback.',
+  Stompable: 'Dies or takes damage when jumped on from above; bounces the stomper.',
+  Collectible: 'Picked up on contact: adds to a variable (e.g. coins), score, optional healing.',
+  Goal: 'Win or load another scene on contact; can require minimum variable values.',
+  Checkpoint: 'Sets the respawn point of the entity that touches it.',
+  Text: 'Text/HUD with {var} and {entity.health} placeholders; screen or world space.',
+  Animator: 'Spritesheet animation clips; picks idle/run/jump/fall automatically.',
+};
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
 
 export const ComponentsSchema = z.strictObject({

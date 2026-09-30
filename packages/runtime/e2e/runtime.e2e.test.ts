@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createEditingTools, ProjectStore } from '@vibe/server';
 import type { VibeApi } from '../src';
 
 declare global {
@@ -147,6 +148,26 @@ describe('runtime page (Chromium)', () => {
     expect(problems.join('\n')).toContain('entities[0](player).components.Body.type');
     // The last valid version keeps running.
     expect(await vibe(page, (v) => v.getState().entityCount)).toBe(count - 1);
+    await page.close();
+  });
+
+  it('shows agent tool edits live and reverts them with undo', async () => {
+    // The previous test leaves the scene invalid on purpose.
+    cpSync(repo('projects/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
+    const { page } = await open('project=e2e-tmp&paused=1');
+    const store = new ProjectStore(TMP_PROJECT);
+    const tools = createEditingTools();
+    const call = (name: string, input: unknown) => tools.call(name, input, { store, author: 'agent' });
+    const coinCount = () => vibe(page, (v) => v.getState({ tags: ['coin'] }).entities.length);
+    const before = await coinCount();
+
+    expect(call('duplicate_game_object', { scene: 'level1', id: 'coin1', newId: 'coin9', patch: { transform: { x: 300 } } }).ok).toBe(true);
+    await page.waitForFunction((n) => window.__vibe!.getState({ tags: ['coin'] }).entities.length === n + 1, before, { timeout: 10_000 });
+    const coin = await vibe(page, (v) => v.getState({ ids: ['coin9'] }).entities[0]);
+    expect(coin.x).toBe(300);
+
+    expect(call('undo', {}).ok).toBe(true);
+    await page.waitForFunction((n) => window.__vibe!.getState({ tags: ['coin'] }).entities.length === n, before, { timeout: 10_000 });
     await page.close();
   });
 });
