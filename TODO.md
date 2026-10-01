@@ -145,7 +145,11 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
   `assertions` e em passos `assert`/`waitUntil` (`check`)
 - [x] meu-pet: regressão do `verify_game` usando asserções estruturadas
 - [x] 313 testes unitários + 16 e2e
-- [ ] Playbooks reutilizáveis (regressão)
+- [x] **Playbooks**: `playbooks/<id>.json` (= entrada do `verify_game` + `tags`), validados em toda escrita pelo
+  `ProjectStore`, no histórico; `verify_game saveAs` (só se passar), `save_playbook`, `list_playbooks`,
+  `run_playbooks` (ids/tags, placar com as falhas), `delete_playbook`; schemas de passos movidos para `shared`
+- [x] meu-pet: 4 playbooks (`limpar_sujeira`, `encher_tigela`, `carinho`, `bola`), rodados pela regressão
+- [x] 316 testes unitários + 16 e2e
 - [ ] Relatório de diagnóstico
 
 ## ~~Etapa 9 — Teste final~~ — descartada

@@ -1,0 +1,25 @@
+{
+  "scenario": "jogar a bola faz o pet correr atrás",
+  "tags": ["interacao", "pet"],
+  "steps": [
+    { "type": "type", "text": "Bolinha" },
+    { "type": "click", "entity": "botaoComecar" },
+    { "type": "assert", "check": { "assert": "scene", "is": "quarto" }, "name": "entrou no quarto" },
+    { "type": "wait", "ms": 300 },
+    { "type": "click", "entity": "bola" },
+    { "type": "wait", "ms": 200 }
+  ],
+  "assertions": [
+    {
+      "assert": "eventOccurred",
+      "event": "interact",
+      "match": { "entity": "bola", "action": "jogar" },
+      "name": "clicou na bola"
+    },
+    { "assert": "state", "id": "pet", "is": "chase", "name": "o pet persegue a bola" }
+  ],
+  "screenshot": true,
+  "annotate": false,
+  "allowErrors": false,
+  "clock": { "speed": 600 }
+}

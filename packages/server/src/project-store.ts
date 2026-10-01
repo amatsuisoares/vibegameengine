@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { Script } from 'node:vm';
 import { parseExpr, SCRIPT_PARAMS, wrapScript } from '@vibe/engine';
-import { formatIssues, MEMORY_FILE, parseProject, ProjectMemorySchema, SCRIPT_PATH, type Components, type Project, type ProjectMemory } from '@vibe/shared';
+import { formatIssues, MEMORY_FILE, parseProject, PLAYBOOK_FILE, PlaybookSchema, ProjectMemorySchema, SCRIPT_PATH, type Playbook, type Components, type Project, type ProjectMemory } from '@vibe/shared';
 import { removeFile, writeFileAtomic } from './fs-atomic';
 import { History, unifiedDiff, type Author, type FileChange, type HistoryEntry } from './history';
 import { formatJson } from './json-format';
@@ -137,6 +137,14 @@ function expressionErrors(project: Project): string[] {
   return errors;
 }
 
+/** Problems of a playbook file's content (empty = valid). */
+function playbookErrors(file: string, text: string): string[] {
+  const json = parseJsonText(file, text);
+  if (json.error) return [json.error];
+  const r = PlaybookSchema.safeParse(json.data);
+  return r.success ? [] : formatIssues(r.error, json.data).map((m) => `${file}: ${m}`);
+}
+
 function parseJsonText(file: string, text: string): { data?: unknown; error?: string } {
   try {
     return { data: JSON.parse(text) };
@@ -199,6 +207,21 @@ export class ProjectStore {
   /** Prefab files (prefabs/<id>.json) on disk, with pending changes applied on top. */
   prefabFiles(changes: Changes = new Map()): string[] {
     return this.filesMatching('prefabs', PREFAB_FILE, changes);
+  }
+
+  /** Playbook files (playbooks/<id>.json) on disk. */
+  playbookFiles(): string[] {
+    return this.filesMatching('playbooks', PLAYBOOK_FILE, new Map());
+  }
+
+  /** Saved playbooks, each parsed or with the reason it is invalid. */
+  playbooks(): { id: string; file: string; playbook?: Playbook; errors?: string[] }[] {
+    return this.playbookFiles().map((file) => {
+      const id = basename(file, '.json');
+      const errors = playbookErrors(file, this.readText(file) ?? '');
+      if (errors.length) return { id, file, errors };
+      return { id, file, playbook: PlaybookSchema.parse(JSON.parse(this.readText(file)!)) };
+    });
   }
 
   private filesMatching(dir: string, pattern: RegExp, changes: Changes): string[] {
@@ -348,6 +371,9 @@ export class ProjectStore {
       if (before !== after) changes.push({ file, before, after });
     }
     if (!changes.length) return { seq: null, files: [], warnings: [], remainingErrors: [] };
+
+    const badPlaybooks = changes.flatMap((c) => (c.after !== null && PLAYBOOK_FILE.test(c.file) ? playbookErrors(c.file, c.after) : []));
+    if (badPlaybooks.length) throw new ToolError('Change rejected: invalid playbook (nothing was written)', badPlaybooks);
 
     let status: ValidationStatus = { ok: true, errors: [], warnings: [] };
     if (changes.some((c) => isProjectDataFile(c.file))) {

@@ -1,0 +1,26 @@
+{
+  "scenario": "carinho no pet deixa ele feliz",
+  "tags": ["interacao", "pet"],
+  "steps": [
+    { "type": "type", "text": "Bolinha" },
+    { "type": "click", "entity": "botaoComecar" },
+    { "type": "assert", "check": { "assert": "scene", "is": "quarto" }, "name": "entrou no quarto" },
+    { "type": "wait", "ms": 500 },
+    { "type": "click", "entity": "pet" },
+    { "type": "wait", "ms": 100 }
+  ],
+  "assertions": [
+    {
+      "assert": "eventOccurred",
+      "event": "interact",
+      "match": { "entity": "pet", "action": "carinho" },
+      "name": "o pet recebeu o carinho"
+    },
+    { "assert": "state", "id": "pet", "is": "happy", "name": "o pet ficou feliz" },
+    { "assert": "variable", "var": "afeto", "gt": 60, "name": "afeto subiu" }
+  ],
+  "screenshot": true,
+  "annotate": false,
+  "allowErrors": false,
+  "clock": { "speed": 600 }
+}

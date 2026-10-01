@@ -120,4 +120,13 @@ describe('meu-pet (regression)', () => {
       errors: [],
     });
   });
+
+  it('every playbook saved in the project passes (run_playbooks)', async () => {
+    const store = new ProjectStore(MEU_PET);
+    const r = await createAgentTools().call('run_playbooks', {}, { store, author: 'agent', host: new RuntimeHost(store) });
+    if (!r.ok) throw new Error(r.error);
+    const board = r.result as { passed: boolean; results: { id: string; passed: boolean; failures?: string[] }[] };
+    expect(board.results.length).toBeGreaterThanOrEqual(4);
+    expect(board.results.filter((p) => !p.passed)).toEqual([]);
+  });
 });

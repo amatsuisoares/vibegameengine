@@ -1,4 +1,14 @@
 import { msToFrames } from '@vibe/engine';
+import {
+  AdvanceClockStepSchema,
+  AssertStepSchema,
+  ClockInputSchema,
+  ExprSchema,
+  InputStepSchema,
+  MAX_WAIT_MS,
+  StorageInputSchema,
+  WaitUntilStepSchema,
+} from '@vibe/shared';
 import { z } from 'zod';
 import { ToolError } from '../project-store';
 import type { RuntimeHost } from '../runtime/host';
@@ -9,49 +19,10 @@ import { defineTool, WithImages, type ToolContext } from './registry';
 const Key = z.string().min(1).describe('Key name: "A".."Z", "0".."9", "Space", "ArrowLeft", "Enter", "Shift"... (case-insensitive).');
 const Button = z.enum(['left', 'right', 'middle']);
 const Ms = (max: number) => z.number().min(0).max(max);
-export const Expr = z.string().min(1).describe(
-  "Expression over the game state, e.g. \"entity('player').x > 300 && vars.coins >= 1\". Names: status, frame, time, scene, vars, camera, clock (clock.hour, clock.now). Functions: entity(id) (x, y, vx, vy, grounded, health, state, stateMs, ai, props, anim, nav, timers, tweens, interactable...), exists(id), count(tag), events(type), distance(a, b), pathDistance(a, b) (null = unreachable), abs, min, max, clamp(x, lo, hi).",
-);
-
-export const MAX_WAIT_MS = 60_000;
-
-export const InputStepSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('keyDown'), key: Key }),
-  z.object({ type: z.literal('keyUp'), key: Key }),
-  z.object({ type: z.literal('tap'), key: Key, ms: Ms(10_000).optional().describe('Hold duration (default 50).') }),
-  z.object({ type: z.literal('hold'), key: Key, ms: Ms(MAX_WAIT_MS) }),
-  z.object({ type: z.literal('wait'), ms: Ms(MAX_WAIT_MS) }),
-  z.object({ type: z.literal('mouseMove'), x: z.number(), y: z.number() }),
-  z.object({ type: z.literal('mouseDown'), button: Button.optional() }),
-  z.object({ type: z.literal('mouseUp'), button: Button.optional() }),
-  z.object({
-    type: z.literal('click'),
-    x: z.number().optional(),
-    y: z.number().optional(),
-    entity: z.string().optional().describe('Click the center of this entity (instead of x/y), wherever it is on screen.'),
-    button: Button.optional(),
-  }),
-  z.object({ type: z.literal('type'), text: z.string().min(1).describe('Characters typed (e.g. a name); "\\b" = Backspace, "\\n" = Enter. Advances 1 frame.') }),
-]);
-
-export const ClockInput = z
-  .object({
-    start: z.string().optional().describe('Date and time the game starts at, ISO (e.g. "2026-03-10T21:30:00Z"). Default 2026-01-01T09:00:00Z.'),
-    utcOffsetMinutes: z.number().int().min(-840).max(840).optional().describe('Time zone, minutes east of UTC (default 0).'),
-    speed: z.number().min(0).max(100_000).optional().describe('Game-clock ms per simulated ms (default 1).'),
-  })
-  .describe('Calendar clock of the run (game.clock in scripts, clock in expressions).');
-export const StorageInput = z.record(z.string(), z.unknown()).describe('Saved data the game starts with (game.storage), e.g. a save from a previous session.');
-
-export const WaitUntilStep = z.object({ type: z.literal('waitUntil'), expr: Expr, maxMs: Ms(MAX_WAIT_MS).optional().describe('Default 5000.') });
-export const AssertStep = z.object({ type: z.literal('assert'), expr: Expr });
-export const AdvanceClockStep = z.object({
-  type: z.literal('advanceClock'),
-  hours: z.number().min(0).optional(),
-  minutes: z.number().min(0).optional(),
-  ms: z.number().min(0).optional(),
-}).describe('Jumps the calendar clock ahead (no frames simulated).');
-const TestStepSchema = z.union([InputStepSchema, WaitUntilStep, AssertStep, AdvanceClockStep]);
+const Expr = ExprSchema;
+const ClockInput = ClockInputSchema;
+const StorageInput = StorageInputSchema;
+const TestStepSchema = z.union([InputStepSchema, WaitUntilStepSchema, AssertStepSchema, AdvanceClockStepSchema]);
 
 export function host(ctx: ToolContext): RuntimeHost {
   if (!ctx.host) throw new ToolError('Runtime tools are not available in this context (no RuntimeHost)');

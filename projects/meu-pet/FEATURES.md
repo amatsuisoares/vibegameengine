@@ -210,6 +210,9 @@ dormir e acordar; carinho, tigela, bola, petisco, remédio, limpeza, luz; observ
 Jovem 1 e Jovem 2 conforme o cuidado e para Adulto 3a com abandono; resumo de tempo fora; novo pet na fase adulta e
 coleção. A plataforma tem testes que confirmam que o save no disco sobrevive a um navegador novo.
 
+Playbooks de regressão em `playbooks/` (rodar com `run_playbooks`): `limpar_sujeira`, `encher_tigela`, `carinho`,
+`bola`.
+
 ## 13. Limitações e pontos em aberto
 
 - Só existem quadros parados: dormir, comer e brincar são animações improvisadas (o pet dorme de olhos abertos).

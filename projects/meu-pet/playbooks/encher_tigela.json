@@ -1,0 +1,24 @@
+{
+  "scenario": "clicar na tigela enche e o pet vai comer",
+  "tags": ["interacao", "quarto"],
+  "steps": [
+    { "type": "type", "text": "Bolinha" },
+    { "type": "click", "entity": "botaoComecar" },
+    { "type": "assert", "check": { "assert": "scene", "is": "quarto" }, "name": "entrou no quarto" },
+    { "type": "click", "entity": "tigela" },
+    { "type": "wait", "ms": 200 }
+  ],
+  "assertions": [
+    { "assert": "variable", "var": "tigela", "equals": 3, "name": "tigela cheia" },
+    {
+      "assert": "eventOccurred",
+      "event": "sound",
+      "match": { "asset": "sfx_tigela" },
+      "name": "som da tigela"
+    }
+  ],
+  "screenshot": true,
+  "annotate": false,
+  "allowErrors": false,
+  "clock": { "speed": 600 }
+}

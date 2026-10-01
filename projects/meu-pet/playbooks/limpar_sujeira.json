@@ -1,0 +1,31 @@
+{
+  "scenario": "limpar a sujeira solta poeira e some",
+  "tags": ["interacao", "quarto"],
+  "steps": [
+    { "type": "type", "text": "Bolinha" },
+    { "type": "click", "entity": "botaoComecar" },
+    { "type": "assert", "check": { "assert": "scene", "is": "quarto" }, "name": "entrou no quarto" },
+    {
+      "type": "waitUntil",
+      "maxMs": 30000,
+      "check": { "assert": "count", "tag": "sujeira" },
+      "name": "apareceu sujeira"
+    },
+    { "type": "click", "entity": "sujeira1" },
+    { "type": "wait", "ms": 150 },
+    { "type": "screenshot", "label": "poeira" }
+  ],
+  "assertions": [
+    { "assert": "entityExists", "id": "sujeira1", "exists": false, "name": "sujeira limpa" },
+    {
+      "assert": "eventOccurred",
+      "event": "particles",
+      "match": { "entity": "sujeira1", "count": 14 },
+      "name": "poeira saiu"
+    }
+  ],
+  "screenshot": true,
+  "annotate": false,
+  "allowErrors": false,
+  "clock": { "speed": 3600 }
+}

@@ -55,7 +55,8 @@ Project
                   components: { Sprite?, Body?, Collider?, PlatformerController?, ... }
 ```
 
-Em disco: `projects/<nome>/project.json` (config) + `scenes/<id>.json` + `scripts/**/*.js` + `prefabs/<id>.json`.
+Em disco: `projects/<nome>/project.json` (config) + `scenes/<id>.json` + `scripts/**/*.js` + `prefabs/<id>.json`
+(+ `playbooks/<id>.json`: cenários de verificação, fora do jogo em si).
 Memória do agente em `.vibe/memory.json`.
 
 - **Prefabs:** `parseProject` expande as instâncias antes da validação (`expandPrefabs`: prefab ⊕ entidade por JSON
@@ -316,6 +317,10 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
   `assert`, validável em arquivos de playbook); `checkAssertion(game, a)` em `engine/src/assertions.ts` lê o `World`
   direto (entidades, componentes, FSM, vars, eventos, cena, status) e devolve `{pass, label, expected, actual,
   evidence}`. Uma checagem de cenário é `{expr}` ou `{check}`.
+- **Playbooks** (V0.3): `PlaybookSchema` (`shared/src/playbook.ts`, junto com os schemas de passos) é a entrada do
+  `verify_game` e o formato de `playbooks/<id>.json`. O `ProjectStore` valida todo arquivo de playbook em qualquer
+  escrita (não entram em `rawProject`, então não deixam a run desatualizada) e os lê com `playbooks()`.
+  `verifyScenario` (`tools/verify-tools.ts`) executa um playbook; `run_playbooks` o chama para cada arquivo.
 - **Avisos visuais:** problemas de asset só aparecem ao desenhar; o screenshot devolve `renderWarnings`, e o
   `ProjectStore` já avisa na validação quando o arquivo de um asset não existe.
 - **Sandbox:** o agente só alcança o que as tools expõem — arquivos dentro do projeto, a run e a página do
@@ -327,7 +332,7 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 
 ```
 Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
-                                   tools/list  → 3 tools de workspace + 50 do ToolRegistry (com annotations)
+                                   tools/list  → 3 tools de workspace + 54 do ToolRegistry (com annotations)
                                    tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
                                                  → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```

@@ -7,8 +7,9 @@ Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa,
 > com hot reload e um modo que segue ao vivo o que o agente está jogando. Além dos componentes prontos há scripts,
 > regras de evento/condição, prefabs, som, plataformas móveis e memória do projeto.
 > **V0.2 concluída** (engine orientada a comportamento): **interações** (`Interactable`: clique, tecla
-> em alcance, entrada numa área, scripts), **máquinas de estado** (`StateMachine`), **Utility AI** (`UtilityAI`), **animação por estado** (`Animator`), **timers**, **tweens**, **pathfinding** (`NavAgent`) e **partículas** (`ParticleEmitter`). Em andamento: **V0.3** (QA do agente) — prontos: `verify_game` (cenário → relatório PASS/FAIL + screenshots) e **asserções estruturadas** (`entityExists`,
-`state`, `variable`, `eventOccurred`... com valor esperado, valor encontrado e evidência).
+> em alcance, entrada numa área, scripts), **máquinas de estado** (`StateMachine`), **Utility AI** (`UtilityAI`), **animação por estado** (`Animator`), **timers**, **tweens**, **pathfinding** (`NavAgent`) e **partículas** (`ParticleEmitter`). Em andamento: **V0.3** (QA do agente) — prontos: `verify_game` (cenário → relatório PASS/FAIL + screenshots) **asserções estruturadas** (`entityExists`,
+`state`, `variable`, `eventOccurred`... com valor esperado, valor encontrado e evidência) e **playbooks** de regressão
+(`playbooks/<id>.json`, `run_playbooks`).
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos
@@ -95,7 +96,7 @@ packages/
     vite/   plugin do dev server: serve projects/ e avisa a página quando arquivos mudam
     e2e/    testes no Chromium (Playwright)
 projects/
-  meu-pet/           o jogo de pet virtual (project.json + scenes/ + scripts/ + prefabs/ + assets/)
+  meu-pet/           o jogo de pet virtual (project.json + scenes/ + scripts/ + prefabs/ + assets/ + playbooks/)
 docs/
   PROMPT_ORIGINAL.md pedido original do projeto (escopo e prioridades)
 ```

@@ -484,7 +484,11 @@ reproduzir a run no Chromium para o screenshot.
 | `read_console` | `since?, level?` | logs, avisos, erros com stack |
 | `take_screenshot` | `annotate?` | PNG (imagem anexada ao resultado), `path`, `frame`, `camera`; `renderWarnings` se algum sprite não pôde ser desenhado |
 | `run_test` | `steps, assertions, scene?, seed?, clock?, storage?` | roda num jogo novo (não mexe na run atual) e relata cada checagem; passo `advanceClock` |
-| `verify_game` | `scenario, steps, assertions, screenshot?, annotate?, allowErrors?, scene?, seed?, clock?, storage?` | verificação completa numa chamada: joga o cenário num jogo novo, checa, fotografa e devolve relatório PASS/FAIL (ver [Verificação](#verificação-verify_game)) |
+| `verify_game` | `scenario, steps, assertions, tags?, screenshot?, annotate?, allowErrors?, scene?, seed?, clock?, storage?, saveAs?` | verificação completa numa chamada: joga o cenário num jogo novo, checa, fotografa e devolve relatório PASS/FAIL (ver [Verificação](#verificação-verify_game)); `saveAs` guarda como playbook se passar |
+| `save_playbook` | `id` + campos do `verify_game` | grava `playbooks/<id>.json` (validado, no histórico; substitui o mesmo id) |
+| `list_playbooks` | — | playbooks salvos (id, cenário, tags, passos, checagens) e arquivos inválidos |
+| `run_playbooks` | `ids?, tags?, screenshots?` | roda os playbooks (todos ou filtrados) e devolve o placar com as linhas que falharam |
+| `delete_playbook` | `id` | apaga um playbook (desfazível) |
 | `open_game_view` | `follow?, scene?, debug?` | URL da página do jogo para o usuário abrir no VS Code (ver abaixo) |
 
 **Observação após cada ação.** `run_game`, `restart_game`, `wait`, `wait_until`, `perform_inputs` e `click_mouse`
@@ -600,6 +604,28 @@ valor precisa existir. Linha do relatório:
 ```
 FAIL entity "player" at x 2000 (±10) — expected x 2000, y any (±10), got {"x":317.5,"y":402}; evidence {"off":{"dx":-1682.5,"dy":0}} (frame 120)
 ```
+
+#### Playbooks (regressão)
+
+Implementados na V0.3. Um playbook é um `verify_game` guardado no projeto, em `playbooks/<id>.json` (mesmos campos,
+mais `tags`). O agente cria um depois de implementar uma feature e roda todos depois de mudanças, para pegar regressões.
+
+- **Criar:** `verify_game {..., "saveAs": "limpar_sujeira"}` grava o cenário **só se ele passou**; `save_playbook`
+  grava direto. Toda escrita (inclusive `write_file`) valida o arquivo pelo `PlaybookSchema`, entra no histórico e é
+  desfazível.
+- **Rodar:** `run_playbooks` (todos, ou `ids` / `tags`), cada um num jogo novo, sem screenshots por padrão:
+
+```json
+{ "passed": false, "summary": "3/4 playbooks passed",
+  "results": [
+    { "id": "bola", "scenario": "...", "passed": true, "summary": "PASS: 3/3 checks passed" },
+    { "id": "encher_tigela", "passed": false, "summary": "FAIL: 2/3 checks passed",
+      "failures": ["FAIL tigela cheia — vars.tigela == 3; expected == 3, got 0 (frame 15)"] } ] }
+```
+
+- **Pela CLI** (sem MCP): `npm run vibe -- call <projeto> run_playbooks {}`.
+- O meu-pet tem 4 playbooks (`limpar_sujeira`, `encher_tigela`, `carinho`, `bola`); o teste de regressão do repositório
+  roda todos os playbooks dele.
 
 ### Screenshots
 
