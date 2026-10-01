@@ -22,7 +22,8 @@
 ```
 
 Implementado até agora: `shared` e `engine` (Etapa 1), `runtime` no browser (Etapa 2), `server` com
-ProjectStore + tools de edição (Etapa 3) e RuntimeHost com runs headless, testes e screenshots (Etapa 4).
+ProjectStore + tools de edição (Etapa 3), RuntimeHost com runs headless, testes e screenshots (Etapa 4) e o
+loop do agente com Claude (Etapa 5).
 
 ## Princípios
 
@@ -200,3 +201,40 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
   runtime. O Chromium só navega para o dev server local; nenhum input chega ao sistema operacional.
 - O dev server é carregado com `configLoader: 'runner'` (a config importa `@vibe/server`, que é TypeScript sem
   build).
+
+## Agente (`packages/server/src/agent`)
+
+```
+vibe agent <projeto> "<pedido>"
+  └─ runAgent(prompt, { provider, store, host, tools, limits, confirm, signal })
+       loop:
+         checa limites (iterações, custo estimado, tokens, tempo, Ctrl+C)
+         provider.complete({ system, messages, tools })      ← histórico só-acréscimo
+         stop_reason == refusal → para (sem rodar tools daquele turno)
+         sem tool_use → concluído (texto final = relatório)
+         para cada tool_use, em ordem:
+           destrutiva? → confirm() → recusada vira tool_result de erro
+           ToolRegistry.call → tool_result (JSON; screenshots viram blocos de imagem)
+         todos os tool_result numa única mensagem do usuário
+       cada evento → .vibe/agent/<runId>.jsonl
+```
+
+- **`LLMProvider`** é a fronteira com o modelo, no formato da Messages API. `ClaudeProvider` usa o SDK oficial
+  (`@anthropic-ai/sdk`): modelo padrão `claude-opus-5-5`, esforço `high`, streaming (`finalMessage()`),
+  thinking adaptativo com resumo (vai para o log), cache automático do prompt (`cache_control` no topo — o
+  histórico cresce a cada turno), `eager_input_streaming` nas tools (o registro valida cada input com zod) e
+  fallback do servidor em caso de recusa (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`;
+  `--no-fallback` desliga). Credenciais pelo ambiente (`ANTHROPIC_API_KEY` ou perfil do `ant auth login`).
+- **`ScriptedProvider`** devolve turnos predefinidos — testes do loop sem API e `--scripted turns.json`.
+- **Prompt de sistema** estático (`prompt.ts`, sem datas/ids → cacheável): modelo de dados, geometria
+  (centro, y para baixo, altura do pulo), fluxo planejar → implementar → rodar → observar → testar → corrigir,
+  e a regra de só declarar pronto o que foi verificado.
+- **Limites:** `maxIterations` (60), `maxCostUsd` (US$ 5, estimado pela tabela de preços em `pricing.ts`),
+  `maxTotalTokens`, `timeoutMs` (30 min; o timer aborta a requisição em andamento e o tempo decorrido também é
+  checado entre passos). Ctrl+C para depois do passo atual; o segundo Ctrl+C encerra.
+- **Ações destrutivas** (`delete_*`, `write_file` sobrescrevendo) passam por `confirm`. Na CLI: pergunta no
+  terminal; sem terminal, recusa; `--yes` libera tudo.
+- **Erros:** erro de tool volta ao modelo como `is_error` (ele corrige e tenta de novo); input de tool
+  ilegível no streaming → o turno é refeito (até 2 vezes); erro da API → a run termina com `error`.
+- **Resultado:** `status` (`completed`, `max_iterations`, `budget`, `timeout`, `aborted`, `refusal`, `error`),
+  texto final, uso de tokens, custo estimado e caminho do log.

@@ -2,8 +2,9 @@
 
 Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa, joga, observa e corrige** o próprio jogo.
 
-> Status: **Etapa 4 concluída** — engine headless determinística, runtime no browser (Canvas2D),
-> ProjectStore com histórico/undo, e as tools com que o agente edita, joga, testa e fotografa o jogo (com CLI).
+> Status: **Etapa 5 concluída** — engine headless determinística, runtime no browser (Canvas2D),
+> ProjectStore com histórico/undo, tools para editar, jogar, testar e fotografar, e o agente (Claude) que usa
+> essas tools sozinho, com limites de custo/tempo e log completo.
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos
@@ -22,7 +23,21 @@ npm run test:e2e    # testes no Chromium headless (requer: npx playwright instal
 npm run vibe -- tools   # CLI das tools de edição (ver abaixo)
 ```
 
-### Tools de edição pela CLI
+### Agente
+
+```bash
+# requer credenciais da Anthropic: ANTHROPIC_API_KEY ou `ant auth login`
+npm run vibe -- agent demo-platformer "Adicione dois inimigos que sigam o jogador e teste se eles causam dano"
+```
+
+Opções: `--model` (padrão `claude-opus-5-5`), `--effort low|medium|high|xhigh|max` (padrão `high`),
+`--max-iterations` (60), `--max-cost` (US$ 5), `--timeout` (30 min), `--yes` (não perguntar antes de apagar ou
+sobrescrever), `--no-fallback`, `--scripted turnos.json` (roda o loop sem API, com respostas roteirizadas).
+O terminal mostra cada tool chamada e seu resultado; Ctrl+C para depois do passo atual. O log completo fica em
+`projects/<nome>/.vibe/agent/`, e cada alteração entra no histórico (dá para desfazer com `undo`).
+Com `npm run dev` aberto, as alterações aparecem no jogo enquanto o agente trabalha.
+
+### Tools pela CLI
 
 ```bash
 npm run vibe -- call demo-platformer get_project_summary
@@ -65,7 +80,7 @@ packages/
   shared/   schemas (zod) do projeto, cenas, entidades e componentes + validação
   engine/   engine 2D headless: física, input virtual, gameplay, câmera, estado
   server/   ProjectStore (disco, escrita atômica, histórico, undo/redo), RuntimeHost (runs headless,
-            screenshots no Chromium), tools do agente, CLI
+            screenshots no Chromium), tools, agente (loop com Claude), CLI
   runtime/  runtime no browser: renderer Canvas2D, assets, loop, teclado/mouse, window.__vibe
     app/    página Vite (index.html + main.ts)
     vite/   plugin do dev server: serve projects/ e avisa a página quando arquivos mudam
@@ -76,7 +91,7 @@ docs/
   PROMPT_ORIGINAL.md pedido original do projeto (escopo e prioridades)
 ```
 
-Pacotes planejados: `editor` (React). O `server` ganha o agente (LLM) e a API nas próximas etapas.
+Pacotes planejados: `editor` (React). O `server` ganha memória do projeto (Etapa 6) e a API do editor (Etapa 7).
 
 ## Uso da engine (headless)
 

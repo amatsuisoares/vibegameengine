@@ -65,6 +65,7 @@ export const fileTools = [
     description:
       'Creates or overwrites a text file. Writes to project.json or scenes/*.json are validated and rejected if they break the project. Prefer the scene/entity tools for game data.',
     mutates: true,
+    destructive: ({ path }, { store }) => store.readText(path) !== null,
     input: z.object({ path: Path, content: z.string() }),
     run: ({ store }, { path, content }, meta) => {
       const rel = normalizeRel(path);
@@ -104,6 +105,7 @@ export const fileTools = [
     name: 'delete_file',
     description: 'Deletes a file (can be undone).',
     mutates: true,
+    destructive: () => true,
     input: z.object({ path: Path }),
     run: ({ store }, { path }, meta) => changeInfo(store.edit(meta(`Delete ${normalizeRel(path)}`), (tx) => tx.delete(path))),
   }),

@@ -8,5 +8,7 @@ coverage/
 projects/*/.vibe/runs/
 # change history written by the ProjectStore (local undo log)
 projects/*/.vibe/history.jsonl
+# agent run logs
+projects/*/.vibe/agent/
 # temporary copy made by the e2e tests
 projects/e2e-tmp/

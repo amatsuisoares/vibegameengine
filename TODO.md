@@ -38,11 +38,14 @@
 - [x] Leitura de projeto unificada (dev server usa o `ProjectStore`)
 - [x] 137 testes unitários + 7 e2e no Chromium
 
-## Etapa 5 — Agente
-- [ ] Interface `LLMProvider` + provider Claude + provider roteirizado (testes sem API)
-- [ ] Loop de tool use com limites: iterações, tokens/custo, timeout, abort
-- [ ] Confirmação opcional para ações destrutivas; log completo de cada passo
-- [ ] CLI `vibe agent "<prompt>"`
+## ✅ Etapa 5 — Agente (concluída)
+- [x] Interface `LLMProvider` + `ClaudeProvider` (SDK oficial, streaming, cache, thinking adaptativo, fallback) +
+      `ScriptedProvider` (testes sem API)
+- [x] Loop de tool use com limites: iterações, custo estimado, tokens, timeout, Ctrl+C
+- [x] Confirmação para ações destrutivas; log JSONL de cada passo; screenshots enviados como imagem
+- [x] CLI `vibe agent <projeto> "<prompt>"` (também `--scripted`)
+- [x] 151 testes unitários (loop, limites, confirmação, recusa, retry, imagens, formato da requisição) + 7 e2e
+- [ ] **Rodar com a API real** (falta credencial nesta máquina): validar o prompt de sistema num pedido real
 
 ## Etapa 6 — Memória + loop autônomo
 - [ ] `.vibe/memory.json`: features, TODOs, erros conhecidos, changelog
@@ -68,6 +71,9 @@
 - Áudio é declarado mas não carregado (Etapa 8).
 - Hot reload reinicia o jogo do começo (não preserva estado).
 - O servidor de projetos existe só no dev server do Vite; build de produção do runtime ainda não existe.
+- Agente ainda não testado contra a API real; o formato da requisição é validado com um `fetch` falso.
+- Custo é estimativa pela tabela de preços (`pricing.ts`); modelos fora da tabela só respeitam o limite de tokens.
+- O histórico da conversa cresce a cada turno (screenshots incluídos); compactação fica para depois.
 - Uma run por projeto/host. O screenshot sobe Vite + Chromium na primeira foto (~1-2 s).
 - Sem áudio nas runs (Etapa 8); screenshots mostram um frame (sem vídeo/GIF).
 - Ids de entidade não são renomeáveis (duplicar + apagar). Edições feitas fora do store não entram no histórico.
