@@ -147,8 +147,10 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   tempo de simulação: avança `speed` ms por ms simulado (âncora + frames inteiros, sem erro acumulado) e pula com a op
   `advanceClock`. `GameStorage` guarda JSON. Ambos voltam ao início no `restart`. Runs headless começam numa data fixa
   e com os dados passados ao `run_game`; o screenshot e o modo seguir recebem os mesmos valores (determinismo). A
-  página jogada usa a data real, o `localStorage` (`vibe:save:<projeto>`) e, se frames forem pulados (aba em segundo
-  plano), soma o tempo perdido com `advanceClock` (`realtimeClock`).
+  página jogada usa a data real, uma seed aleatória por sessão e grava os dados em disco
+  (`GET/PUT/DELETE /api/projects/<p>/save` → `.vibe/save.json`, gravação adiada 0,5 s e garantida no `pagehide`), com
+  cópia no `localStorage`; se frames forem pulados (aba em segundo plano), soma o tempo perdido com `advanceClock`
+  (`realtimeClock`).
 - **Mouse e texto:** o clique esquerdo vai para a entidade de cima sob o ponto onde o botão desceu (posição guardada no
   pressionamento, não a atual) e gera o evento `click`. Texto digitado chega como op `text` (com `\b`/`\n` em ordem).
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).

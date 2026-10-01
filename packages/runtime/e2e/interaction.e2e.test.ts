@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright';
@@ -108,18 +108,26 @@ describe('typing, clicking, saved data and the real clock (Chromium)', () => {
     await page.mouse.click(box.x + 380 * sx, box.y + 20 * sy); // nothing clickable there
     await waitFor(page, () => window.__vibe!.getState().vars.clicks === 1);
 
-    // A new page in the same browser profile finds the saved name.
-    await page.reload();
-    await page.waitForFunction(() => window.__vibe?.ready, undefined, { timeout: 20_000 });
-    expect((await state(page)).storage).toEqual({ name: 'Mimi' });
-    await waitFor(page, () => window.__vibe!.getState().vars.welcome === 'de volta: Mimi');
+    // The save is on disk: a brand-new browser profile (no localStorage) finds it,
+    // like reopening the VS Code Simple Browser.
+    await page.waitForTimeout(800); // the disk write is debounced
+    await context.close();
+    expect(JSON.parse(readFileSync(`${DIR}/.vibe/save.json`, 'utf8'))).toEqual({ name: 'Mimi' });
+    const fresh = await browser.newContext();
+    const page2 = await fresh.newPage();
+    page2.on('pageerror', (e) => errors.push(e.message));
+    await page2.goto(`${baseUrl}?project=${NAME}`);
+    await page2.waitForFunction(() => window.__vibe?.ready, undefined, { timeout: 20_000 });
+    expect((await state(page2)).storage).toEqual({ name: 'Mimi' });
+    await waitFor(page2, () => window.__vibe!.getState().vars.welcome === 'de volta: Mimi');
 
     // "Apagar save" clears it (and restarts with empty data).
-    page.once('dialog', (d) => d.accept());
-    await page.click('#clearSave');
-    expect((await state(page)).storage).toEqual({});
-    expect(await page.evaluate(() => localStorage.getItem('vibe:save:e2e-interact'))).toBeNull();
+    page2.once('dialog', (d) => d.accept());
+    await page2.click('#clearSave');
+    await waitFor(page2, () => Object.keys(window.__vibe!.getState({ storage: true }).storage ?? {}).length === 0);
+    expect(await page2.evaluate(() => localStorage.getItem('vibe:save:e2e-interact'))).toBeNull();
+    expect(existsSync(`${DIR}/.vibe/save.json`)).toBe(false);
     expect(errors).toEqual([]);
-    await context.close();
+    await fresh.close();
   });
 });

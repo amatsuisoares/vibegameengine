@@ -12,3 +12,5 @@ projects/*/.vibe/history.jsonl
 projects/e2e-tmp/
 # published agent run mirrored by the runtime page (follow mode)
 projects/*/.vibe/live.json
+# saved data of played games (game.storage)
+projects/*/.vibe/save.json

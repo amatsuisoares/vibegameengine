@@ -168,8 +168,10 @@ function onCollision(self, other, game) {
 - **Relógio** `game.clock`: `now` (epoch ms), `hour` (0..24, local), `iso`, `speed` (alterável: 60 = 1 minuto de jogo por
   segundo). É a data/hora do calendário do jogo — no browser começa na data real; nas runs, em `clock.start` (padrão
   2026-01-01 09:00 UTC). Expressões leem `clock.hour`, `clock.now`.
-- **Dados salvos** `game.storage`: `get/set/remove/keys`, valores JSON, até 512 KB. No browser ficam no `localStorage`
-  (sobrevivem a fechar o jogo; botão **Apagar save** na barra); nas runs começam de `run_game.storage`. Para tempo
+- **Dados salvos** `game.storage`: `get/set/remove/keys`, valores JSON, até 512 KB. No browser jogado ficam em disco,
+  em `projects/<nome>/.vibe/save.json` (pelo dev server; o Simple Browser do VS Code não guarda `localStorage` entre
+  sessões), com cópia no `localStorage`; sobrevivem a fechar o jogo e o VS Code; botão **Apagar save** na barra. Nas
+  runs começam de `run_game.storage`. Para tempo
   offline: salve `clock.now` e, no `onStart`, compare com o relógio atual.
 - Entidades com a tag `clickable` (sem script) também recebem clique: gera o evento `click {entity}` para regras.
 - Também `console.log/warn/error` (vão para o console do jogo) e `Math` com `Math.random` usando a seed da run.

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseProject } from '@vibe/shared';
 import { describe, expect, it } from 'vitest';
-import { handleProjectRequest, liveRunOfFile, projectOfFile, readProjectDir, resolveInside } from '../vite/project-files';
+import { handleProjectRequest, handleSaveRequest, liveRunOfFile, projectOfFile, readProjectDir, resolveInside } from '../vite/project-files';
 import { PROJECTS_ROOT } from './helpers';
 
 const get = (url: string) => handleProjectRequest(PROJECTS_ROOT, url);
@@ -72,6 +72,30 @@ describe('dev server routes', () => {
       expect(r.status).toBe(200);
       expect(JSON.parse(String(r.body)).runId).toBe('run-1');
       expect(handleProjectRequest(root, '/api/projects/a.b/live')!.status).toBe(404);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the saved data of a played game on disk', () => {
+    const root = mkdtempSync(join(tmpdir(), 'vibe-save-'));
+    try {
+      mkdirSync(join(root, 'game'), { recursive: true });
+      writeFileSync(join(root, 'game', 'project.json'), '{}');
+      const call = (method: string, body?: string) => handleSaveRequest(root, method, '/api/projects/game/save', body)!;
+      expect(JSON.parse(String(call('GET').body))).toBeNull();
+      expect(call('PUT', JSON.stringify({ pet: { name: 'Mimi' } })).status).toBe(204);
+      expect(JSON.parse(String(call('GET').body))).toEqual({ pet: { name: 'Mimi' } });
+      expect(call('PUT', '[1,2]').status).toBe(400);
+      expect(call('PUT', 'nope').status).toBe(400);
+      expect(call('PUT', JSON.stringify({ big: 'x'.repeat(1_100_000) })).status).toBe(413);
+      expect(call('PATCH', '{}').status).toBe(405);
+      expect(call('DELETE').status).toBe(204);
+      expect(JSON.parse(String(call('GET').body))).toBeNull();
+      expect(handleSaveRequest(root, 'GET', '/api/projects/nope/save')!.status).toBe(404);
+      expect(handleSaveRequest(root, 'GET', '/api/projects/game')).toBeNull();
+      // Saves are runtime data: they do not count as project edits (no hot reload).
+      expect(projectOfFile(root, join(root, 'game', '.vibe', 'save.json'))).toBeNull();
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

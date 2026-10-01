@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite';
-import { handleProjectRequest, liveRunOfFile, projectOfFile } from './project-files';
+import { handleProjectRequest, handleSaveRequest, liveRunOfFile, projectOfFile } from './project-files';
 
 /**
  * Serves project data to the runtime page and tells it when project files change,
@@ -10,13 +10,27 @@ export function vibeProjects(projectsRoot: string): Plugin {
   return {
     name: 'vibe-projects',
     configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const result = req.method === 'GET' && req.url ? handleProjectRequest(projectsRoot, req.url) : null;
-        if (!result) return next();
+      const send = (res: import('node:http').ServerResponse, result: { status: number; type: string; body: string | Buffer }) => {
         res.statusCode = result.status;
         res.setHeader('Content-Type', result.type);
         res.setHeader('Cache-Control', 'no-store');
         res.end(result.body);
+      };
+      server.middlewares.use((req, res, next) => {
+        if (!req.url) return next();
+        if (/\/save(\?|$)/.test(req.url) && req.url.startsWith('/api/projects/')) {
+          const chunks: Buffer[] = [];
+          req.on('data', (c: Buffer) => chunks.push(c));
+          req.on('end', () => {
+            const result = handleSaveRequest(projectsRoot, req.method ?? 'GET', req.url!, Buffer.concat(chunks).toString('utf8'));
+            if (result) send(res, result);
+            else next();
+          });
+          return;
+        }
+        const result = req.method === 'GET' ? handleProjectRequest(projectsRoot, req.url) : null;
+        if (!result) return next();
+        send(res, result);
       });
 
       server.watcher.add(projectsRoot);

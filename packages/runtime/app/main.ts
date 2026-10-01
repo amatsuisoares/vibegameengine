@@ -147,40 +147,71 @@ async function main() {
     });
   };
 
-  const seed = params.has('seed') ? Number(params.get('seed')) : undefined;
+  const fixedSeed = params.has('seed') ? Number(params.get('seed')) : undefined;
   const scene = params.get('scene') ?? undefined;
 
-  // Clock and saved data. A page being played uses the real date and keeps game.storage in
-  // localStorage across sessions; pages driven by a host get the run's own clock and data,
-  // so the replay matches the headless run.
+  // Clock and saved data. A page being played uses the real date and keeps game.storage on
+  // disk (projects/<name>/.vibe/save.json, through the dev server) — the VS Code Simple Browser
+  // does not keep localStorage between sessions — with localStorage as a fallback copy.
+  // Pages driven by a host get the run's own clock and data, so the replay matches the headless run.
   const playing = !follow && !host;
+  // A played game is never replayed, so each session gets its own randomness (otherwise every
+  // new pet, enemy wave... would come out the same). Replays keep the run's seed.
+  const seed = fixedSeed ?? (playing ? Math.floor(Math.random() * 2 ** 31) : undefined);
   const saveKey = `vibe:save:${name}`;
-  const readSave = (): Record<string, unknown> => {
+  const saveUrl = `/api/projects/${encodeURIComponent(name)}/save`;
+  const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+  const readLocal = (): Record<string, unknown> => {
     try {
       const data = JSON.parse(localStorage.getItem(saveKey) ?? '{}');
-      return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+      return isObject(data) ? data : {};
     } catch {
       return {};
     }
   };
+  let save: Record<string, unknown> = {};
+  if (playing) {
+    try {
+      const fromDisk = await fetchJson(saveUrl);
+      save = isObject(fromDisk) ? fromDisk : readLocal();
+    } catch {
+      save = readLocal();
+    }
+  }
+  let pendingWrite: ReturnType<typeof setTimeout> | undefined;
+  const flushSave = (keepalive = false) => {
+    clearTimeout(pendingWrite);
+    pendingWrite = undefined;
+    fetch(saveUrl, { method: 'PUT', body: JSON.stringify(save), headers: { 'Content-Type': 'application/json' }, keepalive }).catch((err) =>
+      appendLog('warn', `Could not save game data to disk: ${err instanceof Error ? err.message : String(err)}`),
+    );
+  };
   const writeSave = (data: Record<string, unknown>) => {
+    save = data;
     try {
       localStorage.setItem(saveKey, JSON.stringify(data));
-    } catch (err) {
-      appendLog('warn', `Could not save game data: ${err instanceof Error ? err.message : String(err)}`);
+    } catch {
+      // The disk copy is the one that matters.
     }
+    pendingWrite ??= setTimeout(() => flushSave(), 500);
   };
+  // Closing the panel or the browser: write whatever is pending.
+  addEventListener('pagehide', () => pendingWrite !== undefined && flushSave(true));
   const realClock = (): ClockOptions => ({ start: Date.now(), utcOffsetMinutes: -new Date().getTimezoneOffset() });
   /** Starts the played game again from the real date and the latest save. */
-  const playStart = () => ({ seed, scene, clock: realClock(), storage: readSave() });
+  const playStart = () => ({ seed, scene, clock: realClock(), storage: save });
   clearSaveBtn.hidden = !playing;
-  clearSaveBtn.onclick = () => {
-    if (!confirm('Apagar os dados salvos deste jogo neste navegador?')) return;
+  clearSaveBtn.onclick = async () => {
+    if (!confirm('Apagar os dados salvos deste jogo?')) return;
+    clearTimeout(pendingWrite);
+    pendingWrite = undefined;
+    save = {};
     try {
       localStorage.removeItem(saveKey);
     } catch {
-      // Nothing saved.
+      // Nothing saved locally.
     }
+    await fetch(saveUrl, { method: 'DELETE' }).catch(() => undefined);
     runtime.setProject(runtime.project, undefined, playStart());
     appendLog('log', 'Saved data cleared');
   };
@@ -192,7 +223,7 @@ async function main() {
     assets: loaded.assets,
     seed,
     scene,
-    ...(playing ? { clock: realClock(), storage: readSave() } : (window.__vibeRun ?? {})),
+    ...(playing ? { clock: realClock(), storage: save } : (window.__vibeRun ?? {})),
     onStorageChange: playing ? writeSave : undefined,
     realtimeClock: playing,
     debug: params.get('debug') === '1',

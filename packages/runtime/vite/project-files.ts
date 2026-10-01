@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { ProjectStore, ToolError, type RawProjectData } from '@vibe/server';
+import { ProjectStore, removeFile, ToolError, writeFileAtomic, type RawProjectData } from '@vibe/server';
 import { LIVE_RUN_FILE } from '@vibe/shared';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -120,6 +120,49 @@ export function handleProjectRequest(projectsRoot: string, url: string): HttpRes
     return { status: 200, type: MIME_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', body: readFileSync(file) };
   }
   return null;
+}
+
+/** Where a played game keeps its saved data (game.storage) on disk. */
+export const SAVE_FILE = '.vibe/save.json';
+export const MAX_SAVE_BYTES = 1024 * 1024;
+
+/**
+ * Saved data of a played game, kept on disk so it survives closing the browser (the
+ * VS Code Simple Browser does not keep localStorage between sessions):
+ *   GET    /api/projects/<name>/save -> the saved object, or null
+ *   PUT    /api/projects/<name>/save -> stores a JSON object (204)
+ *   DELETE /api/projects/<name>/save -> removes it (204)
+ * Returns null for any other URL.
+ */
+export function handleSaveRequest(projectsRoot: string, method: string, url: string, body = ''): HttpResult | null {
+  const m = /^\/api\/projects\/([^/]+)\/save$/.exec(decodeURIComponent(new URL(url, 'http://x').pathname));
+  if (!m) return null;
+  const name = m[1];
+  if (!PROJECT_NAME.test(name) || !existsSync(join(projectsRoot, name, 'project.json'))) {
+    return jsonResult(404, { error: `Project "${name}" not found` });
+  }
+  const file = join(projectsRoot, name, SAVE_FILE);
+  if (method === 'GET') {
+    if (!existsSync(file)) return jsonResult(200, null);
+    return { status: 200, type: 'application/json; charset=utf-8', body: readFileSync(file, 'utf8') };
+  }
+  if (method === 'PUT' || method === 'POST') {
+    if (body.length > MAX_SAVE_BYTES) return jsonResult(413, { error: `Save is too large (max ${MAX_SAVE_BYTES} bytes)` });
+    let data: unknown;
+    try {
+      data = JSON.parse(body);
+    } catch {
+      return jsonResult(400, { error: 'Save must be JSON' });
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return jsonResult(400, { error: 'Save must be a JSON object' });
+    writeFileAtomic(file, JSON.stringify(data));
+    return { status: 204, type: 'text/plain', body: '' };
+  }
+  if (method === 'DELETE') {
+    removeFile(file);
+    return { status: 204, type: 'text/plain', body: '' };
+  }
+  return jsonResult(405, { error: `Method ${method} not allowed` });
 }
 
 /** Project name of a file inside projects/<name>/, ignoring runtime artifacts in .vibe/. */
