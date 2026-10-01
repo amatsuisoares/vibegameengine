@@ -95,8 +95,6 @@ export class GameSession {
 
   /** Steps frame by frame until `expr` is truthy or `maxMs` of simulated time passes. */
   waitUntil(expr: string, maxMs: number): { ok: boolean; waitedMs: number } {
-    const max = msToFrames(maxMs);
-    let frames = 0;
     const holds = () => {
       try {
         return !!evaluateExpr(expr, { game: this.game }).value;
@@ -105,12 +103,19 @@ export class GameSession {
         throw err;
       }
     };
-    while (!holds() && frames < max && this.game.status === 'running') {
+    const frames = this.stepUntil(holds, msToFrames(maxMs));
+    return { ok: holds(), waitedMs: Math.round((frames * 1000) / 60) };
+  }
+
+  /** Steps (and records) frame by frame until `done()` or `maxFrames` or the game ends; returns the frames stepped. */
+  stepUntil(done: () => boolean, maxFrames: number): number {
+    let frames = 0;
+    while (!done() && frames < maxFrames && this.game.status === 'running') {
       this.game.step(1);
       frames++;
     }
     if (frames) this.ops.push({ op: 'step', frames });
-    return { ok: holds(), waitedMs: Math.round((frames * 1000) / 60) };
+    return frames;
   }
 
   observe(): Observation {

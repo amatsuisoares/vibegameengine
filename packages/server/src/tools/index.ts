@@ -6,6 +6,7 @@ import { ToolRegistry } from './registry';
 import { ruleTools } from './rule-tools';
 import { runtimeTools } from './runtime-tools';
 import { sceneTools } from './scene-tools';
+import { verifyTools } from './verify-tools';
 
 export * from './registry';
 export { changeInfo, entitySummary } from './scene-tools';
@@ -17,5 +18,5 @@ export function createEditingTools() {
 
 /** Everything the agent can use: editing tools plus runtime tools (these need a RuntimeHost in the context). */
 export function createAgentTools() {
-  return new ToolRegistry([...sceneTools, ...prefabTools, ...ruleTools, ...assetTools, ...fileTools, ...historyTools, ...memoryTools, ...runtimeTools]);
+  return new ToolRegistry([...sceneTools, ...prefabTools, ...ruleTools, ...assetTools, ...fileTools, ...historyTools, ...memoryTools, ...runtimeTools, ...verifyTools]);
 }

@@ -130,8 +130,15 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
 - [x] **V0.2 concluída**: os 8 sistemas de comportamento (interação, máquina de estados, Utility AI, animação, timers,
   tweens, pathfinding, partículas)
 
-## V0.3 — Camada de QA do agente (próxima)
-- [ ] `verify_game` (playbook: ações + asserções + screenshot → relatório)
+## V0.3 — Camada de QA do agente (em andamento)
+- [x] **`verify_game`**: cenário num jogo novo (passos de input, `waitUntil`/`assert` com nome, `advanceClock`,
+  `screenshot` no meio e no fim) → relatório PASS/FAIL por checagem com valores observados, erros de runtime reprovam,
+  estado final, contagem de eventos, imagens anexadas; executor compartilhado com `run_test` (`runtime/scenario.ts`);
+  `RuntimeHost.newSession`/`screenshotOf` para sessões avulsas; CLI `call` fecha o Chromium no fim
+- [x] meu-pet: cenário "limpar a sujeira" verificado (regressão + Chromium)
+- [x] Bug achado pelo próprio `verify_game` no meu-pet: um clique no primeiro frame de uma cena chegava antes do
+  `onStart` dos scripts. Agora os `onStart` pendentes rodam no começo do frame (`ScriptRunner.start`)
+- [x] 309 testes unitários + 16 e2e
 - [ ] Asserções de gameplay estruturadas
 - [ ] Playbooks reutilizáveis (regressão)
 - [ ] Relatório de diagnóstico

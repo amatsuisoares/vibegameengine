@@ -284,6 +284,7 @@ export class Game {
           e.prevX = e.x;
           e.prevY = e.y;
         }
+        this.scriptRunner.start();
         controllerSystem(w, dt);
         moverSystem(w, dt);
         this.nav.run(dt);

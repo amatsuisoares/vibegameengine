@@ -708,7 +708,26 @@ export class ScriptRunner {
     }
   }
 
-  /** onStart (once) and onUpdate for every active scripted entity. */
+  /**
+   * onStart of every active scripted entity that has not started yet. Runs at the start of the
+   * frame, so no other hook (click, interaction, collision...) reaches a script before its onStart.
+   */
+  start() {
+    const w = this.world;
+    for (const e of [...w.entities]) {
+      if (!e.active || w.status !== 'running') continue;
+      const inst = this.instance(e);
+      if (inst && !inst.failed) this.startOnce(e, inst);
+    }
+  }
+
+  private startOnce(e: Entity, inst: ScriptInstance) {
+    if (inst.started) return;
+    inst.started = true;
+    if (inst.hooks.onStart) this.call(e, inst, 'onStart', () => inst.hooks.onStart!(this.api.entity(e), this.api.game));
+  }
+
+  /** onUpdate for every active scripted entity (onStart first for ones that appeared during the frame). */
   update(dt: number) {
     const w = this.world;
     for (const e of [...w.entities]) {
@@ -716,10 +735,7 @@ export class ScriptRunner {
       const inst = this.instance(e);
       if (!inst || inst.failed) continue;
       const self = this.api.entity(e);
-      if (!inst.started) {
-        inst.started = true;
-        if (inst.hooks.onStart) this.call(e, inst, 'onStart', () => inst.hooks.onStart!(self, this.api.game));
-      }
+      this.startOnce(e, inst);
       if (inst.hooks.onUpdate && !inst.failed && e.active) this.call(e, inst, 'onUpdate', () => inst.hooks.onUpdate!(self, this.api.game, dt));
     }
   }

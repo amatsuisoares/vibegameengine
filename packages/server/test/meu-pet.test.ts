@@ -2,7 +2,8 @@ import { fileURLToPath } from 'node:url';
 import { Game, type GameEvent } from '@vibe/engine';
 import type { Project } from '@vibe/shared';
 import { describe, expect, it } from 'vitest';
-import { ProjectStore } from '../src';
+import { ProjectStore, RuntimeHost } from '../src';
+import { createAgentTools } from '../src/tools';
 
 // Regression test of the real game in projects/meu-pet (read only): engine changes must keep it playable.
 const MEU_PET = fileURLToPath(new URL('../../../projects/meu-pet', import.meta.url));
@@ -85,5 +86,36 @@ describe('meu-pet (regression)', () => {
     const form = String(game.world.vars.estagio); // it grew up during the day away
     expect(form).toMatch(/^juvenil/);
     expect([...seen].sort()).toEqual([`${form}_1`, `${form}_2`]);
+  });
+
+  it('verify_game plays a scenario of the real game and reports PASS per check', async () => {
+    const store = new ProjectStore(MEU_PET);
+    const r = await createAgentTools().call(
+      'verify_game',
+      {
+        scenario: 'cleaning the dirt puffs dust and removes it',
+        screenshot: false,
+        clock: { speed: 3600 },
+        steps: [
+          { type: 'type', text: 'Bolinha' },
+          { type: 'click', entity: 'botaoComecar' },
+          { type: 'assert', name: 'in the room', expr: "scene == 'quarto'" },
+          { type: 'waitUntil', name: 'dirt appeared', expr: "count('sujeira') > 0", maxMs: 30000 },
+          { type: 'click', entity: 'sujeira1' },
+          { type: 'wait', ms: 150 },
+        ],
+        assertions: [
+          { name: 'dirt cleaned', expr: "!exists('sujeira1')" },
+          { name: 'dust puffed', expr: "events('particles') >= 1" },
+        ],
+      },
+      { store, author: 'agent', host: new RuntimeHost(store) },
+    );
+    if (!r.ok) throw new Error(r.error);
+    expect(r.result).toMatchObject({
+      passed: true,
+      report: ['PASS in the room', 'PASS dirt appeared', 'PASS dirt cleaned', 'PASS dust puffed'],
+      errors: [],
+    });
   });
 });

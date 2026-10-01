@@ -77,8 +77,15 @@ async function main(argv: string[]): Promise<number> {
       print(rest[0] ? defs.find((d) => d.name === rest[0]) ?? `Unknown tool "${rest[0]}"` : defs);
       return 0;
     }
-    case 'call':
-      return run(openStore(rest[0]), rest[1] ?? '', readInput(rest[2]));
+    case 'call': {
+      const store = openStore(rest[0]);
+      const host = new RuntimeHost(store);
+      try {
+        return await run(store, rest[1] ?? '', readInput(rest[2]), host);
+      } finally {
+        await host.close();
+      }
+    }
     case 'script': {
       const store = openStore(rest[0]);
       const steps = readInput(rest[1]) as { tool: string; input?: unknown }[];

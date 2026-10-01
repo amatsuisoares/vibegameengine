@@ -103,6 +103,36 @@ describe('take_screenshot (Chromium)', () => {
     expect(state.vars.label).toBe('Kuro 22');
   });
 
+  it('verify_game screenshots its own run (mid-scenario and final) and leaves the current run alone', async () => {
+    const t = setup();
+    hosts.push(t.host);
+    await t.ok('run_game');
+    await t.ok('wait', { ms: 500 });
+    const r = await t.call('verify_game', {
+      scenario: 'player collects the first coin',
+      steps: [
+        { type: 'hold', key: 'D', ms: 2200 },
+        { type: 'screenshot', label: 'running', annotate: true },
+        { type: 'tap', key: 'Space' },
+        { type: 'wait', ms: 200 },
+      ],
+      assertions: [{ name: 'coin collected', expr: 'vars.coins >= 1' }],
+    });
+    if (!r.ok) throw new Error(r.error);
+    const v = r.result as { report: string[]; screenshots: (Shot & { label: string })[] };
+    expect(v.report).toEqual(['PASS coin collected']);
+    expect(v.screenshots.map((s) => [s.label, s.warning])).toEqual([['running', undefined], ['final', undefined]]);
+    expect(r.images).toHaveLength(2);
+    expect(pngSize(r.images![1].path)).toEqual({ width: 800, height: 450 });
+    expect(readFileSync(r.images![0].path).equals(readFileSync(r.images![1].path))).toBe(false);
+    // The current run still shoots fine afterwards (its page is reloaded and replayed).
+    const shot = await t.ok<Shot>('take_screenshot', {});
+    expect(shot.warning).toBeUndefined();
+    expect(shot.frame).toBe(30); // the agent's own run did not move
+    mkdirSync(RUNS_DIR, { recursive: true });
+    copyFileSync(r.images![1].path, `${RUNS_DIR}/verify-final.png`);
+  });
+
   it('reports missing assets when editing and when rendering', async () => {
     const t = setup();
     hosts.push(t.host);

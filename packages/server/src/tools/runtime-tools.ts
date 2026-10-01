@@ -1,21 +1,21 @@
-import { evaluateExpr, ExprError, Game, msToFrames, expandInputSteps, type InputStep } from '@vibe/engine';
+import { msToFrames } from '@vibe/engine';
 import { z } from 'zod';
 import { ToolError } from '../project-store';
 import type { RuntimeHost } from '../runtime/host';
+import { inputMs, runScenario, type Check } from '../runtime/scenario';
 import type { GameSession } from '../runtime/session';
 import { defineTool, WithImages, type ToolContext } from './registry';
 
 const Key = z.string().min(1).describe('Key name: "A".."Z", "0".."9", "Space", "ArrowLeft", "Enter", "Shift"... (case-insensitive).');
 const Button = z.enum(['left', 'right', 'middle']);
 const Ms = (max: number) => z.number().min(0).max(max);
-const Expr = z.string().min(1).describe(
+export const Expr = z.string().min(1).describe(
   "Expression over the game state, e.g. \"entity('player').x > 300 && vars.coins >= 1\". Names: status, frame, time, scene, vars, camera, clock (clock.hour, clock.now). Functions: entity(id) (x, y, vx, vy, grounded, health, state, stateMs, ai, props, anim, nav, timers, tweens, interactable...), exists(id), count(tag), events(type), distance(a, b), pathDistance(a, b) (null = unreachable), abs, min, max, clamp(x, lo, hi).",
 );
 
-const MAX_WAIT_MS = 60_000;
-const MAX_TEST_MS = 300_000;
+export const MAX_WAIT_MS = 60_000;
 
-const InputStepSchema = z.discriminatedUnion('type', [
+export const InputStepSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('keyDown'), key: Key }),
   z.object({ type: z.literal('keyUp'), key: Key }),
   z.object({ type: z.literal('tap'), key: Key, ms: Ms(10_000).optional().describe('Hold duration (default 50).') }),
@@ -34,27 +34,26 @@ const InputStepSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('type'), text: z.string().min(1).describe('Characters typed (e.g. a name); "\\b" = Backspace, "\\n" = Enter. Advances 1 frame.') }),
 ]);
 
-const ClockInput = z
+export const ClockInput = z
   .object({
     start: z.string().optional().describe('Date and time the game starts at, ISO (e.g. "2026-03-10T21:30:00Z"). Default 2026-01-01T09:00:00Z.'),
     utcOffsetMinutes: z.number().int().min(-840).max(840).optional().describe('Time zone, minutes east of UTC (default 0).'),
     speed: z.number().min(0).max(100_000).optional().describe('Game-clock ms per simulated ms (default 1).'),
   })
   .describe('Calendar clock of the run (game.clock in scripts, clock in expressions).');
-const StorageInput = z.record(z.string(), z.unknown()).describe('Saved data the game starts with (game.storage), e.g. a save from a previous session.');
+export const StorageInput = z.record(z.string(), z.unknown()).describe('Saved data the game starts with (game.storage), e.g. a save from a previous session.');
 
-const WaitUntilStep = z.object({ type: z.literal('waitUntil'), expr: Expr, maxMs: Ms(MAX_WAIT_MS).optional().describe('Default 5000.') });
-const AssertStep = z.object({ type: z.literal('assert'), expr: Expr });
-const AdvanceClockStep = z.object({
+export const WaitUntilStep = z.object({ type: z.literal('waitUntil'), expr: Expr, maxMs: Ms(MAX_WAIT_MS).optional().describe('Default 5000.') });
+export const AssertStep = z.object({ type: z.literal('assert'), expr: Expr });
+export const AdvanceClockStep = z.object({
   type: z.literal('advanceClock'),
   hours: z.number().min(0).optional(),
   minutes: z.number().min(0).optional(),
   ms: z.number().min(0).optional(),
 }).describe('Jumps the calendar clock ahead (no frames simulated).');
 const TestStepSchema = z.union([InputStepSchema, WaitUntilStep, AssertStep, AdvanceClockStep]);
-type TestStep = z.output<typeof TestStepSchema>;
 
-function host(ctx: ToolContext): RuntimeHost {
+export function host(ctx: ToolContext): RuntimeHost {
   if (!ctx.host) throw new ToolError('Runtime tools are not available in this context (no RuntimeHost)');
   return ctx.host;
 }
@@ -72,21 +71,6 @@ function observe(ctx: ToolContext, extra: Record<string, unknown> = {}) {
     ...s.observe(),
     ...(h.isStale() && { projectChanged: 'Project files changed after this run started; call restart_game to play the latest version.' }),
   };
-}
-
-function totalMs(steps: InputStep[]) {
-  const timed = steps.map((s) => (s.type === 'click' ? { ...s, entity: undefined } : s));
-  return expandInputSteps(timed).reduce((ms, op) => ms + (op.op === 'step' ? (op.frames * 1000) / 60 : 0), 0);
-}
-
-function checkExpr(game: Game, expr: string, sinceFrame: number) {
-  try {
-    const r = evaluateExpr(expr, { game, sinceFrame });
-    return { pass: !!r.value, observed: r.observed };
-  } catch (err) {
-    if (err instanceof ExprError) return { pass: false, error: err.message };
-    throw err;
-  }
 }
 
 export const runtimeTools = [
@@ -226,7 +210,7 @@ export const runtimeTools = [
       'Runs a sequence of input steps in the current run, e.g. [{"type":"hold","key":"D","ms":800},{"type":"tap","key":"Space"},{"type":"wait","ms":500}]. tap/hold/wait advance time.',
     input: z.object({ steps: z.array(InputStepSchema).min(1) }),
     run: (ctx, { steps }) => {
-      if (totalMs(steps) > MAX_WAIT_MS) throw new ToolError(`Steps add up to more than ${MAX_WAIT_MS} ms; split them into several calls`);
+      if (inputMs(steps) > MAX_WAIT_MS) throw new ToolError(`Steps add up to more than ${MAX_WAIT_MS} ms; split them into several calls`);
       session(ctx).perform(steps);
       return observe(ctx);
     },
@@ -324,47 +308,15 @@ export const runtimeTools = [
       clock: ClockInput.optional(),
       storage: StorageInput.optional(),
     }),
-    run: (ctx, { steps, assertions, scene, seed, clock, storage }) => {
-      const status = ctx.store.validate();
-      if (!status.project) throw new ToolError('Cannot test: the project is invalid', status.errors);
-      if (scene && !status.project.scenes[scene]) throw new ToolError(`Scene "${scene}" does not exist`);
-      const game = new Game(status.project, { seed: seed ?? 1, scene, clock, storage });
-      const checks: { step?: number; expr: string; pass: boolean; observed?: Record<string, unknown>; error?: string; waitedMs?: number }[] = [];
-      let simulatedMs = 0;
-
-      steps.forEach((step: TestStep, i) => {
-        if (step.type === 'assert') {
-          checks.push({ step: i, expr: step.expr, ...checkExpr(game, step.expr, 0) });
-        } else if (step.type === 'advanceClock') {
-          game.apply({ op: 'advanceClock', ms: (step.hours ?? 0) * 3_600_000 + (step.minutes ?? 0) * 60_000 + (step.ms ?? 0) });
-        } else if (step.type === 'waitUntil') {
-          const max = msToFrames(step.maxMs ?? 5000);
-          let frames = 0;
-          let r = checkExpr(game, step.expr, 0);
-          while (!r.pass && !('error' in r) && frames < max && game.status === 'running') {
-            game.step(1);
-            frames++;
-            r = checkExpr(game, step.expr, 0);
-          }
-          simulatedMs += (frames * 1000) / 60;
-          checks.push({ step: i, expr: `waitUntil ${step.expr}`, ...r, waitedMs: Math.round((frames * 1000) / 60) });
-        } else {
-          simulatedMs += totalMs([step]);
-          try {
-            game.perform([step]);
-          } catch (err) {
-            throw new ToolError(`step ${i}: ${err instanceof Error ? err.message : String(err)}`);
-          }
-        }
-        if (simulatedMs > MAX_TEST_MS) throw new ToolError(`Test exceeds ${MAX_TEST_MS} ms of simulated time`);
-      });
-      for (const expr of assertions) checks.push({ expr, ...checkExpr(game, expr, 0) });
-
+    run: async (ctx, { steps, assertions, scene, seed, clock, storage }) => {
+      const s = host(ctx).newSession({ scene, seed, clock, storage });
+      const game = s.game;
+      const { checks } = await runScenario(s, steps, assertions.map((expr) => ({ expr })));
       const final = game.getState({ tags: ['player'] });
       const counts: Record<string, number> = {};
       for (const e of game.events()) counts[e.type] = (counts[e.type] ?? 0) + 1;
       return {
-        passed: checks.every((c) => c.pass),
+        passed: checks.every((c: Check) => c.pass),
         checks,
         final: { frame: final.frame, status: final.status, scene: final.scene, vars: final.vars, players: final.entities },
         eventCounts: counts,

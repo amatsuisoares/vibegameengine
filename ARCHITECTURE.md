@@ -108,11 +108,12 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
  └── World ── entidades, vars, status (running|won|lost|crashed), eventos, câmera, checkpoints
       Passo fixo (1/60 s), nesta ordem:
         1. Input.beginFrame()        latch de teclas pressionadas entre frames
-        2. controllerSystem           PlatformerController, Patrol, FollowTarget
+        2. ScriptRunner.start         onStart dos scripts que ainda não começaram (antes de qualquer outro hook)
+           controllerSystem           PlatformerController, Patrol, FollowTarget
            moverSystem                Mover: velocidade dos kinematic rumo ao próximo waypoint
            NavRunner.run              NavAgent: planeja/replaneja (A*) e anda (posição, ou velocidade do Body)
            InteractionRunner.input    clique esquerdo (click, onClick) e tecla de interação → Interactable
-           ScriptRunner.update        onStart (1ª vez) e onUpdate dos scripts
+           ScriptRunner.update        onUpdate dos scripts (onStart antes, se a entidade surgiu neste frame)
         3. physicsSystem              gravidade; move X e resolve; move Y e resolve (grounded)
         4. findContacts + interactionSystem   coleta, pisão, dano, checkpoint, goal
            ScriptRunner.collisions    onCollision dos contatos que começaram neste frame
@@ -306,6 +307,11 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
   `projectChanged` até `restart_game`.
 - **Observação incremental:** cada ação devolve os eventos e avisos novos desde a anterior (rastreados pelo
   último evento visto, não por frame — eventos do frame 0 surgem antes e depois do primeiro passo).
+- **Cenários** (`server/src/runtime/scenario.ts`, V0.3): `runScenario(session, steps, assertions, shoot?)` executa
+  passos de input, `waitUntil`, `assert`, `advanceClock` e `screenshot` numa `GameSession` avulsa
+  (`RuntimeHost.newSession`, que não substitui a run atual) e devolve as checagens (`expr`, `pass`, `observed`, `frame`).
+  É usado pelo `run_test` e pelo `verify_game`; este ainda fotografa a sessão (`RuntimeHost.screenshotOf`, que serve
+  para qualquer sessão) e monta o relatório PASS/FAIL (`tools/verify-tools.ts`). Erros de runtime reprovam por padrão.
 - **Avisos visuais:** problemas de asset só aparecem ao desenhar; o screenshot devolve `renderWarnings`, e o
   `ProjectStore` já avisa na validação quando o arquivo de um asset não existe.
 - **Sandbox:** o agente só alcança o que as tools expõem — arquivos dentro do projeto, a run e a página do
@@ -317,7 +323,7 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 
 ```
 Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
-                                   tools/list  → 3 tools de workspace + 38 do ToolRegistry (com annotations)
+                                   tools/list  → 3 tools de workspace + 50 do ToolRegistry (com annotations)
                                    tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
                                                  → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```

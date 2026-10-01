@@ -34,20 +34,25 @@ export class RuntimeHost {
 
   /** Starts a fresh run from the project as it is on disk now. */
   run(options: Partial<SessionOptions> = {}): GameSession {
+    this.session = this.newSession(options);
+    this.publishLive();
+    return this.session;
+  }
+
+  /** A fresh run of the project as it is on disk now that is not the current run (e.g. for verify_game). */
+  newSession(options: Partial<SessionOptions> = {}): GameSession {
     const raw = this.store.rawProject();
     const status = this.store.validate();
     if (!status.project) throw new ToolError('Cannot run: the project is invalid', status.errors);
     if (options.scene && !status.project.scenes[options.scene]) {
       throw new ToolError(`Scene "${options.scene}" does not exist. Scenes: ${Object.keys(status.project.scenes).join(', ')}`);
     }
-    this.session = new GameSession(
+    return new GameSession(
       raw,
       status.project,
       { seed: options.seed ?? 1, scene: options.scene, clock: options.clock, storage: options.storage },
       fingerprint(raw),
     );
-    this.publishLive();
-    return this.session;
   }
 
   stop() {
@@ -100,8 +105,13 @@ export class RuntimeHost {
     }
   }
 
-  async screenshot(annotate = false): Promise<ScreenshotInfo> {
-    const s = this.requireSession();
+  /** Screenshot of the current run. */
+  screenshot(annotate = false): Promise<ScreenshotInfo> {
+    return this.screenshotOf(this.requireSession(), annotate);
+  }
+
+  /** Screenshot of any session (the current run or a verify_game run); `label` is added to the file name. */
+  async screenshotOf(s: GameSession, annotate = false, label?: string): Promise<ScreenshotInfo> {
     const { png, state, warnings } = await this.screenshotter.shoot({
       key: s.id,
       projectName: this.store.name,
@@ -115,7 +125,9 @@ export class RuntimeHost {
       annotate,
     });
     const frame = s.game.frame;
-    const path = `.vibe/runs/${s.id}/${String(++this.shots).padStart(3, '0')}-f${frame}${annotate ? '-debug' : ''}.png`;
+    const clean = (label ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+    const slug = clean ? `-${clean}` : '';
+    const path = `.vibe/runs/${s.id}/${String(++this.shots).padStart(3, '0')}-f${frame}${slug}${annotate ? '-debug' : ''}.png`;
     const absolutePath = this.store.path(path);
     mkdirSync(dirname(absolutePath), { recursive: true });
     writeFileSync(absolutePath, png);

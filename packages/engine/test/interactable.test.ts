@@ -248,3 +248,23 @@ describe('Interactable: observation and determinism', () => {
     expect(a.events(0, 'interact_blocked').length).toBeGreaterThan(0);
   });
 });
+
+describe('scripts start before input', () => {
+  it('a click on the very first frame reaches scripts that already ran onStart', () => {
+    const g = game(
+      [
+        { id: 'bowl', transform: { x: 200, y: 150 }, components: { Sprite: { width: 40, height: 40 }, Interactable: { via: ['click'] }, Script: { src: 'scripts/bowl.js' } } },
+        { id: 'pet', transform: { x: 50, y: 150 }, components: { Script: { src: 'scripts/pet.js' } } },
+      ],
+      {
+        scripts: {
+          'scripts/pet.js': 'function onStart(self, game) { self.state.api = { fill() { game.vars.filled = 1; } }; }',
+          'scripts/bowl.js': "function onInteract(self, by, game) { game.entity('pet').state.api.fill(); }",
+        },
+      },
+    );
+    g.perform([{ type: 'click', entity: 'bowl' }]);
+    expect(g.world.vars.filled).toBe(1);
+    expect(g.console.read(0, 'error')).toEqual([]);
+  });
+});

@@ -484,6 +484,7 @@ reproduzir a run no Chromium para o screenshot.
 | `read_console` | `since?, level?` | logs, avisos, erros com stack |
 | `take_screenshot` | `annotate?` | PNG (imagem anexada ao resultado), `path`, `frame`, `camera`; `renderWarnings` se algum sprite não pôde ser desenhado |
 | `run_test` | `steps, assertions, scene?, seed?, clock?, storage?` | roda num jogo novo (não mexe na run atual) e relata cada checagem; passo `advanceClock` |
+| `verify_game` | `scenario, steps, assertions, screenshot?, annotate?, allowErrors?, scene?, seed?, clock?, storage?` | verificação completa numa chamada: joga o cenário num jogo novo, checa, fotografa e devolve relatório PASS/FAIL (ver [Verificação](#verificação-verify_game)) |
 | `open_game_view` | `follow?, scene?, debug?` | URL da página do jogo para o usuário abrir no VS Code (ver abaixo) |
 
 **Observação após cada ação.** `run_game`, `restart_game`, `wait`, `wait_until`, `perform_inputs` e `click_mouse`
@@ -528,6 +529,49 @@ Exemplo de `run_test`:
 ```
 
 Retorno: `passed`, `checks[]`, `final` (status, vars, players), `eventCounts`, `errors`. Limite de 300 s simulados.
+
+### Verificação (`verify_game`)
+
+Implementado na V0.3. Executa → interage → observa → verifica → reporta numa chamada só, num jogo novo (a run atual
+não muda). Os passos são os do `run_test` (input, `waitUntil`, `assert`, `advanceClock`) mais
+`{"type": "screenshot", "label"?, "annotate"?}`; `waitUntil`/`assert` e as `assertions` aceitam `name` para o relatório
+ficar legível.
+
+```json
+{
+  "scenario": "limpar a sujeira solta poeira e some",
+  "clock": { "speed": 3600 },
+  "steps": [
+    { "type": "type", "text": "Bolinha" },
+    { "type": "click", "entity": "botaoComecar" },
+    { "type": "assert", "name": "entrou no quarto", "expr": "scene == 'quarto'" },
+    { "type": "waitUntil", "name": "apareceu sujeira", "expr": "count('sujeira') > 0", "maxMs": 30000 },
+    { "type": "click", "entity": "sujeira1" },
+    { "type": "wait", "ms": 150 },
+    { "type": "screenshot", "label": "poeira" }
+  ],
+  "assertions": [{ "name": "sujeira limpa", "expr": "!exists('sujeira1')" }, "events('particles') >= 1"]
+}
+```
+
+Retorno:
+
+```json
+{
+  "scenario": "...", "passed": false, "summary": "FAIL: 3/4 checks passed",
+  "report": ["PASS entrou no quarto", "PASS apareceu sujeira",
+             "FAIL sujeira limpa — !exists('sujeira1'); observed exists(\"sujeira1\") = true (frame 414)",
+             "PASS events('particles') >= 1"],
+  "checks": [...], "screenshots": [{ "step": 6, "label": "poeira", "frame": 414, "path": ".vibe/runs/..." }, { "label": "final", ... }],
+  "final": { "frame", "simulatedMs", "status", "scene", "vars", "clock" }, "eventCounts": {...}, "errors": [], "warnings"?: [...]
+}
+```
+
+- `passed` exige todas as checagens verdadeiras **e nenhum erro de runtime** (crash de script, regra quebrada...);
+  `allowErrors: true` só anota os erros. Sem checagens, o relatório avisa (`NOTE no checks`).
+- `screenshot` (padrão `true`) fotografa o frame final; as imagens vêm anexadas (máx. 6 por verificação). Uma foto
+  que falha (sem Chromium, por exemplo) vira `NOTE` no relatório, sem derrubar a verificação.
+- Use `run_test` para checagens rápidas só numéricas; `verify_game` para verificar uma feature com relatório e imagem.
 
 ### Screenshots
 
