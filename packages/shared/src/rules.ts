@@ -31,6 +31,22 @@ export const RuleTriggerSchema = z.union([
   z.strictObject({ every: z.number().positive().describe('Fires every N milliseconds of game time.') }),
 ]);
 
+export const EASES = ['linear', 'easeIn', 'easeOut', 'easeInOut'] as const;
+export const EaseSchema = z.enum(EASES);
+
+/** Animatable properties of an entity, besides "Component.field" numbers (e.g. "Text.fontSize"). */
+export const TWEEN_PROPS = ['x', 'y', 'rotation', 'scaleX', 'scaleY', 'scale', 'opacity'] as const;
+
+export const TweenFields = {
+  prop: z.string().min(1).describe('x, y, rotation, scaleX, scaleY, scale (both), opacity (Sprite and Text), or a numeric component field like "Sprite.width".'),
+  to: z.number(),
+  ms: z.number().min(0).describe('Duration of one pass, ms.'),
+  from: z.number().optional().describe('Start value (default: the current value).'),
+  ease: EaseSchema.default('easeInOut'),
+  yoyo: z.boolean().default(false).describe('Go to `to` and back to the start value.'),
+  repeat: z.number().int().min(-1).default(0).describe('Extra passes (or round trips with yoyo); -1 = forever.'),
+};
+
 /** Actions that run at once (also the ones an "after" action can delay). */
 const immediateActions = [
   z.strictObject({ action: z.literal('setVar'), var: z.string().min(1), value: Value }),
@@ -52,6 +68,7 @@ const immediateActions = [
     set: z.record(z.string(), z.unknown()).describe('Fields to set on the component (shallow).'),
   }),
   z.strictObject({ action: z.literal('log'), message: z.string() }),
+  z.strictObject({ action: z.literal('tween'), target: Target, ...TweenFields }),
   z.strictObject({ action: z.literal('playSound'), asset: z.string().min(1), volume: z.number().min(0).max(1).default(1) }),
   z.strictObject({
     action: z.literal('spawn'),

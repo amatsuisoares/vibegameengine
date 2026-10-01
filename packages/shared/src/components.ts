@@ -133,6 +133,7 @@ export const TextSchema = z.strictObject({
   color: z.string().default('#ffffff'),
   align: z.enum(['left', 'center', 'right']).default('left'),
   screenSpace: z.boolean().default(true).describe('true: fixed on screen (HUD). false: placed in the world.'),
+  opacity: z.number().min(0).max(1).default(1),
   layer: z.number().default(100),
 });
 

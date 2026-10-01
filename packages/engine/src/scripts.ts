@@ -4,6 +4,7 @@ import type { Entity } from './entity';
 import { fsmOf, stateMs, type StateMachineRunner } from './fsm';
 import { animFrameIndex } from './systems/animation';
 import { cooldown, type TimerInfo } from './timers';
+import type { Ease, TweenInfo } from './tweens';
 import { aiOf, type UtilityRunner } from './utility';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
@@ -193,6 +194,14 @@ export interface ScriptEntity {
   readonly timers: TimerInfo[];
   /** True (and starts the cooldown) if `name` is not cooling down; false otherwise. */
   cooldown(name: string, ms: number): boolean;
+  /**
+   * Animates a property to `to` over `ms`: x, y, rotation, scaleX, scaleY, scale, opacity or "Component.field".
+   * Options: from, ease (linear|easeIn|easeOut|easeInOut), yoyo, repeat (-1 = forever), id, onDone. Returns the id.
+   */
+  tween(prop: string, to: number, ms: number, options?: { from?: number; ease?: Ease; yoyo?: boolean; repeat?: number; id?: string; onDone?: () => void }): string;
+  /** Stops tweens by id or property (all without an argument); returns how many. */
+  stopTween(idOrProp?: string): number;
+  readonly tweens: TweenInfo[];
   /** Live component data (changes apply immediately), or undefined. */
   get(type: ComponentType): Record<string, unknown> | undefined;
   damage(amount: number): boolean;
@@ -509,6 +518,15 @@ class ScriptApi {
         return w.timers.list(e);
       },
       cooldown: (name, ms) => cooldown(w, e, String(name), finite(ms, 'cooldown ms')),
+      tween: (prop, to, ms, options = {}) => {
+        if (options.onDone !== undefined && typeof options.onDone !== 'function') throw new Error('tween onDone must be a function');
+        const id: string = w.tweens.start(e, { ...options, prop: String(prop), to, ms, onError: (err) => this.report(e, err, `onDone of tween "${id}"`) });
+        return id;
+      },
+      stopTween: (idOrProp) => w.tweens.stop(e, idOrProp === undefined ? undefined : String(idOrProp)),
+      get tweens() {
+        return w.tweens.list(e);
+      },
       get: (type) => e.components[type] as Record<string, unknown> | undefined,
       damage: (amount) => applyDamage(w, e, amount),
       destroy: () => w.destroy(e),

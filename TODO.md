@@ -113,7 +113,10 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
   estado; evento `timer_error`
 - [x] meu-pet: observações (1 s) e save (3 s) do pet viraram `self.every` em vez de contadores manuais
 - [x] 272 testes unitários + 15 e2e
-- [ ] Tween
+- [x] **Tween**: `self.tween/stopTween/tweens`, ação `tween` em regras e estados; x, y, rotation, scale, opacity e
+  `Componente.campo`; linear/easeIn/easeOut/easeInOut, yoyo, repeat; `tween_end`; `tweens` no estado; `Text.opacity`
+- [x] meu-pet: o emote (♥, z, ♪...) sobe, balança e some com tweens (sem `onUpdate` nem `rgba` manual)
+- [x] 282 testes unitários + 15 e2e
 - [ ] Pathfinding
 - [ ] Particles / VFX
 

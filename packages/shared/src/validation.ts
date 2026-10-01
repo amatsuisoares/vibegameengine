@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { COMPONENT_TYPES, type Components, type StateTransition } from './components';
-import type { RuleAction } from './rules';
+import { TWEEN_PROPS, type RuleAction } from './rules';
 import { expandPrefabs } from './prefabs';
 import { ProjectSchema, SceneSchema, type Project, type Scene, type SoundRef } from './project';
 
@@ -62,6 +62,12 @@ function actionErrors(
     if (a.action === 'spawn' && project && !project.prefabs[a.prefab]) errors.push(`${at}[${i}].prefab: prefab "${a.prefab}" does not exist`);
     if (a.action === 'modify' && !(COMPONENT_TYPES as string[]).includes(a.component)) {
       errors.push(`${at}[${i}].component: unknown component "${a.component}"`);
+    }
+    if (a.action === 'tween') {
+      const m = /^([A-Za-z]+)\.([A-Za-z]+)$/.exec(a.prop);
+      if (!(TWEEN_PROPS as readonly string[]).includes(a.prop) && !(m && (COMPONENT_TYPES as string[]).includes(m[1]))) {
+        errors.push(`${at}[${i}].prop: cannot tween "${a.prop}" (use ${TWEEN_PROPS.join(', ')} or "Component.field")`);
+      }
     }
     if (a.action === 'after') errors.push(...actionErrors(a.do, `${at}[${i}].do`, ids, project, refProblem));
   });

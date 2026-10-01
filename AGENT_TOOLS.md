@@ -101,7 +101,8 @@ Ações: `setVar {var, value}`, `addVar {var, amount}`, `emit {event, data?}`, `
 `destroy {target}`, `setEnabled {target, enabled}`, `setText {target, text}`, `damage {target, amount}`,
 `heal {target, amount}`, `move {target, x?, y?}`, `modify {target, component, set}`, `log {message}`,
 `playSound {asset, volume?}`, `spawn {prefab, x?, y?, at?, id?}`, `after {ms, do: [ações], id?}` (roda as ações
-depois de um tempo; ver [Timers](#timers)), `cancelTimer {id}`.
+depois de um tempo; ver [Timers](#timers)), `cancelTimer {id}`, `tween {target, prop, to, ms, from?, ease?, yoyo?,
+repeat?}` (ver [Tweens](#tweens)).
 `target` é um id, `"$by"` (quem entrou na zona, ou o `by`/`entity` do evento) ou `"$entity"` (a zona, ou o `entity`
 do evento — por exemplo o objeto de um `interact`). `if` e `when.expr` usam as mesmas
 expressões do `wait_until`. Cada disparo gera o evento `rule`. Referências (ids, cenas, componentes) e expressões são
@@ -287,6 +288,27 @@ seed e mesmo input ⇒ os timers disparam nos mesmos frames.
 - O mesmo para "depois de X segundos" sem código: `after` numa regra, `every` como gatilho de regra, `after` numa
   transição da `StateMachine`, `cooldownMs` do `Interactable` e da `UtilityAI`.
 
+## Tweens
+
+Implementado na V0.2 (`packages/engine/src/tweens.ts`). Mudança suave de um número ao longo do tempo — botão que pulsa,
+item que flutua, dano que pisca, entrada/saída de UI, efeito que some. Em frames (reproduzível).
+
+- **Propriedades:** `x`, `y`, `rotation`, `scaleX`, `scaleY`, `scale` (as duas), `opacity` (do `Sprite` e do `Text`) ou
+  qualquer campo numérico `Componente.campo` (`Text.fontSize`, `Sprite.width`...).
+- **Curvas:** `linear`, `easeIn`, `easeOut`, `easeInOut` (padrão). `yoyo: true` vai e volta; `repeat` = passadas extras
+  (`-1` = para sempre); `from` define o valor inicial (padrão: o atual).
+- **Scripts:** `self.tween(prop, para, ms, {from, ease, yoyo, repeat, id, onDone})` → id; `self.stopTween(id ou prop)`
+  (o valor fica onde está); `self.tweens`. Ex.: `self.tween('opacity', 0, 800, { ease: 'easeIn', onDone: () =>
+  self.destroy() })`.
+- **Sem código:** ação `tween {target, prop, to, ms, ...}` em regras e estados, ex. pulsar o objeto usado:
+  `{"when": {"event": "interact"}, "do": [{"action": "tween", "target": "$entity", "prop": "scale", "to": 1.2, "ms": 100,
+  "yoyo": true}]}`; flutuar para sempre: `yoyo: true, repeat: -1` numa regra `start`.
+- **Regras:** um tween novo na mesma propriedade da mesma entidade substitui o anterior; tweens são da entidade (somem se
+  ela for destruída, esperam se estiver desligada); ao terminar: evento `tween_end {entity, prop, id}`.
+- **Estado:** `inspect_game_state` mostra `tweens: [{id, prop, to, ms?}]` por entidade (`ms` ausente = para sempre).
+- **Cuidado:** tween de `x`/`y` em corpo dinâmico briga com a física; e um script que escreve a mesma propriedade todo
+  frame sobrescreve o tween.
+
 ## Assets e som
 
 Implementado na Etapa 8 (`tools/asset-tools.ts`, `sfx.ts`, `engine/src/sound.ts`, `runtime/src/audio.ts`).
@@ -361,6 +383,7 @@ function onCollision(self, other, game) {
 - `game.interact(alvo, ator?)` e `game.nearbyInteractables(ator)`: ver [Interações](#interações-interactable).
 - `self.fsm` (`state, previous, time, is(...), go(estado)`): ver [Máquinas de estado](#máquinas-de-estado-statemachine).
 - `self.ai` (`choice, scores, decide()`): ver [Utility AI](#utility-ai-utilityai).
+- `self.tween/stopTween/tweens`: ver [Tweens](#tweens).
 - `self.after/every/cancel/timers/cooldown`: ver [Timers](#timers). Não há `setTimeout` (tempo real quebraria o replay).
 - Também `console.log/warn/error` (vão para o console do jogo) e `Math` com `Math.random` usando a seed da run.
 - **Determinismo:** `Date`, timers, rede, `process`, `window` e `globalThis` não existem para o script. É uma API

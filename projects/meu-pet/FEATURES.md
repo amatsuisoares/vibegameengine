@@ -131,7 +131,7 @@ da forma atual, mais lento doente ou dormindo); o resto é procedural: respiraç
 pulinhos ao andar, achatar ao dormir, balançar ao comer, pular de alegria, bocejo (estica e encolhe), inclinar a cabeça
 ao investigar, postura caída emburrado, tremor doente, pulsar ao evoluir. Vira para o lado em que anda.
 
-**Emotes** (efeitos, não falas): `z` dormindo, `♥` carinho e petisco, `♪` brincadeira e felicidade, `?` tigela vazia,
+**Emotes** (efeitos, não falas; sobem, balançam e somem com tweens da engine): `z` dormindo, `♥` carinho e petisco, `♪` brincadeira e felicidade, `?` tigela vazia,
 `~` doente.
 
 ## 7. Interações do jogador (mouse)

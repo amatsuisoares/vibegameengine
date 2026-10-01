@@ -4,6 +4,7 @@ import { Entity } from './entity';
 import type { Input } from './input';
 import { Rng } from './rng';
 import { Scheduler } from './timers';
+import { TweenRunner } from './tweens';
 
 export type GameStatus = 'running' | 'won' | 'lost' | 'crashed';
 
@@ -41,6 +42,8 @@ export class World {
   readonly events: GameEvent[] = [];
   /** Timers of this scene (scripts' self.after/every, rule and state "after" actions). */
   readonly timers: Scheduler = new Scheduler(this);
+  /** Tweens of this scene (self.tween, "tween" actions). */
+  readonly tweens: TweenRunner = new TweenRunner(this);
   private eventCapacity = 2000;
 
   constructor(

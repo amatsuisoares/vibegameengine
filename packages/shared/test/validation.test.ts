@@ -252,3 +252,12 @@ describe('"after" actions', () => {
     expect(nested.ok).toBe(false);
   });
 });
+
+describe('"tween" actions', () => {
+  it('accept entity properties and component fields only', () => {
+    const rule = (prop: string) => ({ id: 'r', when: { event: 'x' }, do: [{ action: 'tween', target: '$by', prop, to: 1, ms: 100 }] });
+    for (const prop of ['scale', 'opacity', 'Sprite.width']) expect(parseProject(project([], { rules: [rule(prop)] })).ok).toBe(true);
+    const bad = parseProject(project([], { rules: [rule('Jetpack.power')] }));
+    expect(bad.ok ? [] : bad.errors[0]).toContain('scenes.main.rules(r).do[0].prop: cannot tween "Jetpack.power"');
+  });
+});

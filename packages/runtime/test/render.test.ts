@@ -180,3 +180,16 @@ describe('interaction prompt', () => {
     expect(buildDrawList(far.world).some((c) => c.id.endsWith(':prompt'))).toBe(false);
   });
 });
+
+describe('text opacity', () => {
+  it('fades world and HUD text; fully transparent text is skipped', () => {
+    const text = (id: string, opacity: number) => ({ id, transform: { x: 10, y: 10 }, components: { Text: { text: id, opacity } } });
+    const game = new Game(project([text('half', 0.5), text('gone', 0), text('full', 1)]));
+    const cmds = buildDrawList(game.world) as TextCmd[];
+    expect(cmds.map((c) => [c.id, c.opacity])).toEqual([['half', 0.5], ['full', undefined]]);
+    const { ctx, ops } = recordingContext();
+    paint(ctx, cmds, { width: 400, height: 300, background: '#000', pixelArt: true });
+    const alphas = ops.flatMap((o) => ('prop' in o && o.prop === 'globalAlpha' ? [o.value] : []));
+    expect(alphas).toEqual([1, 0.5, 1]);
+  });
+});

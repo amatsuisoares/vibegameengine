@@ -101,6 +101,11 @@ export function runAction(w: World, a: RuleAction, target: (ref: string) => Enti
     case 'cancelTimer':
       w.timers.cancel(a.id, origin.kind === 'state' ? w.get(origin.data.entity) : undefined);
       return;
+    case 'tween': {
+      const { action: _a, target: ref, ...o } = a;
+      w.tweens.start(target(ref), o);
+      return;
+    }
     case 'spawn': {
       const at = a.at ? target(a.at) : null;
       w.spawn(a.prefab, (at?.x ?? 0) + (a.x ?? 0), (at?.y ?? 0) + (a.y ?? 0), a.id);

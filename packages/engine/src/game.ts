@@ -15,6 +15,7 @@ import { hitBox, InteractionRunner, snapshotInteractable, type InteractableSnaps
 import { fsmOf, StateMachineRunner, stateMs } from './fsm';
 import { aiOf, UtilityRunner } from './utility';
 import { cooldownsLeft, type TimerInfo } from './timers';
+import type { TweenInfo } from './tweens';
 import { SoundDirector, soundOf } from './sound';
 import { ScriptLibrary, ScriptRunner } from './scripts';
 import { findContacts, interactionSystem, pairKey } from './systems/interactions';
@@ -130,6 +131,8 @@ export interface EntitySnapshot {
   timers?: TimerInfo[];
   /** Cooldowns running (self.cooldown): ms left by name. */
   cooldowns?: Record<string, number>;
+  /** Tweens running on the entity. */
+  tweens?: TweenInfo[];
   /** Animator: clip showing and its frame index. */
   anim?: { clip: string | null; frame: number };
   components?: Record<string, unknown>;
@@ -287,6 +290,7 @@ export class Game {
         this.utility.run();
         this.stateMachines.run();
         w.timers.run();
+        w.tweens.run();
         animationSystem(w, dt);
         this.soundDirector.run();
         this.scriptRunner.events();
@@ -442,6 +446,8 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
   if (timers.length) s.timers = timers;
   const cds = cooldownsLeft(w, e);
   if (Object.keys(cds).length) s.cooldowns = cds;
+  const tweens = w.tweens.list(e);
+  if (tweens.length) s.tweens = tweens;
   if (e.components.Animator) s.anim = { clip: e.animName, frame: Math.max(0, animFrameIndex(e)) };
   const props = e.components.Script?.props;
   if (props && Object.keys(props).length) s.props = { ...props };

@@ -41,6 +41,7 @@ export interface TextCmd {
   color: string;
   align: 'left' | 'center' | 'right';
   baseline: 'top' | 'middle';
+  opacity?: number;
 }
 
 export type DrawCmd = SpriteCmd | TextCmd;
@@ -76,7 +77,7 @@ export function buildDrawList(world: World): DrawCmd[] {
       if (visible) out.push(sprite);
     }
     const t = e.components.Text;
-    if (t && t.text) {
+    if (t && t.text && t.opacity > 0) {
       const screen = t.screenSpace;
       const zoom = screen ? 1 : cam.zoom;
       out.push({
@@ -91,6 +92,7 @@ export function buildDrawList(world: World): DrawCmd[] {
         color: t.color,
         align: t.align,
         baseline: screen ? 'top' : 'middle',
+        ...(t.opacity < 1 && { opacity: t.opacity }),
       });
     }
   }
@@ -239,6 +241,7 @@ function paintText(ctx: CanvasRenderingContext2D, c: TextCmd) {
   const lh = c.fontSize * LINE_HEIGHT;
   const y0 = c.baseline === 'middle' ? c.y - ((c.lines.length - 1) * lh) / 2 : c.y;
   ctx.save();
+  ctx.globalAlpha = c.opacity ?? 1;
   ctx.font = `${c.fontSize}px ${c.font}`;
   ctx.fillStyle = c.color;
   ctx.textAlign = c.align;

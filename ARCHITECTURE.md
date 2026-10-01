@@ -91,7 +91,7 @@ Memória do agente em `.vibe/memory.json`.
 | `Collectible` | incrementa variável (ex. `coins`), soma `score`, pode curar |
 | `Goal` | vitória ou troca de cena; `require` exige variáveis mínimas |
 | `Checkpoint` | define ponto de respawn |
-| `Text` | texto/HUD com placeholders `{coins}`, `{player.health}` |
+| `Text` | texto/HUD com placeholders `{coins}`, `{player.health}`; `opacity` |
 | `Animator` | clipes (quadros de spritesheet ou imagens); clipe pelo estado da `StateMachine` ou idle/run/jump/fall; eventos de quadro, one-shots, velocidade |
 | `Interactable` | algo que se usa (porta, NPC, tigela): por clique, tecla em alcance ou entrada; condição, cooldown, once, som |
 | `StateMachine` | estados nomeados com transições por condição, tempo no estado ou evento; ações de entrada/saída |
@@ -119,6 +119,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
            UtilityRunner.run          decisões da UtilityAI que venceram o intervalo (→ StateMachine.go)
            StateMachineRunner.run     estado inicial e transições das StateMachines (exit → state_change → enter)
            Scheduler.run              timers vencidos (self.after/every, ações "after" de regras e estados)
+           TweenRunner.run            um passo de cada tween (valor = from + (to - from) × ease(t))
            animationSystem            flip; clipe do Animator (script > estado > auto > base), quadro, eventos de quadro
            SoundDirector.run          eventos com som em config.sounds → evento sound
         7. flushDestroyed, cameraSystem
@@ -132,7 +133,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Contatos:** pares sobrepostos (tolerância 0,5 px, então “encostar” conta). Goal/Checkpoint usam
   semântica de *enter* (só no primeiro frame de contato).
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -199,6 +200,10 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   desligado espera. Vencidos disparam em ordem (frame, criação); um timer cancelado por outro no mesmo frame não
   dispara. Mesmo id (por dono) substitui. Cooldowns de script ficam em `Entity.cooldowns` (frame em que libera).
   Timers não sobrevivem a troca de cena/restart (o mundo é recriado), como o resto do estado de cena.
+- **Tweens** (`engine/src/tweens.ts`, V0.2): `TweenRunner` por `World` (`world.tweens`). Cada tween conta frames
+  jogados (o primeiro passo é no frame em que começa); `yoyo` dobra o ciclo, `repeat` multiplica (`-1` sem fim); no fim
+  grava o valor exato (`to`, ou `from` com yoyo). `tweenProp` resolve `x/y/rotation/scale*/opacity` e
+  `Componente.campo` numérico. O `Text` ganhou `opacity` (o render aplica `globalAlpha`; texto com 0 não é desenhado).
 - **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
   conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).

@@ -39,6 +39,10 @@ describe('meu-pet (regression)', () => {
     ]);
     expect(pick(events, 'sound').map((e) => e.asset)).toEqual(expect.arrayContaining(['sfx_tigela', 'sfx_clique', 'sfx_bola']));
     expect(pick(events, 'spawn').some((e) => e.prefab === 'emote')).toBe(true); // the ♥ of the petting
+    const heart = game.world.withTag('emote')[0];
+    expect(game.getState({ ids: [heart.id] }).entities[0].tweens!.map((t) => t.prop).sort()).toEqual(['opacity', 'x', 'y']); // floats, sways, fades
+    game.perform([{ type: 'wait', ms: 1700 }]);
+    expect(game.entity(heart.id)).toBeUndefined(); // gone when faded out
 
     // Away for a day: hygiene drops and dirt appears; clicking it cleans one.
     game.apply({ op: 'advanceClock', ms: 24 * 3_600_000 });

@@ -1,17 +1,9 @@
-// Emote flutuante (z, ♥, ♪, ?, ~): sobe, balança e some. É só um efeito visual, nunca fala.
-const DURATION = 1.6;
-let life = 0;
+// Emote flutuante (z, ♥, ♪, ?, ~): sobe, balança e some — com tweens da engine. É só um efeito visual, nunca fala.
+const DURATION = 1600;
 
-function rgba(hex, a) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a.toFixed(2)})`;
-}
-
-function onUpdate(self, game, dt) {
-  life += dt;
-  self.y -= 28 * dt;
-  self.x += Math.sin(life * 4) * 0.4;
-  const a = Math.max(0, 1 - life / DURATION);
-  self.get('Text').color = rgba(self.props.color || '#ffffff', a);
-  if (life >= DURATION) self.destroy();
+function onStart(self) {
+  if (self.props.color) self.get('Text').color = self.props.color;
+  self.tween('y', self.y - 45, DURATION, { ease: 'easeOut' });
+  self.tween('x', self.x + 3, 250, { from: self.x - 3, yoyo: true, repeat: -1 });
+  self.tween('opacity', 0, DURATION, { ease: 'easeIn', onDone: () => self.destroy() });
 }

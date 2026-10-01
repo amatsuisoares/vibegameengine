@@ -12,7 +12,7 @@ PROJECTS
 
 RULES (events and conditions without code)
 - set_rule / delete_rule edit scene rules: {"id", "when", "if"?, "do": [actions], "once"?}. when: {"start":true} | {"event":"collect","match":{"entity":"coin1"}} | {"enter":"zoneId","tag":"player"} | {"expr":"vars.coins >= 3"} (fires on false->true) | {"every":1000}.
-- Actions: setVar, addVar, emit, win, lose, loadScene, destroy, setEnabled, setText, damage, heal, move, modify {target, component, set}, log, playSound, spawn, after {ms, do: [actions], id?} (delayed actions; not nested), cancelTimer {id}. target: entity id, "$by" (who entered / caused the event) or "$entity" (the zone / the event's entity). Use a disabled entity + setEnabled to make things appear. Each firing emits a "rule" event.
+- Actions: setVar, addVar, emit, win, lose, loadScene, destroy, setEnabled, setText, damage, heal, move, modify {target, component, set}, log, playSound, spawn, after {ms, do: [actions], id?} (delayed actions; not nested), cancelTimer {id}, tween {target, prop, to, ms, from?, ease?, yoyo?, repeat?}. target: entity id, "$by" (who entered / caused the event) or "$entity" (the zone / the event's entity). Use a disabled entity + setEnabled to make things appear. Each firing emits a "rule" event.
 
 INTERACTIONS (doors, NPCs, items, objects to use)
 - Interactable {action ("open", "talk", "feed"...), label?, via: ["click","key","enter"] (default click+key), key (default action "interact" = E), actorTags (default ["player"]), range (px between boxes, default 32), condition? (expression), cooldownMs, once, enabled, sound?}. Do not write a component or script per action: one Interactable + what it does.
@@ -38,6 +38,10 @@ ANIMATION (Animator)
 TIMERS (deterministic, in game frames)
 - Scripts: self.after(ms, fn, id?), self.every(ms, fn, id?), self.cancel(id), self.timers, self.cooldown(name, ms) -> true if ready (and starts it). Timers belong to the entity (gone if it is destroyed). Never count time by hand in onUpdate.
 - Data: rule/state action after {ms, do, id?}; cancelTimer {id}. inspect_game_state shows timers [{id, ms, every?}] and cooldowns per entity.
+
+TWEENS (smooth changes: pulse, float, fade, slide)
+- self.tween(prop, to, ms, {from, ease: linear|easeIn|easeOut|easeInOut, yoyo, repeat (-1 forever), id, onDone}); self.stopTween(idOrProp); props: x, y, rotation, scaleX, scaleY, scale, opacity (Sprite and Text), or "Component.field". Data: the "tween" action in rules/states (e.g. pulse "$entity" on "interact"; float with yoyo + repeat -1 on start).
+- A new tween of the same property replaces the old one; "tween_end" when done; inspect_game_state shows tweens. Do not also write that property every frame in a script.
 
 SCRIPTS (when built-in components and rules are not enough)
 - Write scripts/<name>.js with write_file and attach it with the Script component: {"src":"scripts/<name>.js","props":{...}}. Broken syntax is rejected with file:line.
