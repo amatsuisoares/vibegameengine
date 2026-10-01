@@ -95,3 +95,85 @@ describe('project schema', () => {
     expect(r.warnings[0]).toContain('without Collider');
   });
 });
+
+describe('Interactable', () => {
+  const door = (interactable: Record<string, unknown> = {}) => ({ id: 'door', components: { Sprite: {}, Interactable: interactable } });
+
+  it('fills defaults, adds the "interact" action and checks its sound', () => {
+    const r = parseProject(project([door()]));
+    if (!r.ok) throw new Error(r.errors.join());
+    expect(r.value.scenes.main.entities[0].components.Interactable).toEqual({
+      action: 'use',
+      via: ['click', 'key'],
+      key: 'interact',
+      actorTags: ['player'],
+      range: 32,
+      cooldownMs: 0,
+      once: false,
+      enabled: true,
+    });
+    expect(r.value.config.actions.interact).toEqual(['E']);
+    const bad = parseProject(project([door({ sound: 'nope' })]));
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors).toEqual(['scenes.main.entities(door).components.Interactable.sound: audio asset "nope" does not exist']);
+  });
+
+  it('warns when the key is an action the project does not define', () => {
+    const r = parseProject({ ...project([door({ via: ['key'] })]), config: { name: 'p', startScene: 'main', actions: { left: ['A'] } } });
+    expect(r.ok).toBe(true);
+    expect(r.warnings).toEqual([expect.stringContaining('Interactable.key: "interact" is not an input action')]);
+    expect(parseProject({ ...project([door({ via: ['click'] })]), config: { name: 'p', startScene: 'main', actions: {} } }).warnings).toEqual([]);
+  });
+
+  it('rules may target "$entity" only with event and enter triggers', () => {
+    const rule = (when: unknown) => ({ id: 'r', when, do: [{ action: 'destroy', target: '$entity' }] });
+    expect(parseProject(project([door()], { rules: [rule({ event: 'interact' })] })).ok).toBe(true);
+    const r = parseProject(project([door()], { rules: [rule({ start: true })] }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors[0]).toContain('"$entity" only works with "enter" and "event" triggers');
+  });
+});
+
+describe('StateMachine', () => {
+  const guard = (sm: Record<string, unknown>) => ({ id: 'guard', components: { StateMachine: sm } });
+  const errors = (sm: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
+    const r = parseProject(project([guard(sm), { id: 'door' }], extra));
+    return r.ok ? [] : r.errors;
+  };
+
+  it('accepts minimal machines and fills defaults', () => {
+    const r = parseProject(project([guard({ initial: 'idle', states: { idle: {} } })]));
+    if (!r.ok) throw new Error(r.errors.join());
+    expect(r.value.scenes.main.entities[0].components.StateMachine).toEqual({ initial: 'idle', states: { idle: { enter: [], exit: [], transitions: [] } }, transitions: [] });
+  });
+
+  it('checks states, transition targets and action targets', () => {
+    expect(errors({ initial: 'idle', states: {} })[0]).toContain('needs at least one state');
+    expect(
+      errors({
+        initial: 'idel',
+        transitions: [{ to: 'dead' }],
+        states: {
+          idle: {
+            enter: [{ action: 'setEnabled', target: 'door', enabled: false }, { action: 'destroy', target: '$by' }, { action: 'destroy', target: 'ghost' }],
+            transitions: [{ to: 'run' }],
+          },
+        },
+      }),
+    ).toEqual([
+      'scenes.main.entities(guard).components.StateMachine.initial: state "idel" does not exist (states: idle)',
+      'scenes.main.entities(guard).components.StateMachine.transitions[0].to: state "dead" does not exist (states: idle)',
+      'scenes.main.entities(guard).components.StateMachine.states.idle.transitions[0].to: state "run" does not exist (states: idle)',
+      'scenes.main.entities(guard).components.StateMachine.states.idle.enter[1].target: "$by" is not available in states (use "$self" or an entity id)',
+      'scenes.main.entities(guard).components.StateMachine.states.idle.enter[2].target: entity "ghost" does not exist',
+    ]);
+  });
+
+  it('"$self" is for states, not rules; state sounds are checked', () => {
+    const rule = { id: 'r', when: { event: 'x' }, do: [{ action: 'destroy', target: '$self' }] };
+    expect(errors({ initial: 'a', states: { a: {} } }, { rules: [rule] })).toEqual(['scenes.main.rules(r).do[0].target: "$self" is not a rule target']);
+    expect(errors({ initial: 'a', states: { a: { enter: [{ action: 'playSound', asset: 'boom' }] } } })).toEqual([
+      'scenes.main.entities(guard).components.StateMachine.states.a.enter[0].asset: audio asset "boom" does not exist',
+    ]);
+  });
+});

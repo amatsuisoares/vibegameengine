@@ -93,6 +93,8 @@ Memória do agente em `.vibe/memory.json`.
 | `Checkpoint` | define ponto de respawn |
 | `Text` | texto/HUD com placeholders `{coins}`, `{player.health}` |
 | `Animator` | clipes de spritesheet; seleção automática idle/run/jump/fall |
+| `Interactable` | algo que se usa (porta, NPC, tigela): por clique, tecla em alcance ou entrada; condição, cooldown, once, som |
+| `StateMachine` | estados nomeados com transições por condição, tempo no estado ou evento; ações de entrada/saída |
 | `Script` | comportamento em JavaScript (`scripts/*.js`): `onStart/onUpdate/onCollision` com API restrita |
 | `Mover` | segue waypoints (vaivém ou loop, pausa); com Body kinematic vira plataforma móvel/elevador |
 
@@ -105,13 +107,16 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
         1. Input.beginFrame()        latch de teclas pressionadas entre frames
         2. controllerSystem           PlatformerController, Patrol, FollowTarget
            moverSystem                Mover: velocidade dos kinematic rumo ao próximo waypoint
+           InteractionRunner.input    clique esquerdo (click, onClick) e tecla de interação → Interactable
            ScriptRunner.update        onStart (1ª vez) e onUpdate dos scripts
         3. physicsSystem              gravidade; move X e resolve; move Y e resolve (grounded)
         4. findContacts + interactionSystem   coleta, pisão, dano, checkpoint, goal
            ScriptRunner.collisions    onCollision dos contatos que começaram neste frame
+           InteractionRunner.proximity  Interactable via "enter" (ator entrou no alcance) + foco da tecla
         5. healthSystem               timers, queda no abismo (killY), morte
         6. animationSystem            flip e frames de animação
            RuleRunner.run             regras da cena (start/event/enter/expr/every → if → ações)
+           StateMachineRunner.run     estado inicial e transições das StateMachines (exit → state_change → enter)
            SoundDirector.run          eventos com som em config.sounds → evento sound
         7. flushDestroyed, cameraSystem
 ```
@@ -124,7 +129,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Contatos:** pares sobrepostos (tolerância 0,5 px, então “encostar” conta). Goal/Checkpoint usam
   semântica de *enter* (só no primeiro frame de contato).
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error` e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error` e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -153,6 +158,27 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   (`realtimeClock`).
 - **Mouse e texto:** o clique esquerdo vai para a entidade de cima sob o ponto onde o botão desceu (posição guardada no
   pressionamento, não a atual) e gera o evento `click`. Texto digitado chega como op `text` (com `\b`/`\n` em ordem).
+- **Clique em entidade:** `Game.expand({type: 'click', entity})` mira o centro da caixa da entidade na tela no momento
+  do passo e vira `mouseMove` + clique comuns — o agente clica "no objeto" e o log de ops continua reproduzível.
+- **Interações** (`engine/src/interact.ts`, V0.2): `InteractionRunner` por mundo, como regras e scripts. A engine só
+  decide **se** um `Interactable` é usado — clique (o mesmo roteamento do `onClick`), tecla (`key`, padrão a ação
+  `interact` = E) pelo ator mais próximo dentro de `range` (distância entre caixas Collider/Sprite), entrada no alcance
+  (borda, uma vez por aproximação) ou `game.interact(alvo, ator?)` num script — checando, nesta ordem, `enabled`,
+  `actorTags`, `range`, `cooldownMs` e `condition` (expressão compilada uma vez). Sucesso: evento `interact`, `sound`,
+  `once` desliga, hook `onInteract`; falha: `interact_blocked {reason}`. O efeito é do jogo (regras com `$by`/`$entity`,
+  scripts). Estado em `Entity.interact` (`readyAt` em frames, `uses`) e no snapshot (`interactable`, com `inRange`).
+  `World.interactFocus` guarda o alvo da tecla para o renderer desenhar `[E] rótulo`. Laço `onInteract` →
+  `game.interact` é cortado em 8 níveis.
+- **Máquinas de estado** (`engine/src/fsm.ts`, V0.2): `StateMachineRunner` por mundo, depois das regras. Estado vivo em
+  `Entity.fsm` (`state`, `previous`, `since` = frame de entrada; criado do `initial`, entra no primeiro frame). Por frame
+  e entidade: transições "de qualquer estado" e depois as do estado atual; a primeira com `after` (frames no estado),
+  `event` (eventos novos do frame, lidos por contagem como nas regras; `"$self"` no `match`) e `when` (expressão com
+  `self`) satisfeitos é tomada — no máximo uma por frame, ida ao próprio estado é ignorada. Troca: ações `exit`, evento
+  `state_change {entity, from, to}`, ações `enter` (target `"$self"`), hook `onStateChange`. Scripts usam `self.fsm`
+  (`state`, `previous`, `time`, `is`, `go`); `go` troca na hora. Erro → `state_error`, máquina daquela entidade
+  desligada até recarregar a cena. Trocas aninhadas (onStateChange → go...) param em 8 níveis.
+- **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
+  conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).
 - **Troca de cena:** variáveis são mantidas; frame/tempo/eventos continuam acumulando.
 

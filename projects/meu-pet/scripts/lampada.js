@@ -1,5 +1,5 @@
 // Lâmpada: clicar acende ou apaga a luz do quarto (o pet dorme melhor no escuro).
-function onClick(self, game) {
+function onInteract(self, by, game) {
   const pet = game.entity('pet');
   if (pet && pet.state.api) pet.state.api.alternarLuz();
   game.playSound('sfx_clique');

@@ -8,8 +8,14 @@ import { z } from 'zod';
 
 const Value = z.union([z.number(), z.string(), z.boolean()]);
 const Expr = z.string().min(1);
-/** Entity id, or "$by" for the entity that entered the zone / caused the event that fired the rule. */
-const Target = z.string().min(1).describe('Entity id, or "$by": the entity that entered the zone (or the "by"/"entity" of the event).');
+/**
+ * Entity id, "$by" for the entity that entered the zone / caused the event that fired the rule, or
+ * "$entity" for the zone / the event's "entity" (e.g. the interactable of an "interact" event).
+ */
+const Target = z
+  .string()
+  .min(1)
+  .describe('Entity id, "$by" (the entity that entered the zone, or the "by"/"entity" of the event) or "$entity" (the zone, or the "entity" of the event).');
 
 export const RuleTriggerSchema = z.union([
   z.strictObject({ start: z.literal(true).describe('Once, when the scene starts.') }),
@@ -68,3 +74,4 @@ export const RuleSchema = z.strictObject({
 export type RuleTrigger = z.output<typeof RuleTriggerSchema>;
 export type RuleAction = z.output<typeof RuleActionSchema>;
 export type Rule = z.output<typeof RuleSchema>;
+export type RuleInput = z.input<typeof RuleSchema>;

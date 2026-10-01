@@ -1,5 +1,16 @@
 import { createHash } from 'node:crypto';
-import { evaluateExpr, ExprError, Game, msToFrames, type ClockOptions, type EntitySnapshot, type GameEvent, type GameOp, type LogEntry } from '@vibe/engine';
+import {
+  evaluateExpr,
+  ExprError,
+  Game,
+  msToFrames,
+  type ClockOptions,
+  type EntitySnapshot,
+  type GameEvent,
+  type GameOp,
+  type InputStep,
+  type LogEntry,
+} from '@vibe/engine';
 import type { Project } from '@vibe/shared';
 import { ToolError } from '../project-store';
 
@@ -67,6 +78,19 @@ export class GameSession {
 
   applyAll(ops: GameOp[]) {
     for (const op of ops) this.apply(op);
+  }
+
+  /** Input steps, each expanded in the current state (a click on an entity aims at where it is then). */
+  perform(steps: InputStep[]) {
+    for (const step of steps) {
+      let ops: GameOp[];
+      try {
+        ops = this.game.expand(step);
+      } catch (err) {
+        throw new ToolError(err instanceof Error ? err.message : String(err));
+      }
+      this.applyAll(ops);
+    }
   }
 
   /** Steps frame by frame until `expr` is truthy or `maxMs` of simulated time passes. */

@@ -73,6 +73,7 @@ export const DEFAULT_ACTIONS: Record<string, string[]> = {
   up: ['W', 'ArrowUp'],
   down: ['S', 'ArrowDown'],
   jump: ['Space', 'W', 'ArrowUp'],
+  interact: ['E'],
 };
 
 export const ProjectConfigSchema = z.strictObject({

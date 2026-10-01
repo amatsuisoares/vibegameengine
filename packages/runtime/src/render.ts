@@ -1,4 +1,4 @@
-import { formatText, type Entity, type GameStatus, type World } from '@vibe/engine';
+import { formatText, hitBox, type Entity, type GameStatus, type World } from '@vibe/engine';
 
 /**
  * Rendering is split in two phases so it can be tested without a browser:
@@ -94,8 +94,57 @@ export function buildDrawList(world: World): DrawCmd[] {
       });
     }
   }
+  out.push(...promptCmds(world));
   // Array.prototype.sort is stable: equal layers keep scene order.
   return out.sort((a, b) => a.layer - b.layer);
+}
+
+export const PROMPT_LAYER = 1000;
+const PROMPT_FONT = 14;
+
+/** "[E] Open" above the interactable the interaction key would use now (only when it has a label). */
+function promptCmds(world: World): DrawCmd[] {
+  const focus = world.interactFocus;
+  const target = focus && world.get(focus.entity);
+  const c = target?.components.Interactable;
+  if (!target || !c?.label) return [];
+  const cam = world.camera;
+  const box = hitBox(target);
+  const key = world.config.actions[c.key]?.[0] ?? c.key;
+  const text = `[${key}] ${c.label}`;
+  const x = ((box ? box.x + box.w / 2 : target.x) - cam.x) * cam.zoom;
+  const y = ((box ? box.y : target.y) - cam.y) * cam.zoom - PROMPT_FONT;
+  const id = `${target.id}:prompt`;
+  const backdrop: SpriteCmd = {
+    kind: 'sprite',
+    id,
+    layer: PROMPT_LAYER,
+    x,
+    y,
+    w: text.length * PROMPT_FONT * 0.6 + 10,
+    h: PROMPT_FONT + 8,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+    opacity: 0.75,
+    shape: 'rect',
+    color: '#000000',
+    frame: 0,
+  };
+  const label: TextCmd = {
+    kind: 'text',
+    id,
+    layer: PROMPT_LAYER,
+    x,
+    y,
+    lines: [text],
+    font: 'monospace',
+    fontSize: PROMPT_FONT,
+    color: '#ffffff',
+    align: 'center',
+    baseline: 'middle',
+  };
+  return [backdrop, label];
 }
 
 function spriteCmd(e: Entity, world: World): SpriteCmd | null {

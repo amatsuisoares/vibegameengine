@@ -1,4 +1,5 @@
 import type { Components, EntityData } from '@vibe/shared';
+import type { FsmState } from './fsm';
 import type { AABB } from './math';
 import type { ScriptInstance } from './scripts';
 
@@ -35,6 +36,10 @@ export class Entity {
   animTime = 0;
   /** Mover progress: waypoint index, direction (ping-pong) and remaining pause in frames. */
   mover?: { target: number; dir: number; wait: number };
+  /** Interactable state: frame from which it can be used again, successful uses. */
+  interact?: { readyAt: number; uses: number };
+  /** StateMachine state (created on first use; see fsm.ts). */
+  fsm?: FsmState;
   /** Script instance (created on first use by the ScriptRunner). */
   script?: ScriptInstance;
 

@@ -1,6 +1,8 @@
 import type { ComponentType, VarValue } from '@vibe/shared';
 import { checkSpeed, type GameClock } from './clock';
 import type { Entity } from './entity';
+import { fsmOf, stateMs, type StateMachineRunner } from './fsm';
+import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
 import type { GameStorage } from './storage';
 import { screenToWorld } from './systems/camera';
@@ -16,6 +18,8 @@ import { FIXED_DT, type GameEvent, type World } from './world';
  *   function onCollision(self, other, game) {}   // when a contact with `other` begins
  *   function onClick(self, game, pos) {}          // the entity was clicked (left button; pos in world px)
  *   function onEvent(self, event, game) {}        // every game event (end of frame), incl. custom ones
+ *   function onInteract(self, by, game, info) {}  // self (an Interactable) was used; by = actor or null, info = { action, via }
+ *   function onStateChange(self, change, game) {} // self's StateMachine changed state: change = { from, to } (from null at start)
  *
  * Top-level variables are per entity (each entity runs its own copy of the script).
  * Scripts only see `self`, `game`, `console` and a deterministic `Math` (Math.random is
@@ -28,14 +32,30 @@ export interface ScriptHooks {
   onCollision?: (self: ScriptEntity, other: ScriptEntity, game: ScriptGame) => void;
   onClick?: (self: ScriptEntity, game: ScriptGame, pos: { x: number; y: number }) => void;
   onEvent?: (self: ScriptEntity, event: GameEvent, game: ScriptGame) => void;
+  onInteract?: (self: ScriptEntity, by: ScriptEntity | null, game: ScriptGame, info: { action: string; via: InteractVia }) => void;
+  onStateChange?: (self: ScriptEntity, change: { from: string | null; to: string }, game: ScriptGame) => void;
 }
 
-const HOOKS = ['onStart', 'onUpdate', 'onCollision', 'onClick', 'onEvent'] as const;
+const HOOKS = ['onStart', 'onUpdate', 'onCollision', 'onClick', 'onEvent', 'onInteract', 'onStateChange'] as const;
 
-/** What scripts reach beyond the world: the calendar clock and the saved data. */
+/** What scripts reach beyond the world: the calendar clock, the saved data, interactions and state machines. */
 export interface ScriptHost {
   clock: GameClock;
   storage: GameStorage;
+  readonly interactions: InteractionRunner;
+  readonly stateMachines: StateMachineRunner;
+}
+
+/** self.fsm: the entity's StateMachine (state is null without one). */
+export interface ScriptFsm {
+  readonly state: string | null;
+  readonly previous: string | null;
+  /** Seconds in the current state. */
+  readonly time: number;
+  /** True if the current state is any of these. */
+  is(...states: string[]): boolean;
+  /** Changes state now (exit/enter actions, onStateChange); false if already in it. */
+  go(state: string): boolean;
 }
 
 type Factory = (math: Math, console: ScriptConsole) => ScriptHooks;
@@ -128,6 +148,8 @@ export interface ScriptEntity {
   readonly props: Record<string, VarValue>;
   /** Free per-entity storage for the script. */
   readonly state: Record<string, unknown>;
+  /** The entity's StateMachine. */
+  readonly fsm: ScriptFsm;
   /** Live component data (changes apply immediately), or undefined. */
   get(type: ComponentType): Record<string, unknown> | undefined;
   damage(amount: number): boolean;
@@ -174,6 +196,13 @@ export interface ScriptGame {
   playSound(asset: string, volume?: number): void;
   /** Creates an entity from a prefab (prefabs/<id>.json) at (x, y); returns it. */
   spawn(prefab: string, x: number, y: number, id?: string): ScriptEntity;
+  /**
+   * Uses the Interactable of `target` (id or entity), optionally as `actor` (then its tags and
+   * range are checked). Same checks and events as a player interaction; returns { ok, reason? }.
+   */
+  interact(target: string | ScriptEntity, actor?: string | ScriptEntity): InteractResult;
+  /** Enabled interactables that `actor` may use and is in range of, nearest first. */
+  nearbyInteractables(actor: string | ScriptEntity): NearbyInteractable[];
 }
 
 /** Builds the `self`/`game` objects scripts see, bound to one world. */
@@ -184,11 +213,17 @@ class ScriptApi {
 
   constructor(
     private readonly world: World,
-    host: ScriptHost,
+    private readonly host: ScriptHost,
   ) {
     const w = world;
     const input = w.input;
     const { clock, storage } = host;
+    const resolve = (ref: string | ScriptEntity | undefined, what: string): Entity => {
+      const id = typeof ref === 'string' ? ref : ref?.id;
+      const e = id === undefined ? undefined : w.get(id);
+      if (!e) throw new Error(`${what}: entity "${String(id)}" does not exist`);
+      return e;
+    };
     this.game = {
       get frame() {
         return w.frame;
@@ -276,6 +311,9 @@ class ScriptApi {
       },
       playSound: (asset, volume = 1) => emitSound(w, asset, finite(volume, 'volume'), 'script'),
       spawn: (prefab, x, y, id) => this.entity(w.spawn(prefab, x, y, id)),
+      interact: (target, actor) =>
+        host.interactions.attempt(resolve(target, 'game.interact target'), actor === undefined ? undefined : resolve(actor, 'game.interact actor'), 'script'),
+      nearbyInteractables: (actor) => host.interactions.nearby(resolve(actor, 'game.nearbyInteractables')),
     };
   }
 
@@ -285,6 +323,21 @@ class ScriptApi {
     const w = this.world;
     const states = this.states;
     const body = () => e.components.Body;
+    const host = this.host;
+    const fsm: ScriptFsm = {
+      get state() {
+        return fsmOf(e)?.state ?? null;
+      },
+      get previous() {
+        return fsmOf(e)?.previous ?? null;
+      },
+      get time() {
+        const st = fsmOf(e);
+        return st ? stateMs(w, st) / 1000 : 0;
+      },
+      is: (...names) => names.includes(fsmOf(e)?.state as string),
+      go: (to) => host.stateMachines.go(e, String(to)),
+    };
     api = {
       id: e.id,
       name: e.name,
@@ -357,6 +410,7 @@ class ScriptApi {
         if (!s) states.set(e, (s = {}));
         return s;
       },
+      fsm,
       get: (type) => e.components[type] as Record<string, unknown> | undefined,
       damage: (amount) => applyDamage(w, e, amount),
       destroy: () => w.destroy(e),
@@ -444,10 +498,9 @@ export class ScriptRunner {
     }
   }
 
-  /** onStart (once) and onUpdate for every active scripted entity; first, clicks. */
+  /** onStart (once) and onUpdate for every active scripted entity. */
   update(dt: number) {
     const w = this.world;
-    this.clicks();
     for (const e of [...w.entities]) {
       if (!e.active || w.status !== 'running') continue;
       const inst = this.instance(e);
@@ -461,21 +514,32 @@ export class ScriptRunner {
     }
   }
 
-  /**
-   * A left click goes to the topmost clickable entity under the mouse: one whose script has
-   * onClick, or that is tagged "clickable" (rules can react to its "click" event).
-   */
-  private clicks() {
-    const w = this.world;
-    const at = w.input.leftPressPosition();
-    if (!at || w.status !== 'running') return;
-    const pos = screenToWorld(w, at.x, at.y);
-    const target = topmostAt(w, pos.x, pos.y, (e) => e.hasTag('clickable') || !!this.instance(e)?.hooks.onClick);
-    if (!target) return;
-    w.emit('click', { entity: target.id, x: Math.round(pos.x), y: Math.round(pos.y) });
+  hasClickHandler(e: Entity) {
+    return !!this.instance(e)?.hooks.onClick;
+  }
+
+  /** onClick of the clicked entity (the InteractionRunner picks it). */
+  click(target: Entity, pos: { x: number; y: number }) {
     const inst = this.instance(target);
     if (inst && !inst.failed && inst.hooks.onClick) {
       this.call(target, inst, 'onClick', () => inst.hooks.onClick!(this.api.entity(target), this.api.game, pos));
+    }
+  }
+
+  /** onStateChange of an entity whose StateMachine changed state. */
+  stateChanged(e: Entity, change: { from: string | null; to: string }) {
+    const inst = this.instance(e);
+    if (inst && !inst.failed && inst.hooks.onStateChange && e.active) {
+      this.call(e, inst, 'onStateChange', () => inst.hooks.onStateChange!(this.api.entity(e), { ...change }, this.api.game));
+    }
+  }
+
+  /** onInteract of an interactable that was used. */
+  interact(target: Entity, by: Entity | undefined, info: { action: string; via: InteractVia }) {
+    const inst = this.instance(target);
+    if (inst && !inst.failed && inst.hooks.onInteract && target.active) {
+      const actor = by ? this.api.entity(by) : null;
+      this.call(target, inst, 'onInteract', () => inst.hooks.onInteract!(this.api.entity(target), actor, this.api.game, { ...info }));
     }
   }
 
@@ -509,34 +573,6 @@ export class ScriptRunner {
       }
     }
   }
-}
-
-/** Box used for clicks: the Collider, else the (scaled) Sprite. */
-function hitBox(e: Entity) {
-  const box = e.aabb();
-  if (box) return box;
-  const s = e.components.Sprite;
-  if (!s || !s.visible) return null;
-  const w = s.width * Math.abs(e.scaleX);
-  const h = s.height * Math.abs(e.scaleY);
-  return { x: e.x - w / 2, y: e.y - h / 2, w, h };
-}
-
-/** Topmost (highest Sprite layer, then latest in the scene) active entity containing the point. */
-function topmostAt(world: World, x: number, y: number, accept: (e: Entity) => boolean): Entity | null {
-  let best: Entity | null = null;
-  let bestLayer = -Infinity;
-  for (const e of world.entities) {
-    if (!e.active) continue;
-    const b = hitBox(e);
-    if (!b || x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h || !accept(e)) continue;
-    const layer = e.components.Sprite?.layer ?? 0;
-    if (layer >= bestLayer) {
-      best = e;
-      bestLayer = layer;
-    }
-  }
-  return best;
 }
 
 function describe(err: unknown, file: string, e: Entity, where: string): string {

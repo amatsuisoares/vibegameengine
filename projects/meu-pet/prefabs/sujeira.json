@@ -17,6 +17,7 @@
       "align": "center",
       "screenSpace": false,
       "layer": 8
-    }
+    },
+    "Interactable": { "action": "limpar", "via": ["click"] }
   }
 }

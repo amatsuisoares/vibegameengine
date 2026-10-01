@@ -1,15 +1,15 @@
-import type { ComponentType, Rule, RuleAction } from '@vibe/shared';
+import type { Rule, RuleAction } from '@vibe/shared';
+import { runAction } from './actions';
 import type { Entity } from './entity';
 import { compileExpr, ExprError, type ExprScope } from './expr';
 import type { Game } from './game';
-import { emitSound } from './sound';
-import { applyDamage } from './systems/interactions';
-
 import { FIXED_DT, type GameEvent, type World } from './world';
 
 interface FireContext {
   /** Entity behind the trigger: the one that entered the zone, or the event's "by"/"entity". */
   by?: Entity;
+  /** The zone of an "enter" trigger, or the event's "entity". */
+  entity?: Entity;
 }
 
 /**
@@ -55,14 +55,14 @@ export class RuleRunner {
         } else if ('event' in when) {
           for (const ev of fresh) {
             if (ev.type !== when.event || !matches(ev, when.match)) continue;
-            this.fire(rule, { by: this.entityOf(ev) });
+            this.fire(rule, { by: this.entityOf(ev), entity: typeof ev.entity === 'string' ? this.world.get(ev.entity) : undefined });
             if (rule.once && this.fired.has(rule.id)) break;
           }
         } else if ('enter' in when) {
           for (const [a, b] of entered) {
-            const other = a.id === when.enter ? b : b.id === when.enter ? a : null;
-            if (!other || !other.hasTag(when.tag)) continue;
-            this.fire(rule, { by: other });
+            const [zone, other] = a.id === when.enter ? [a, b] : b.id === when.enter ? [b, a] : [null, null];
+            if (!zone || !other.hasTag(when.tag)) continue;
+            this.fire(rule, { by: other, entity: zone });
             if (rule.once && this.fired.has(rule.id)) break;
           }
         } else if ('expr' in when) {
@@ -131,80 +131,25 @@ export class RuleRunner {
       if (!ctx.by) throw new Error('"$by" has no entity for this trigger');
       return ctx.by;
     }
+    if (target === '$entity') {
+      if (!ctx.entity) throw new Error('"$entity" has no entity for this trigger');
+      return ctx.entity;
+    }
     const e = this.world.get(target);
     if (!e) throw new Error(`entity "${target}" no longer exists`);
     return e;
   }
 
   private act(rule: Rule, a: RuleAction, ctx: FireContext) {
-    const w = this.world;
-    switch (a.action) {
-      case 'setVar':
-        w.vars[a.var] = a.value;
-        return;
-      case 'addVar':
-        w.addVar(a.var, a.amount);
-        return;
-      case 'emit':
-        w.emit(a.event, { ...a.data, rule: rule.id });
-        return;
-      case 'win':
-      case 'lose':
-        w.status = a.action === 'win' ? 'won' : 'lost';
-        w.emit(a.action, { by: 'rule', rule: rule.id });
-        w.console.log(`${a.action.toUpperCase()} by rule "${rule.id}"`, 'rules');
-        return;
-      case 'loadScene':
-        w.pendingScene = a.scene;
-        return;
-      case 'destroy':
-        w.destroy(this.target(a.target, ctx));
-        return;
-      case 'setEnabled':
-        this.target(a.target, ctx).enabled = a.enabled;
-        return;
-      case 'setText': {
-        const e = this.target(a.target, ctx);
-        if (!e.components.Text) throw new Error(`entity "${e.id}" has no Text component`);
-        e.components.Text.text = a.text;
-        return;
-      }
-      case 'damage':
-        applyDamage(w, this.target(a.target, ctx), a.amount, undefined, true);
-        return;
-      case 'heal': {
-        const h = this.target(a.target, ctx).components.Health;
-        if (h) h.current = Math.min(h.max, (h.current ?? h.max) + a.amount);
-        return;
-      }
-      case 'move': {
-        const e = this.target(a.target, ctx);
-        if (a.x !== undefined) e.x = a.x;
-        if (a.y !== undefined) e.y = a.y;
-        return;
-      }
-      case 'modify': {
-        const e = this.target(a.target, ctx);
-        const data = e.components[a.component as ComponentType];
-        if (!data) throw new Error(`entity "${e.id}" has no ${a.component} component`);
-        Object.assign(data, structuredClone(a.set));
-        return;
-      }
-      case 'log':
-        w.console.log(a.message, `rule:${rule.id}`);
-        return;
-      case 'playSound':
-        emitSound(w, a.asset, a.volume, `rule:${rule.id}`);
-        return;
-      case 'spawn': {
-        const at = a.at ? this.target(a.at, ctx) : null;
-        w.spawn(a.prefab, (at?.x ?? 0) + (a.x ?? 0), (at?.y ?? 0) + (a.y ?? 0), a.id);
-        return;
-      }
-    }
+    runAction(this.world, a, (ref) => this.target(ref, ctx), {
+      kind: 'rule',
+      data: { rule: rule.id },
+      label: `rule "${rule.id}"`,
+      source: `rule:${rule.id}`,
+    });
   }
 }
 
-function matches(ev: GameEvent, match: Record<string, unknown> | undefined) {
+export function matches(ev: GameEvent, match: Record<string, unknown> | undefined) {
   return !match || Object.entries(match).every(([k, v]) => ev[k] === v);
 }

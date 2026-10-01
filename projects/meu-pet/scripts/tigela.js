@@ -1,5 +1,5 @@
 // Tigela: clicar enche (3 porções). A ração aparece conforme o que sobrou.
-function onClick(self, game) {
+function onInteract(self, by, game) {
   const pet = game.entity('pet');
   if (pet && pet.state.api) pet.state.api.encherTigela();
 }

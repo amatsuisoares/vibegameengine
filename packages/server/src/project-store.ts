@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { Script } from 'node:vm';
 import { parseExpr, SCRIPT_PARAMS, wrapScript } from '@vibe/engine';
-import { formatIssues, MEMORY_FILE, parseProject, ProjectMemorySchema, SCRIPT_PATH, type Project, type ProjectMemory } from '@vibe/shared';
+import { formatIssues, MEMORY_FILE, parseProject, ProjectMemorySchema, SCRIPT_PATH, type Components, type Project, type ProjectMemory } from '@vibe/shared';
 import { removeFile, writeFileAtomic } from './fs-atomic';
 import { History, unifiedDiff, type Author, type FileChange, type HistoryEntry } from './history';
 import { formatJson } from './json-format';
@@ -90,10 +90,29 @@ export function checkScriptSyntax(file: string, source: string): string | null {
   }
 }
 
-/** Syntax errors in scene rule expressions (`when.expr` and `if`). */
-function ruleExpressionErrors(project: Project): string[] {
+/** Syntax errors in expressions: scene rules (`when.expr` and `if`), Interactable conditions, StateMachine `when`s. */
+function expressionErrors(project: Project): string[] {
   const errors: string[] = [];
+  const check = (src: string | undefined, at: string) => {
+    if (src === undefined) return;
+    try {
+      parseExpr(src);
+    } catch (err) {
+      errors.push(`${at}: ${(err as Error).message}`);
+    }
+  };
+  const checkEntity = (c: Components, at: string) => {
+    check(c.Interactable?.condition, `${at}.components.Interactable.condition`);
+    const sm = c.StateMachine;
+    if (!sm) return;
+    sm.transitions.forEach((t, i) => check(t.when, `${at}.components.StateMachine.transitions[${i}].when`));
+    for (const [name, state] of Object.entries(sm.states)) {
+      state.transitions.forEach((t, i) => check(t.when, `${at}.components.StateMachine.states.${name}.transitions[${i}].when`));
+    }
+  };
+  for (const [id, prefab] of Object.entries(project.prefabs)) checkEntity(prefab.components, `prefabs.${id}`);
   for (const scene of Object.values(project.scenes)) {
+    for (const e of scene.entities) checkEntity(e.components, `scenes.${scene.id}.entities(${e.id})`);
     for (const rule of scene.rules) {
       const at = `scenes.${scene.id}.rules(${rule.id})`;
       const exprs: [string, string | undefined][] = [['when.expr', 'expr' in rule.when ? rule.when.expr : undefined], ['if', rule.if]];
@@ -235,7 +254,7 @@ export class ProjectStore {
     const prefabs = Object.fromEntries(snap.prefabs.map((p) => [p.id, p.data]));
     const r = parseProject({ config: snap.config, scenes, scripts: snap.scripts, prefabs });
     if (!r.ok) return { ok: false, errors: r.errors, warnings: r.warnings };
-    const exprErrors = ruleExpressionErrors(r.value);
+    const exprErrors = expressionErrors(r.value);
     if (exprErrors.length) return { ok: false, errors: exprErrors, warnings: r.warnings };
     const warnings = [...r.warnings];
     for (const a of r.value.config.assets) {

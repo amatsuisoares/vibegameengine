@@ -24,7 +24,13 @@ const InputStepSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('mouseMove'), x: z.number(), y: z.number() }),
   z.object({ type: z.literal('mouseDown'), button: Button.optional() }),
   z.object({ type: z.literal('mouseUp'), button: Button.optional() }),
-  z.object({ type: z.literal('click'), x: z.number().optional(), y: z.number().optional(), button: Button.optional() }),
+  z.object({
+    type: z.literal('click'),
+    x: z.number().optional(),
+    y: z.number().optional(),
+    entity: z.string().optional().describe('Click the center of this entity (instead of x/y), wherever it is on screen.'),
+    button: Button.optional(),
+  }),
   z.object({ type: z.literal('type'), text: z.string().min(1).describe('Characters typed (e.g. a name); "\\b" = Backspace, "\\n" = Enter. Advances 1 frame.') }),
 ]);
 
@@ -69,7 +75,8 @@ function observe(ctx: ToolContext, extra: Record<string, unknown> = {}) {
 }
 
 function totalMs(steps: InputStep[]) {
-  return expandInputSteps(steps).reduce((ms, op) => ms + (op.op === 'step' ? (op.frames * 1000) / 60 : 0), 0);
+  const timed = steps.map((s) => (s.type === 'click' ? { ...s, entity: undefined } : s));
+  return expandInputSteps(timed).reduce((ms, op) => ms + (op.op === 'step' ? (op.frames * 1000) / 60 : 0), 0);
 }
 
 function checkExpr(game: Game, expr: string, sinceFrame: number) {
@@ -158,10 +165,16 @@ export const runtimeTools = [
   defineTool({
     name: 'click_mouse',
     changesRun: true,
-    description: 'Clicks (press, 1 frame, release), optionally moving to viewport coordinates first.',
-    input: z.object({ x: z.number().optional(), y: z.number().optional(), button: Button.optional() }),
+    description:
+      'Clicks (press, 1 frame, release), optionally moving to viewport coordinates first, or to the center of an entity (entity: id) — like a player clicking it. The "click" event says what was hit.',
+    input: z.object({
+      x: z.number().optional(),
+      y: z.number().optional(),
+      entity: z.string().optional().describe('Entity to click (its Collider/Sprite center on screen). Use instead of x/y.'),
+      button: Button.optional(),
+    }),
     run: (ctx, input) => {
-      session(ctx).applyAll(expandInputSteps([{ type: 'click', ...input }]));
+      session(ctx).perform([{ type: 'click', ...input }]);
       return observe(ctx);
     },
   }),
@@ -214,7 +227,7 @@ export const runtimeTools = [
     input: z.object({ steps: z.array(InputStepSchema).min(1) }),
     run: (ctx, { steps }) => {
       if (totalMs(steps) > MAX_WAIT_MS) throw new ToolError(`Steps add up to more than ${MAX_WAIT_MS} ms; split them into several calls`);
-      session(ctx).applyAll(expandInputSteps(steps));
+      session(ctx).perform(steps);
       return observe(ctx);
     },
   }),
@@ -337,7 +350,11 @@ export const runtimeTools = [
           checks.push({ step: i, expr: `waitUntil ${step.expr}`, ...r, waitedMs: Math.round((frames * 1000) / 60) });
         } else {
           simulatedMs += totalMs([step]);
-          game.perform([step]);
+          try {
+            game.perform([step]);
+          } catch (err) {
+            throw new ToolError(`step ${i}: ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
         if (simulatedMs > MAX_TEST_MS) throw new ToolError(`Test exceeds ${MAX_TEST_MS} ms of simulated time`);
       });

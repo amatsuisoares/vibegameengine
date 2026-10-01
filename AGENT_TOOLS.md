@@ -101,10 +101,93 @@ Ações: `setVar {var, value}`, `addVar {var, amount}`, `emit {event, data?}`, `
 `destroy {target}`, `setEnabled {target, enabled}`, `setText {target, text}`, `damage {target, amount}`,
 `heal {target, amount}`, `move {target, x?, y?}`, `modify {target, component, set}`, `log {message}`,
 `playSound {asset, volume?}`, `spawn {prefab, x?, y?, at?, id?}`.
-`target` é um id ou `"$by"` (quem entrou na zona, ou o `by`/`entity` do evento). `if` e `when.expr` usam as mesmas
+`target` é um id, `"$by"` (quem entrou na zona, ou o `by`/`entity` do evento) ou `"$entity"` (a zona, ou o `entity`
+do evento — por exemplo o objeto de um `interact`). `if` e `when.expr` usam as mesmas
 expressões do `wait_until`. Cada disparo gera o evento `rule`. Referências (ids, cenas, componentes) e expressões são
 validadas ao gravar; uma regra que falha em execução gera `rule_error`, vai para o console e fica desligada até a
 cena recarregar. Eventos emitidos por uma regra são vistos pelas outras no frame seguinte (sem laços infinitos).
+
+## Interações (`Interactable`)
+
+Implementado na V0.2 (`packages/engine/src/interact.ts`). Um componente genérico para tudo que se *usa*: abrir porta,
+conversar, pegar item, alimentar, ativar máquina, entrar numa área, clicar num objeto. A engine decide **se** a interação
+acontece e avisa; **o que** ela faz fica com regras ou scripts do jogo.
+
+```json
+"door": { "components": { "Sprite": {}, "Interactable": { "action": "open", "label": "Abrir", "condition": "vars.keys >= 1", "once": true } } }
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `action` | `"use"` | verbo que vai no evento (`open`, `talk`, `feed`, `pickup`...) |
+| `label` | — | rótulo para o jogador: com interação por tecla em alcance, o jogo desenha `[E] Abrir` acima do objeto |
+| `via` | `["click", "key"]` | `click`: clique esquerdo no objeto. `key`: um ator em alcance aperta `key`. `enter`: dispara quando um ator entra no alcance. Scripts sempre podem chamar `game.interact()` |
+| `key` | `"interact"` | ação de `config.actions` (padrão `interact: ["E"]`) ou nome de tecla |
+| `actorTags` | `["player"]` | quem interage por tecla, por entrada ou como ator de `game.interact` |
+| `range` | `32` | distância máxima em px entre a caixa do ator e a do objeto (0 = encostando); não vale para clique |
+| `condition` | — | expressão (mesma linguagem do `wait_until`) que precisa ser verdadeira |
+| `cooldownMs` | `0` | tempo depois de um sucesso até poder de novo |
+| `once` | `false` | desliga (`enabled: false`) depois do primeiro sucesso |
+| `enabled` | `true` | `false`: ignorado por clique, tecla e entrada (regras `modify` e scripts podem alternar) |
+| `sound` | — | asset de áudio tocado no sucesso |
+
+- **Eventos:** `interact {entity, action, via, by?, label?}` no sucesso; `interact_blocked {entity, action, via, by?,
+  reason}` quando uma tentativa falha — `reason`: `disabled`, `actor` (ator sem a tag), `range`, `cooldown` (com
+  `cooldownMs` restante), `condition` (falsa) ou `error` (expressão com erro, também vai para o console).
+- **Tecla:** usa o objeto mais próximo em alcance (empate: ordem da cena). **Clique:** o objeto de cima sob o mouse
+  (como `onClick`); um `Interactable` desligado deixa o clique passar. **Entrada:** uma vez por aproximação (sair do
+  alcance e voltar dispara de novo).
+- **Regras:** `{"when": {"event": "interact", "match": {"action": "pickup"}}, "do": [{"action": "addVar", "var": "itens",
+  "amount": 1}, {"action": "destroy", "target": "$entity"}]}` — `$by` é o ator, `$entity` o objeto.
+- **Scripts:** hook `onInteract(self, by, game, info)` no objeto (`by` = ator ou `null` no clique; `info = {action, via}`);
+  `game.interact(alvo, ator?)` tenta interagir (via `script`, com as mesmas checagens; devolve `{ok, reason?}`) — é o
+  caminho para NPCs/pets usarem objetos; `game.nearbyInteractables(ator)` lista o que o ator alcança, do mais perto.
+- **Estado:** `inspect_game_state` mostra em cada entidade com o componente `interactable: {action, label?, via,
+  enabled, uses, cooldownMs?, inRange}` (`inRange` = atores em alcance); expressões leem
+  `entity('door').interactable.uses`.
+- **Agente:** joga como um jogador — `press_key E` perto do objeto, ou `click_mouse {entity: "door"}` (clica no centro
+  do objeto na tela, onde quer que a câmera esteja). Não há tool própria de interação: tudo passa pelo input virtual
+  e o replay continua exato.
+- **Limites:** um `Interactable` por entidade (uma ação; para várias, o script decide por `via`/`by`); a condição não
+  enxerga o ator (use `game.interact` num script quando precisar).
+
+## Máquinas de estado (`StateMachine`)
+
+Implementado na V0.2 (`packages/engine/src/fsm.ts`). Para NPCs, inimigos, pets, objetos e chefes simples: a entidade
+está sempre em um estado nomeado, e a engine troca de estado sozinha pelas transições. Sem scripts cheios de `if`.
+
+```json
+"StateMachine": {
+  "initial": "patrol",
+  "transitions": [{ "to": "dead", "when": "self.health <= 0" }],
+  "states": {
+    "patrol": { "transitions": [{ "to": "chase", "when": "distance(self, 'player') < 120" }] },
+    "chase":  { "enter": [{ "action": "modify", "target": "$self", "component": "FollowTarget", "set": { "speed": 120 } }],
+                "exit":  [{ "action": "modify", "target": "$self", "component": "FollowTarget", "set": { "speed": 0 } }],
+                "transitions": [{ "to": "patrol", "when": "distance(self, 'player') > 200", "after": 1000 }] },
+    "dead":   { "enter": [{ "action": "destroy", "target": "$self" }] }
+  }
+}
+```
+
+- **Transição** `{to, when?, after?, event?, match?}`: todas as condições dadas precisam valer — `when` (expressão; `self`
+  é a própria entidade), `after` (ms mínimos no estado atual), `event` (evento desse tipo no frame; `match` compara
+  campos, `"$self"` = id da entidade, ex. `{"event": "interact", "match": {"entity": "$self"}}`). Sem condições = troca
+  imediata.
+- **Ordem:** a cada frame (depois das regras), primeiro `transitions` do topo (de qualquer estado), depois as do estado
+  atual; a primeira que vale é tomada. No máximo uma troca por frame; ir para o estado atual é ignorado.
+- **Entrada/saída:** `enter`/`exit` usam as mesmas ações das regras, com `target: "$self"` (ou um id). O estado inicial
+  também roda `enter` (no primeiro frame).
+- **Eventos:** `state_change {entity, from, to}` (o primeiro tem `from: null`); `state_error {entity, state, message}`
+  quando uma expressão/ação falha — a máquina daquela entidade para até recarregar a cena (as outras seguem).
+- **Estado observado:** `inspect_game_state` traz `state`, `stateMs` (tempo no estado) e `prevState`; expressões leem
+  `entity('guard').state == 'chase'` (bom para `wait_until` e `run_test`).
+- **Scripts:** `self.fsm.state`, `.previous`, `.time` (s no estado), `.is('a', 'b')`, `.go('estado')` (troca agora,
+  com exit/enter; devolve `false` se já está nele; estado inexistente é erro). Hook `onStateChange(self, {from, to}, game)`.
+  O efeito contínuo de um estado (andar, perseguir) fica no `onUpdate`, lendo `self.fsm.state`.
+- **Validação ao gravar:** `initial` e cada `to` precisam existir; alvos de ações são `"$self"` ou ids da cena; `when`
+  com erro de sintaxe é recusado.
+- **Limites:** uma máquina por entidade; sem estados hierárquicos; `"$by"`/`"$entity"` não existem nas ações de estado.
 
 ## Assets e som
 
@@ -157,6 +240,8 @@ function onCollision(self, other, game) {
 | `onCollision(self, other, game)` | quando um contato começa (dos dois lados) |
 | `onClick(self, game, pos)` | clique esquerdo na entidade (a de cima, por `Sprite.layer`, cuja caixa Collider/Sprite contém o ponto) |
 | `onEvent(self, event, game)` | cada evento do jogo (fim do frame), inclusive os emitidos por scripts e regras |
+| `onInteract(self, by, game, info)` | o `Interactable` da entidade foi usado (ver [Interações](#interações-interactable)) |
+| `onStateChange(self, change, game)` | a `StateMachine` da entidade trocou de estado: `change = {from, to}` (ver [Máquinas de estado](#máquinas-de-estado-statemachine)) |
 
 - `self`: `id, name, tags, hasTag(t), x, y, vx, vy` (velocidade exige `Body`), `grounded, enabled, destroyed, health,
   props, state` (armazenamento livre), `get(tipo)` (dados vivos do componente), `damage(n)`, `destroy()`.
@@ -174,6 +259,8 @@ function onCollision(self, other, game) {
   runs começam de `run_game.storage`. Para tempo
   offline: salve `clock.now` e, no `onStart`, compare com o relógio atual.
 - Entidades com a tag `clickable` (sem script) também recebem clique: gera o evento `click {entity}` para regras.
+- `game.interact(alvo, ator?)` e `game.nearbyInteractables(ator)`: ver [Interações](#interações-interactable).
+- `self.fsm` (`state, previous, time, is(...), go(estado)`): ver [Máquinas de estado](#máquinas-de-estado-statemachine).
 - Também `console.log/warn/error` (vão para o console do jogo) e `Math` com `Math.random` usando a seed da run.
 - **Determinismo:** `Date`, timers, rede, `process`, `window` e `globalThis` não existem para o script. É uma API
   restrita para lógica de jogo, não uma sandbox de segurança.
@@ -202,12 +289,12 @@ reproduzir a run no Chromium para o screenshot.
 | `restart_game` | — | recomeça com os **arquivos atuais** (mesma cena/seed) — use depois de editar |
 | `stop_game` | — | encerra a run |
 | `press_key` / `release_key` | `key` | tecla fica pressionada até soltar; não avança o tempo |
-| `move_mouse` / `click_mouse` | `x, y` / `x?, y?, button?` | coordenadas do viewport; o clique avança 1 frame |
+| `move_mouse` / `click_mouse` | `x, y` / `x?, y?, entity?, button?` | coordenadas do viewport, ou `entity`: clica no centro da entidade na tela (erro se não existe ou está fora da tela); o clique avança 1 frame |
 | `wait` | `ms` (máx. 60000) | avança o tempo simulado |
 | `wait_until` | `expr, maxMs?` | avança até a expressão valer (ou timeout / fim de jogo); `ok`, `waitedMs` |
 | `advance_clock` | `hours?, minutes?, ms?` | pula o relógio do calendário (sem simular os frames) e avança 1 frame — como fechar o jogo por um tempo |
-| `perform_inputs` | `steps` | sequência `keyDown/keyUp/tap/hold/wait/mouseMove/mouseDown/mouseUp/click/type` (`type`: texto digitado; `\b` = Backspace, `\n` = Enter) |
-| `inspect_game_state` | `ids?, tags?, components?, storage?` | estado completo (vars, câmera, relógio, entidades com posição, velocidade, vida...); `storage` inclui os dados salvos |
+| `perform_inputs` | `steps` | sequência `keyDown/keyUp/tap/hold/wait/mouseMove/mouseDown/mouseUp/click/type` (`type`: texto digitado; `\b` = Backspace, `\n` = Enter; `click` aceita `entity`) |
+| `inspect_game_state` | `ids?, tags?, components?, storage?` | estado completo (vars, câmera, relógio, entidades com posição, velocidade, vida, `interactable`...); `storage` inclui os dados salvos |
 | `read_events` | `sinceFrame?, type?, limit?` | eventos de gameplay com frame |
 | `read_console` | `since?, level?` | logs, avisos, erros com stack |
 | `take_screenshot` | `annotate?` | PNG (imagem anexada ao resultado), `path`, `frame`, `camera`; `renderWarnings` se algum sprite não pôde ser desenhado |
@@ -224,8 +311,11 @@ do início da run, vem `projectChanged` pedindo `restart_game`.
 Usadas por `wait_until`, passos `waitUntil`/`assert` e `assertions` do `run_test`. São interpretadas por um
 parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 
-- Nomes: `status`, `frame`, `time`, `scene`, `vars`, `camera`
-- Funções: `entity(id)` (snapshot ou `null`), `exists(id)`, `count(tag)`, `events(type)`, `abs`, `min`, `max`
+- Nomes: `status`, `frame`, `time`, `scene`, `vars`, `camera`, `clock`; `self` só em condições de `StateMachine` e
+  `Interactable` (a própria entidade)
+- Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState` e `interactable` quando há),
+  `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar uma),
+  `abs`, `min`, `max`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").
 
@@ -286,7 +376,7 @@ Para execuções determinísticas, abra a página com `?paused=1`.
 |---|---|---|
 | `info()` | `{project, scenes, scene, width, height, paused, debug}` | |
 | `pause()` / `resume()` | — | pausa só o loop de tempo real |
-| `step(frames=1)` / `advance(ms)` / `perform(steps)` / `apply(ops)` | `{frame, status, scene}` | redesenha em seguida; `apply` reaplica `GameOp`s |
+| `step(frames=1)` / `advance(ms)` / `perform(steps)` / `apply(ops)` | `{frame, status, scene}` | redesenha em seguida; `apply` reaplica `GameOp`s; `perform` aceita `{type: "click", entity}` |
 | `keyDown(key)` / `keyUp(key)` | — | mesmo `normalizeKey` da engine |
 | `mouseMove(x, y)` / `mouseDown(btn)` / `mouseUp(btn)` | — | coordenadas do viewport |
 | `getState(query?)` | `GameState` | igual a `game.getState` |

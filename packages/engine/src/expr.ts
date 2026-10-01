@@ -6,8 +6,8 @@ import type { Game } from './game';
  * (never `eval`), so agent-written expressions cannot run arbitrary code.
  *
  *   literals     12  1.5  'text'  "text"  true  false  null
- *   names        status  frame  time  scene  vars  camera
- *   functions    entity(id) exists(id) count(tag) events(type) abs(x) min(a,b) max(a,b)
+ *   names        status  frame  time  scene  vars  camera  clock  self (StateMachine/Interactable conditions)
+ *   functions    entity(id) exists(id) count(tag) events(type) distance(a,b) abs(x) min(a,b) max(a,b)
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
  * Field access on null yields null (the assertion then fails and shows the null).
  */
@@ -143,6 +143,15 @@ export interface ExprScope {
   game: Game;
   /** Events at or after this frame are counted by events(type). */
   sinceFrame?: number;
+  /** Entity id that `self` refers to (conditions of a StateMachine or an Interactable). */
+  self?: string;
+}
+
+/** An entity id, or an entity value from entity(id) / self. */
+function idOf(v: unknown): string | null {
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string') return (v as { id: string }).id;
+  return null;
 }
 
 function entityValue(game: Game, id: unknown) {
@@ -175,8 +184,11 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
           return { ...w.camera };
         case 'clock':
           return game.clock.snapshot();
+        case 'self':
+          if (scope.self === undefined) throw new ExprError('"self" only exists in StateMachine and Interactable conditions', src);
+          return entityValue(game, scope.self);
         default:
-          throw new ExprError(`Unknown name "${n.name}" (use status, frame, time, scene, vars, camera, clock or a function)`, src);
+          throw new ExprError(`Unknown name "${n.name}" (use status, frame, time, scene, vars, camera, clock, self or a function)`, src);
       }
     }
     case 'get': {
@@ -202,6 +214,14 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'events':
           arity(1);
           return game.events(scope.sinceFrame ?? 0, String(args[0])).length;
+        case 'distance': {
+          arity(2);
+          const [a, b] = args.map((v) => {
+            const id = idOf(v);
+            return id === null ? undefined : game.entity(id);
+          });
+          return a && b ? Math.round(Math.hypot(a.x - b.x, a.y - b.y) * 100) / 100 : null;
+        }
         case 'abs':
           arity(1);
           return Math.abs(Number(args[0]));
@@ -210,7 +230,7 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'max':
           return Math.max(...args.map(Number));
         default:
-          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, count, events, abs, min, max)`, src);
+          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, count, events, distance, abs, min, max)`, src);
       }
     }
     case 'unary': {

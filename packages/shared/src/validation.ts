@@ -1,5 +1,6 @@
 import type { z } from 'zod';
-import { COMPONENT_TYPES } from './components';
+import { COMPONENT_TYPES, type Components, type StateTransition } from './components';
+import type { RuleAction } from './rules';
 import { expandPrefabs } from './prefabs';
 import { ProjectSchema, SceneSchema, type Project, type Scene, type SoundRef } from './project';
 
@@ -34,6 +35,72 @@ function formatPath(path: PropertyKey[], raw: unknown): string {
   return out;
 }
 
+/** "$by" / "$entity": rule targets resolved from the trigger. */
+const RULE_REFS = new Set(['$by', '$entity']);
+
+/**
+ * Cross references of data-driven actions (rules, states). `ids`: entities of the scene (null = unknown,
+ * as in prefabs). `refProblem(ref)` says why a "$..." target is not allowed here (null = allowed).
+ */
+function actionErrors(
+  actions: RuleAction[],
+  at: string,
+  ids: Set<string> | null,
+  project: Project | undefined,
+  refProblem: (ref: string) => string | null,
+): string[] {
+  const errors: string[] = [];
+  actions.forEach((a, i) => {
+    for (const field of ['target', 'at'] as const) {
+      const ref = (a as Record<string, unknown>)[field];
+      if (typeof ref !== 'string') continue;
+      const problem = ref.startsWith('$') ? refProblem(ref) : null;
+      if (problem) errors.push(`${at}[${i}].${field}: "${ref}" ${problem}`);
+      else if (!ref.startsWith('$') && ids && !ids.has(ref)) errors.push(`${at}[${i}].${field}: entity "${ref}" does not exist`);
+    }
+    if (a.action === 'loadScene' && project && !project.scenes[a.scene]) errors.push(`${at}[${i}].scene: scene "${a.scene}" does not exist`);
+    if (a.action === 'spawn' && project && !project.prefabs[a.prefab]) errors.push(`${at}[${i}].prefab: prefab "${a.prefab}" does not exist`);
+    if (a.action === 'modify' && !(COMPONENT_TYPES as string[]).includes(a.component)) {
+      errors.push(`${at}[${i}].component: unknown component "${a.component}"`);
+    }
+  });
+  return errors;
+}
+
+/** States referenced by initial/transitions exist; actions only target "$self" or real entities. */
+export function stateMachineErrors(sm: NonNullable<Components['StateMachine']>, at: string, ids: Set<string> | null, project?: Project): string[] {
+  const errors: string[] = [];
+  const names = Object.keys(sm.states);
+  const known = (s: string) => Object.hasOwn(sm.states, s);
+  if (!known(sm.initial)) errors.push(`${at}.initial: state "${sm.initial}" does not exist (states: ${names.join(', ')})`);
+  const checkTransitions = (list: StateTransition[], where: string) =>
+    list.forEach((t, i) => {
+      if (!known(t.to)) errors.push(`${where}[${i}].to: state "${t.to}" does not exist (states: ${names.join(', ')})`);
+    });
+  checkTransitions(sm.transitions, `${at}.transitions`);
+  const refProblem = (ref: string) => (ref === '$self' ? null : 'is not available in states (use "$self" or an entity id)');
+  for (const [name, state] of Object.entries(sm.states)) {
+    checkTransitions(state.transitions, `${at}.states.${name}.transitions`);
+    errors.push(...actionErrors(state.enter, `${at}.states.${name}.enter`, ids, project, refProblem));
+    errors.push(...actionErrors(state.exit, `${at}.states.${name}.exit`, ids, project, refProblem));
+  }
+  return errors;
+}
+
+/** Every action list of a StateMachine (for checks that apply to all actions, e.g. sounds). */
+export function stateActions(sm: NonNullable<Components['StateMachine']> | undefined): [string, RuleAction[]][] {
+  if (!sm) return [];
+  return Object.entries(sm.states).flatMap(([name, s]) => [[`states.${name}.enter`, s.enter], [`states.${name}.exit`, s.exit]] as [string, RuleAction[]][]);
+}
+
+function interactableWarnings(c: NonNullable<Components['Interactable']>, project: Project, at: string): string[] {
+  // Lowercase multi-letter names are action names; one missing from config.actions never fires.
+  if (c.via.includes('key') && !project.config.actions[c.key] && c.key.length > 1 && c.key === c.key.toLowerCase()) {
+    return [`${at}.components.Interactable.key: "${c.key}" is not an input action in config.actions (add e.g. {"${c.key}": ["E"]})`];
+  }
+  return [];
+}
+
 /** Semantic checks that a schema cannot express (cross references, uniqueness). */
 export function checkScene(scene: Scene, project?: Project): { errors: string[]; warnings: string[] } {
   const errors: string[] = [];
@@ -55,18 +122,11 @@ export function checkScene(scene: Scene, project?: Project): { errors: string[];
     if (ruleIds.has(r.id)) errors.push(`${at}.rules: duplicate rule id "${r.id}"`);
     ruleIds.add(r.id);
     if ('enter' in r.when && !ids.has(r.when.enter)) errors.push(`${rp}.when.enter: entity "${r.when.enter}" does not exist`);
-    r.do.forEach((a, i) => {
-      if ('target' in a && a.target !== '$by' && !ids.has(a.target)) errors.push(`${rp}.do[${i}].target: entity "${a.target}" does not exist`);
-      if (a.action === 'loadScene' && project && !project.scenes[a.scene]) errors.push(`${rp}.do[${i}].scene: scene "${a.scene}" does not exist`);
-      if (a.action === 'spawn' && project && !project.prefabs[a.prefab]) errors.push(`${rp}.do[${i}].prefab: prefab "${a.prefab}" does not exist`);
-      if (a.action === 'spawn' && a.at && a.at !== '$by' && !ids.has(a.at)) errors.push(`${rp}.do[${i}].at: entity "${a.at}" does not exist`);
-      if (a.action === 'modify' && !(COMPONENT_TYPES as string[]).includes(a.component)) {
-        errors.push(`${rp}.do[${i}].component: unknown component "${a.component}"`);
-      }
-      if ('target' in a && a.target === '$by' && !('enter' in r.when) && !('event' in r.when)) {
-        errors.push(`${rp}.do[${i}].target: "$by" only works with "enter" and "event" triggers`);
-      }
-    });
+    const fromTrigger = 'enter' in r.when || 'event' in r.when;
+    errors.push(
+      ...actionErrors(r.do, `${rp}.do`, ids, project, (ref) =>
+        RULE_REFS.has(ref) && fromTrigger ? null : RULE_REFS.has(ref) ? 'only works with "enter" and "event" triggers' : 'is not a rule target'),
+    );
   }
 
   const assetIds = new Set(project?.config.assets.map((a) => a.id) ?? []);
@@ -96,6 +156,8 @@ export function checkScene(scene: Scene, project?: Project): { errors: string[];
     if (project && c.Script && project.scripts[c.Script.src] === undefined) {
       errors.push(`${ep}.components.Script.src: script file "${c.Script.src}" does not exist`);
     }
+    if (project && c.Interactable) warnings.push(...interactableWarnings(c.Interactable, project, ep));
+    if (c.StateMachine) errors.push(...stateMachineErrors(c.StateMachine, `${ep}.components.StateMachine`, ids, project));
   }
   return { errors, warnings };
 }
@@ -124,8 +186,16 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
     if (!audio.has(id)) errors.push(`${at}: ${assetIds.has(id) ? `asset "${id}" is not audio` : `audio asset "${id}" does not exist`}`);
   };
   for (const [event, ref] of Object.entries(project.config.sounds)) checkSound(ref, `config.sounds.${event}`);
+  const checkEntitySounds = (c: Components, at: string) => {
+    checkSound(c.Interactable?.sound, `${at}.components.Interactable.sound`);
+    for (const [where, actions] of stateActions(c.StateMachine)) {
+      actions.forEach((a, i) => a.action === 'playSound' && checkSound(a.asset, `${at}.components.StateMachine.${where}[${i}].asset`));
+    }
+  };
+  for (const [id, prefab] of Object.entries(project.prefabs)) checkEntitySounds(prefab.components, `prefabs.${id}`);
   for (const scene of Object.values(project.scenes)) {
     checkSound(scene.music, `scenes.${scene.id}.music`);
+    for (const e of scene.entities) checkEntitySounds(e.components, `scenes.${scene.id}.entities(${e.id})`);
     for (const r of scene.rules) {
       r.do.forEach((a, i) => a.action === 'playSound' && checkSound(a.asset, `scenes.${scene.id}.rules(${r.id}).do[${i}].asset`));
     }
@@ -137,6 +207,7 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
     if (c.Script && project.scripts[c.Script.src] === undefined) errors.push(`${at}.components.Script.src: script file "${c.Script.src}" does not exist`);
     if (c.Sprite?.asset && !assetIds.has(c.Sprite.asset)) errors.push(`${at}.components.Sprite.asset: asset "${c.Sprite.asset}" does not exist`);
     if (c.FollowTarget?.targetId) warnings.push(`${at}.components.FollowTarget.targetId: prefabs should target by tag (ids differ per scene)`);
+    if (c.StateMachine) errors.push(...stateMachineErrors(c.StateMachine, `${at}.components.StateMachine`, null, project));
   }
   for (const [key, scene] of Object.entries(project.scenes)) {
     if (key !== scene.id) errors.push(`scenes.${key}: key does not match scene id "${scene.id}"`);

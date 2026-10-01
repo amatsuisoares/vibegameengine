@@ -14,3 +14,6 @@ export * from './rules';
 export * from './sound';
 export * from './clock';
 export * from './storage';
+export * from './interact';
+export * from './fsm';
+export * from './actions';

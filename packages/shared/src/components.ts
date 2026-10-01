@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RuleActionSchema } from './rules';
 
 /**
  * Built-in component schemas.
@@ -147,6 +148,49 @@ export const AnimatorSchema = z.strictObject({
   auto: z.boolean().default(true).describe('Pick idle/run/jump/fall from the body state automatically.'),
 });
 
+export const InteractableSchema = z.strictObject({
+  action: z.string().min(1).default('use').describe('Verb reported in the "interact" event, e.g. "open", "talk", "feed", "pickup".'),
+  label: z.string().optional().describe('Prompt for the player, e.g. "Open". Shown above the entity ("[E] Open") when a key interaction is in range.'),
+  via: z
+    .array(z.enum(['click', 'key', 'enter']))
+    .default(() => ['click' as const, 'key' as const])
+    .describe('click: left click on the entity. key: an actor in range presses `key`. enter: fires when an actor comes within range. Scripts can always call game.interact().'),
+  key: z.string().default('interact').describe('Input action (config.actions) or key name for "key".'),
+  actorTags: tagList(['player']).describe('Entities that can interact by key, by entering, or as the actor of game.interact().'),
+  range: z.number().min(0).default(32).describe("Max gap in px between the actor's box and this entity's box (0 = touching). Not checked for clicks."),
+  condition: z.string().min(1).optional().describe('Expression that must be true, e.g. "vars.keys >= 1". Otherwise the attempt is blocked.'),
+  cooldownMs: z.number().min(0).default(0).describe('Time after a successful interaction before the next one.'),
+  once: z.boolean().default(false).describe('Disable after the first successful interaction.'),
+  enabled: z.boolean().default(true).describe('false: ignored by clicks, keys and entering (scripts and rules can toggle it).'),
+  sound: z.string().optional().describe('Audio asset played on a successful interaction.'),
+});
+
+export const StateTransitionSchema = z.strictObject({
+  to: z.string().min(1).describe('State to go to.'),
+  when: z.string().min(1).optional().describe(`Expression that must be true, e.g. "distance(self, 'player') < 120" or "self.health <= 0".`),
+  after: z.number().min(0).optional().describe('Minimum time in the current state, in ms.'),
+  event: z.string().min(1).optional().describe('A game event of this type happened this frame (e.g. "interact", "damage").'),
+  match: z
+    .record(z.string(), z.union([z.number(), z.string(), z.boolean()]))
+    .optional()
+    .describe(`Event fields that must match; "$self" stands for this entity's id, e.g. {"entity": "$self"}.`),
+});
+
+export const StateSchema = z.strictObject({
+  enter: z.array(RuleActionSchema).default(() => []).describe('Actions run when entering the state (same actions as rules; target "$self" = this entity).'),
+  exit: z.array(RuleActionSchema).default(() => []).describe('Actions run when leaving the state.'),
+  transitions: z.array(StateTransitionSchema).default(() => []).describe('Checked in order every frame; the first whose conditions all hold is taken.'),
+});
+
+export const StateMachineSchema = z.strictObject({
+  initial: z.string().min(1).describe('State entered when the entity starts.'),
+  states: z
+    .record(z.string(), StateSchema)
+    .refine((s) => Object.keys(s).length > 0, 'needs at least one state')
+    .describe('State name -> { enter, exit, transitions }.'),
+  transitions: z.array(StateTransitionSchema).default(() => []).describe(`Transitions from any state, checked before the current state's (e.g. to "dead").`),
+});
+
 /** Script file path: scripts/<name>.js (subfolders allowed). */
 export const SCRIPT_PATH = /^scripts\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*\.js$/;
 
@@ -178,6 +222,8 @@ export const ComponentSchemas = {
   Checkpoint: CheckpointSchema,
   Text: TextSchema,
   Animator: AnimatorSchema,
+  Interactable: InteractableSchema,
+  StateMachine: StateMachineSchema,
   Script: ScriptSchema,
 } as const;
 
@@ -200,6 +246,8 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Checkpoint: 'Sets the respawn point of the entity that touches it.',
   Text: 'Text/HUD with {var} and {entity.health} placeholders; screen or world space.',
   Animator: 'Spritesheet animation clips; picks idle/run/jump/fall automatically.',
+  Interactable: 'Something actors can interact with (open, talk, feed...) by click, key in range or entering; condition, cooldown, once; emits "interact".',
+  StateMachine: 'Named states (idle, chase, sleeping...) with transitions by condition, time in state or event, and enter/exit actions.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -220,9 +268,12 @@ export const ComponentsSchema = z.strictObject({
   Checkpoint: CheckpointSchema.optional(),
   Text: TextSchema.optional(),
   Animator: AnimatorSchema.optional(),
+  Interactable: InteractableSchema.optional(),
+  StateMachine: StateMachineSchema.optional(),
   Script: ScriptSchema.optional(),
 });
 
 export type Components = z.output<typeof ComponentsSchema>;
+export type StateTransition = z.output<typeof StateTransitionSchema>;
 export type ComponentData<T extends ComponentType> = z.output<(typeof ComponentSchemas)[T]>;
 export type ComponentInput<T extends ComponentType> = z.input<(typeof ComponentSchemas)[T]>;

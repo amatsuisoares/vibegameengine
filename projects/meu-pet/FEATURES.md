@@ -32,7 +32,7 @@ Motor próprio (VibeGameEngine, TypeScript): o projeto é **dados + scripts**.
 | `scripts/pet.js` | **cérebro do pet** (~790 linhas): necessidades, personalidade, comportamento, observações, evolução, save |
 | `scripts/aviso.js` | mostra as observações no topo, uma de cada vez |
 | `scripts/botao.js` | botões (petisco, remédio, diário, coleção, velocidade, novo pet, voltar) |
-| `scripts/tigela.js`, `bola.js`, `lampada.js`, `sujeira.js` | objetos clicáveis |
+| `scripts/tigela.js`, `bola.js`, `lampada.js`, `sujeira.js` | objetos clicáveis: componente `Interactable` (via clique) + hook `onInteract`; o pet também (carinho) |
 | `scripts/ceu.js` | céu da janela pela hora, escuridão da noite, relógio |
 | `scripts/diario.js` | painel do diário |
 | `scripts/inicio.js`, `comecar.js` | digitação do nome |
@@ -99,7 +99,11 @@ dizer "Parece ser: …". O jogador nunca vê a lista sorteada.
 
 ## 6. Comportamento autônomo
 
-O pet escolhe a próxima atividade quando termina a atual:
+O pet escolhe a próxima atividade quando termina a atual. A atividade do momento é também o estado da
+`StateMachine` da entidade `pet` (idle, walk, yawn, sleep, eat, lookBowl, play, chase, toy, investigate, greet, sulk,
+happy, evolve): dá para ver `state`/`stateMs` no estado do jogo e os eventos `state_change`.
+
+Ordem da escolha:
 
 1. **Sono** se `energia < 25` ou (noite 22h–7h e `energia < 85`): boceja (estica), anda até a cama e dorme.
    À noite só acorda de manhã: depois das 7h, com energia ≥ 95, ou antes das 9h com energia ≥ 60. De dia acorda com

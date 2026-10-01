@@ -148,3 +148,35 @@ describe('overlays', () => {
     expect(colors).toEqual(expect.arrayContaining([DEBUG_COLORS.dynamic, DEBUG_COLORS.solid, DEBUG_COLORS.trigger, DEBUG_COLORS.oneWay]));
   });
 });
+
+describe('interaction prompt', () => {
+  const scene = (label?: string) =>
+    new Game(
+      project(
+        [
+          { id: 'player', tags: ['player'], transform: { x: 100, y: 150 }, components: { Sprite: { width: 20, height: 20 } } },
+          { id: 'door', transform: { x: 140, y: 150 }, components: { Sprite: { width: 40, height: 40 }, Interactable: { label } } },
+        ],
+        { camera: { x: 50, clampToBounds: false } },
+      ),
+    );
+
+  it('shows "[key] label" above the interactable the key would use', () => {
+    const game = scene('Abrir');
+    game.step(1);
+    const cmds = buildDrawList(game.world).filter((c) => c.id === 'door:prompt');
+    expect(cmds.map((c) => c.kind)).toEqual(['sprite', 'text']);
+    expect(cmds[1]).toMatchObject({ lines: ['[E] Abrir'], x: 90, y: 130 - 14, align: 'center' });
+    expect(cmds.every((c) => c.layer === 1000)).toBe(true);
+  });
+
+  it('shows nothing without a label or out of range', () => {
+    const unlabeled = scene();
+    unlabeled.step(1);
+    expect(buildDrawList(unlabeled.world).some((c) => c.id.endsWith(':prompt'))).toBe(false);
+    const far = scene('Abrir');
+    far.entity('player')!.x = 20;
+    far.step(1);
+    expect(buildDrawList(far.world).some((c) => c.id.endsWith(':prompt'))).toBe(false);
+  });
+});

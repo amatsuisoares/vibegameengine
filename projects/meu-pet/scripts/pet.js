@@ -645,6 +645,8 @@ function onUpdate(self, game, dt) {
   game.vars.higiene = Math.round(pet.needs.higiene);
   game.vars.saude = Math.round(pet.needs.saude);
   game.vars.afeto = Math.round(pet.needs.afeto);
+  // A atividade do momento é o estado da StateMachine: o agente vê state/stateMs e os eventos state_change.
+  if (self.fsm.state !== mind.act) self.fsm.go(mind.act);
   game.vars.acao = mind.act;
   game.vars.estagio = pet.stage;
   game.vars.dormindo = pet.asleep;
@@ -784,6 +786,6 @@ function checkObservations(game, self) {
   }
 }
 
-function onClick(self, game) {
+function onInteract(self, by, game) {
   self.state.api.carinho();
 }

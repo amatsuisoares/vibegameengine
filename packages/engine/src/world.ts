@@ -35,6 +35,8 @@ export class World {
   /** Contact pair keys from the previous frame (for enter-only interactions). */
   prevContacts = new Set<string>();
   pendingScene: string | null = null;
+  /** Interactable that the interaction key would use now, and by which actor (for the on-screen prompt). */
+  interactFocus: { entity: string; by: string } | null = null;
   readonly events: GameEvent[] = [];
   private eventCapacity = 2000;
 

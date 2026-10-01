@@ -35,7 +35,7 @@ function onUpdate(self, game, dt) {
   self.state.vx = vx;
 }
 
-function onClick(self, game) {
+function onInteract(self, by, game) {
   const dir = self.x < 480 ? 1 : -1;
   vx = dir * (280 + game.random() * 220);
   vy = -420;

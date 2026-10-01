@@ -82,6 +82,28 @@ comportamento, um quarto, interações com o mouse, evolução bebê → juvenil
   em disco, coleção de pets anteriores ("pokédex")
 - [ ] Ajustes a partir do teste da usuária (balanceamento, visual, arte de dormir/comer)
 
+## V0.2 — Engine orientada a comportamento (em andamento)
+Roadmap de evolução: cada sistema só avança com testes passando. Sistemas genéricos na engine; regras de cada jogo
+ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na engine).
+- [x] **Interaction System**: componente `Interactable` (ação, rótulo, via click/key/enter, alcance, condição,
+  cooldown, once, som), eventos `interact`/`interact_blocked`, hook `onInteract`, `game.interact`/
+  `game.nearbyInteractables`, alvo `$entity` nas regras, ação `interact: ["E"]` no padrão, prompt `[E] rótulo` no
+  render, `interactable` no estado, clique por `entity` (`click_mouse`, `perform_inputs`, `run_test`, `__vibe.perform`)
+- [x] meu-pet: tigela, bola, lâmpada, sujeira e pet viraram `Interactable` (onInteract); teste de regressão do jogo
+- [x] 223 testes unitários + 15 e2e (antes: 199 + 13)
+- [x] **State Machine**: componente `StateMachine` (estados com `enter`/`exit`, transições por `when`/`after`/`event`,
+  transições de qualquer estado), evento `state_change`/`state_error`, `self.fsm` e `onStateChange` nos scripts,
+  `state`/`stateMs`/`prevState` no estado, `self` e `distance()` nas expressões; ações de regras e estados num executor
+  comum (`actions.ts`)
+- [x] meu-pet: as 14 atividades do pet são estados da `StateMachine` (sincronizadas pelo `pet.js`); regressão cobre
+- [x] 240 testes unitários + 15 e2e
+- [ ] Utility AI
+- [ ] Animation Controller
+- [ ] Timer / Scheduler
+- [ ] Tween
+- [ ] Pathfinding
+- [ ] Particles / VFX
+
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.
 

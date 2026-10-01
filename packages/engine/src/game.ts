@@ -6,11 +6,13 @@ import { GameStorage } from './storage';
 import { round2 } from './math';
 import { Rng } from './rng';
 import { animationSystem } from './systems/animation';
-import { cameraSystem } from './systems/camera';
+import { cameraSystem, worldToScreen } from './systems/camera';
 import { controllerSystem } from './systems/controllers';
 import { moverSystem } from './systems/mover';
 import { healthSystem } from './systems/health';
 import { RuleRunner } from './rules';
+import { hitBox, InteractionRunner, snapshotInteractable, type InteractableSnapshot } from './interact';
+import { fsmOf, StateMachineRunner, stateMs } from './fsm';
 import { SoundDirector, soundOf } from './sound';
 import { ScriptLibrary, ScriptRunner } from './scripts';
 import { findContacts, interactionSystem, pairKey } from './systems/interactions';
@@ -42,7 +44,7 @@ export type InputStep =
   | { type: 'mouseMove'; x: number; y: number }
   | { type: 'mouseDown'; button?: MouseButton }
   | { type: 'mouseUp'; button?: MouseButton }
-  | { type: 'click'; x?: number; y?: number; button?: MouseButton }
+  | { type: 'click'; x?: number; y?: number; entity?: string; button?: MouseButton }
   | { type: 'type'; text: string };
 
 /** Primitive, replayable operation. Every way of driving a Game reduces to a sequence of these. */
@@ -58,7 +60,10 @@ export type GameOp =
   | { op: 'text'; text: string }
   | { op: 'advanceClock'; ms: number };
 
-/** Expands scripted input steps into primitive ops (tap/hold/click become down, step, up). */
+/**
+ * Expands scripted input steps into primitive ops (tap/hold/click become down, step, up).
+ * A click on an `entity` needs the game to find where it is: use Game.expand / Game.perform.
+ */
 export function expandInputSteps(steps: InputStep[]): GameOp[] {
   const ops: GameOp[] = [];
   for (const s of steps) {
@@ -84,6 +89,7 @@ export function expandInputSteps(steps: InputStep[]): GameOp[] {
         ops.push({ op: s.type, button: s.button });
         break;
       case 'click':
+        if (s.entity !== undefined) throw new Error(`click on entity "${s.entity}" needs a running game (Game.expand)`);
         if (s.x !== undefined && s.y !== undefined) ops.push({ op: 'mouseMove', x: s.x, y: s.y });
         ops.push({ op: 'mouseDown', button: s.button }, { op: 'step', frames: 1 }, { op: 'mouseUp', button: s.button });
         break;
@@ -109,6 +115,11 @@ export interface EntitySnapshot {
   health?: number;
   maxHealth?: number;
   invulnerable?: boolean;
+  interactable?: InteractableSnapshot;
+  /** StateMachine: current state, time in it (ms) and the previous state. */
+  state?: string;
+  stateMs?: number;
+  prevState?: string;
   components?: Record<string, unknown>;
 }
 
@@ -156,6 +167,10 @@ export class Game {
   private scriptRunner!: ScriptRunner;
   private ruleRunner!: RuleRunner;
   private soundDirector!: SoundDirector;
+  /** Interactions of the current scene (clicks, interaction keys, game.interact). */
+  interactions!: InteractionRunner;
+  /** State machines of the current scene. */
+  stateMachines!: StateMachineRunner;
   /** Music asset playing (for the `music` event when a scene without music follows one with music). */
   private music: string | null = null;
 
@@ -199,6 +214,8 @@ export class Game {
     this.console.log(`Scene "${id}" loaded (${scene.entities.length} entities)`, 'engine');
     this.scriptRunner = new ScriptRunner(this.world, this.scripts, this);
     this.ruleRunner = new RuleRunner(this.world, this);
+    this.interactions = new InteractionRunner(this.world, this, this.scriptRunner);
+    this.stateMachines = new StateMachineRunner(this.world, this, this.scriptRunner);
     this.soundDirector = new SoundDirector(this.world);
     const music = scene.music ? soundOf(scene.music) : null;
     if (music) this.world.emit('music', music);
@@ -242,15 +259,18 @@ export class Game {
         }
         controllerSystem(w, dt);
         moverSystem(w, dt);
+        this.interactions.input();
         this.scriptRunner.update(dt);
         physicsSystem(w, dt);
         const contacts = findContacts(w);
         const entered = contacts.filter(([a, b]) => !w.prevContacts.has(pairKey(a, b)));
         interactionSystem(w, contacts);
         this.scriptRunner.collisions(entered);
+        this.interactions.proximity();
         healthSystem(w, dt);
         animationSystem(w, dt);
         this.ruleRunner.run(entered);
+        this.stateMachines.run();
         this.soundDirector.run();
         this.scriptRunner.events();
         w.flushDestroyed();
@@ -276,7 +296,29 @@ export class Game {
 
   /** Runs a scripted input sequence (used by tests and by the agent's input tools). */
   perform(steps: InputStep[]) {
-    for (const op of expandInputSteps(steps)) this.apply(op);
+    for (const step of steps) for (const op of this.expand(step)) this.apply(op);
+  }
+
+  /** Ops for one input step in the current state (a click on an entity aims at where it is now). */
+  expand(step: InputStep): GameOp[] {
+    if (step.type === 'click' && step.entity !== undefined) {
+      const { x, y } = this.screenPointOf(step.entity);
+      return expandInputSteps([{ type: 'click', x, y, button: step.button }]);
+    }
+    return expandInputSteps([step]);
+  }
+
+  /** Viewport point at the center of an entity's box (Collider or Sprite); throws if it is not on screen. */
+  screenPointOf(id: string): { x: number; y: number } {
+    const e = this.world.get(id);
+    if (!e || !e.active) throw new Error(`entity "${id}" does not exist or is disabled`);
+    const b = hitBox(e);
+    const p = worldToScreen(this.world, b ? b.x + b.w / 2 : e.x, b ? b.y + b.h / 2 : e.y);
+    const { width, height } = this.project.config;
+    if (p.x < 0 || p.y < 0 || p.x > width || p.y > height) {
+      throw new Error(`entity "${id}" is off screen (viewport ${round2(p.x)}, ${round2(p.y)}); move the camera or click by x/y`);
+    }
+    return { x: round2(p.x), y: round2(p.y) };
   }
 
   /** Applies one primitive operation. Replaying the same ops on a fresh game reproduces its state exactly. */
@@ -343,14 +385,14 @@ export class Game {
       },
       input: this.input.snapshot(),
       entityCount: w.entities.length,
-      entities: list.map((e) => snapshotEntity(e, !!query.components)),
+      entities: list.map((e) => snapshotEntity(w, e, !!query.components)),
       clock: this.clock.snapshot(),
       ...(query.storage && { storage: this.storage.snapshot() }),
     };
   }
 }
 
-function snapshotEntity(e: Entity, withComponents: boolean): EntitySnapshot {
+function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySnapshot {
   const s: EntitySnapshot = { id: e.id, name: e.name, tags: [...e.tags], x: round2(e.x), y: round2(e.y) };
   const b = e.components.Body;
   if (b && b.type !== 'static') {
@@ -368,6 +410,14 @@ function snapshotEntity(e: Entity, withComponents: boolean): EntitySnapshot {
     s.health = h.current;
     s.maxHealth = h.max;
     if (e.invulnTimer > 0) s.invulnerable = true;
+  }
+  const interactable = snapshotInteractable(w, e);
+  if (interactable) s.interactable = interactable;
+  const fsm = fsmOf(e);
+  if (fsm) {
+    s.state = fsm.state;
+    s.stateMs = stateMs(w, fsm);
+    if (fsm.previous !== null) s.prevState = fsm.previous;
   }
   if (withComponents) s.components = structuredClone(e.components) as Record<string, unknown>;
   return s;

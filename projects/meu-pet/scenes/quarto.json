@@ -93,7 +93,8 @@
       "components": {
         "Sprite": { "shape": "triangle", "width": 70, "height": 40, "color": "#ffe28a", "layer": -7 },
         "Collider": { "width": 80, "height": 60, "isTrigger": true },
-        "Script": { "src": "scripts/lampada.js" }
+        "Script": { "src": "scripts/lampada.js" },
+        "Interactable": { "action": "luz", "via": ["click"] }
       }
     },
     {
@@ -112,7 +113,8 @@
       "components": {
         "Sprite": { "width": 74, "height": 24, "color": "#e76f51", "layer": 7 },
         "Collider": { "width": 90, "height": 50, "isTrigger": true },
-        "Script": { "src": "scripts/tigela.js" }
+        "Script": { "src": "scripts/tigela.js" },
+        "Interactable": { "action": "encher", "via": ["click"] }
       }
     },
     {
@@ -128,7 +130,8 @@
       "components": {
         "Sprite": { "shape": "circle", "width": 34, "height": 34, "color": "#e63946", "layer": 9 },
         "Collider": { "width": 50, "height": 50, "isTrigger": true },
-        "Script": { "src": "scripts/bola.js" }
+        "Script": { "src": "scripts/bola.js" },
+        "Interactable": { "action": "jogar", "via": ["click"] }
       }
     },
     {
@@ -138,7 +141,27 @@
       "components": {
         "Sprite": { "asset": "bebe_1", "width": 250, "height": 250, "layer": 5, "faceVelocity": false },
         "Collider": { "width": 130, "height": 130, "offsetY": 15, "isTrigger": true },
-        "Script": { "src": "scripts/pet.js" }
+        "Script": { "src": "scripts/pet.js" },
+        "Interactable": { "action": "carinho", "via": ["click"] },
+        "StateMachine": {
+          "initial": "idle",
+          "states": {
+            "idle": {},
+            "walk": {},
+            "yawn": {},
+            "sleep": {},
+            "eat": {},
+            "lookBowl": {},
+            "play": {},
+            "chase": {},
+            "toy": {},
+            "investigate": {},
+            "greet": {},
+            "sulk": {},
+            "happy": {},
+            "evolve": {}
+          }
+        }
       }
     },
     {
