@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach } from 'vitest';
-import { ProjectStore, RuntimeHost } from '../src';
+import { Game } from '@vibe/engine';
+import { ProjectStore, RuntimeHost, Screenshotter, type ShotRequest, type ShotResult } from '../src';
 import { createAgentTools, type ToolResult } from '../src/tools';
 
 const DEMO = fileURLToPath(new URL('../../../test-fixtures/demo-platformer', import.meta.url));
@@ -46,4 +47,30 @@ export function setup() {
     return r as Extract<ToolResult, { ok: false }>;
   };
   return { dir, store, tools, host, call, ok, fail };
+}
+
+/** Replays the run headless instead of in Chromium (same contract: PNG + replayed state). */
+export class FakeScreenshotter extends Screenshotter {
+  readonly requests: ShotRequest[] = [];
+  override async shoot(req: ShotRequest): Promise<ShotResult> {
+    this.requests.push({ ...req, ops: [...req.ops] });
+    const game = Game.fromRaw(req.raw as Parameters<typeof Game.fromRaw>[0], { seed: req.seed, scene: req.scene, clock: req.clock, storage: req.storage });
+    for (const op of req.ops) game.apply(op);
+    return { png: Buffer.from('PNG fake'), state: game.getState(), warnings: [] };
+  }
+}
+
+/** Like setup(), with screenshots replayed headless (no Chromium). */
+export function setupWithShots() {
+  const store = new ProjectStore(demoCopy(), { clock: fixedClock });
+  const shots = new FakeScreenshotter();
+  const host = new RuntimeHost(store, shots);
+  const tools = createAgentTools();
+  const call = (name: string, input: unknown = {}) => tools.call(name, input, { store, author: 'agent', host });
+  const ok = async <T = Record<string, unknown>>(name: string, input: unknown = {}) => {
+    const r = await call(name, input);
+    if (!r.ok) throw new Error(`${name} failed: ${r.error}\n${(r.details ?? []).join('\n')}`);
+    return { ...(r.result as T), images: r.images };
+  };
+  return { store, host, shots, call, ok };
 }

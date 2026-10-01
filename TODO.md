@@ -158,8 +158,12 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
 - [x] 321 testes unitários + 16 e2e
 - [x] **V0.3 concluída**: `verify_game`, asserções estruturadas, playbooks, relatório de diagnóstico
 
-## V0.4 — Percepção do agente (próxima)
-- [ ] Observação unificada (`observe`: estado, entidades, player, input, eventos, console, câmera, mouse, screenshot)
+## V0.4 — Percepção do agente (em andamento)
+- [x] **Observação unificada**: tool `observe` (jogo, players, entidades na tela com caixa no viewport, input com mouse
+  em tela e mundo, câmera, eventos e console novos, screenshot), `getState({onScreen})` / `Game.screenBoxOf`,
+  `inspect_game_state {onScreen}`
+- [x] meu-pet: `observe` no quarto lista só o que está desenhado (sem a `noite` transparente nem a ração escondida)
+- [x] 324 testes unitários + 17 e2e
 - [ ] Percepção do mouse (posição na tela e no mundo, entidade sob o mouse, `get_mouse_target`)
 - [ ] Controle do mouse (mover, clicar, pressionar, soltar, arrastar, duplo clique), sempre pelo input virtual
 

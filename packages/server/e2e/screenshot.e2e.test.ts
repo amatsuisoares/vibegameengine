@@ -133,6 +133,20 @@ describe('take_screenshot (Chromium)', () => {
     copyFileSync(r.images![1].path, `${RUNS_DIR}/verify-final.png`);
   });
 
+  it('observe returns the state and a real screenshot of the same frame', async () => {
+    const t = setup();
+    hosts.push(t.host);
+    await t.ok('run_game');
+    await t.ok('perform_inputs', { steps: [{ type: 'hold', key: 'D', ms: 1200 }, { type: 'mouseMove', x: 400, y: 200 }] });
+    const r = await t.call('observe', {});
+    if (!r.ok) throw new Error(r.error);
+    const o = r.result as { game: { frame: number }; entities: { id: string }[]; screenshot: Shot };
+    expect(o.screenshot.warning).toBeUndefined();
+    expect(o.screenshot.frame).toBe(o.game.frame);
+    expect(o.entities.map((e) => e.id)).toContain('player');
+    expect(pngSize(r.images![0].path)).toEqual({ width: 800, height: 450 });
+  });
+
   it('reports missing assets when editing and when rendering', async () => {
     const t = setup();
     hosts.push(t.host);

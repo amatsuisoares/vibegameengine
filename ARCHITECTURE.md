@@ -317,6 +317,9 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
   `assert`, validável em arquivos de playbook); `checkAssertion(game, a)` em `engine/src/assertions.ts` lê o `World`
   direto (entidades, componentes, FSM, vars, eventos, cena, status) e devolve `{pass, label, expected, actual,
   evidence}`. Uma checagem de cenário é `{expr}` ou `{check}`.
+- **Observação unificada** (V0.4): `observe` junta `GameSession.observe()` (eventos/console incrementais, players),
+  `Game.getState({onScreen})` e `RuntimeHost.screenshot()`. `Game.screenBoxOf(e)` dá a caixa de uma entidade no
+  viewport (ou null se fora da tela ou não desenhada) — base também para percepção do mouse.
 - **Diagnóstico** (V0.3, `server/src/runtime/diagnosis.ts`): `diagnose(game, project, scripts, falhas, erros)` extrai
   das checagens que falharam as entidades, variáveis e eventos citados (parse leve das expressões ou campos das
   asserções), junta evidências do `World`, dos eventos, das regras/scripts/`Collectible` que escrevem as variáveis e da
@@ -337,7 +340,7 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 
 ```
 Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
-                                   tools/list  → 3 tools de workspace + 54 do ToolRegistry (com annotations)
+                                   tools/list  → 3 tools de workspace + 55 do ToolRegistry (com annotations)
                                    tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
                                                  → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```

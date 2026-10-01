@@ -28,7 +28,7 @@ describe('MCP server launched from .mcp.json (as Claude Code does)', () => {
     try {
       await client.connect(transport);
       const { tools } = await client.listTools();
-      expect(tools.length).toBe(57);
+      expect(tools.length).toBe(58);
 
       await client.callTool({ name: 'run_game', arguments: {} });
       await client.callTool({ name: 'perform_inputs', arguments: { steps: [{ type: 'hold', key: 'D', ms: 1500 }, { type: 'tap', key: 'Space' }] } });

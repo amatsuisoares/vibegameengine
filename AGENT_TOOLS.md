@@ -479,7 +479,8 @@ reproduzir a run no Chromium para o screenshot.
 | `wait_until` | `expr, maxMs?` | avança até a expressão valer (ou timeout / fim de jogo); `ok`, `waitedMs` |
 | `advance_clock` | `hours?, minutes?, ms?` | pula o relógio do calendário (sem simular os frames) e avança 1 frame — como fechar o jogo por um tempo |
 | `perform_inputs` | `steps` | sequência `keyDown/keyUp/tap/hold/wait/mouseMove/mouseDown/mouseUp/click/type` (`type`: texto digitado; `\b` = Backspace, `\n` = Enter; `click` aceita `entity`) |
-| `inspect_game_state` | `ids?, tags?, components?, storage?` | estado completo (vars, câmera, relógio, entidades com posição, velocidade, vida, `interactable`...); `storage` inclui os dados salvos |
+| `observe` | `screenshot?, annotate?, entities?, components?` | tudo do momento numa chamada (ver [Observação](#observação-unificada-observe)) |
+| `inspect_game_state` | `ids?, tags?, components?, storage?, onScreen?` | estado completo (vars, câmera, relógio, entidades com posição, velocidade, vida, `interactable`...); `storage` inclui os dados salvos |
 | `read_events` | `sinceFrame?, type?, limit?` | eventos de gameplay com frame |
 | `read_console` | `since?, level?` | logs, avisos, erros com stack |
 | `take_screenshot` | `annotate?` | PNG (imagem anexada ao resultado), `path`, `frame`, `camera`; `renderWarnings` se algum sprite não pôde ser desenhado |
@@ -495,6 +496,25 @@ reproduzir a run no Chromium para o screenshot.
 devolvem o que aconteceu desde a ação anterior: `frame`, `status`, `scene`, `keysDown`, `players` (entidades com
 tag `player`), `events` novos (máx. 30) e avisos/erros novos do console. Se os arquivos do projeto mudaram depois
 do início da run, vem `projectChanged` pedindo `restart_game`.
+
+### Observação unificada (`observe`)
+
+Implementado na V0.4. Uma chamada devolve o momento atual da run, sem avançar o tempo. O estado responde "o que
+aconteceu?" e o screenshot responde "como isso está aparecendo?"; os dois vêm juntos.
+
+| Campo | Conteúdo |
+|---|---|
+| `game` | `frame`, `time`, `status`, `scene`, `clock`, `vars` |
+| `players` | entidades com tag `player` (onde estiverem) |
+| `entities` | entidades **na tela** (padrão), cada uma com `screen: {x, y, w, h}` em pixels do viewport; `entities: "all"` lista todas, `"none"` nenhuma; máx. 60 (`entitiesTruncated`); `entityCount` = total na cena |
+| `input` | `keysDown`; `mouse: {x, y, world: {x, y}, buttons}` |
+| `camera` | `x`, `y`, `zoom`, `width`, `height` |
+| `events`, `console` | eventos e avisos/erros novos desde a ação anterior (incremental, como em `wait`) |
+| `screenshot` | `path`, `frame` (+ imagem anexada); `screenshot: false` desliga; uma foto que falha vira `{error}` |
+
+"Na tela" = entidade ativa cuja caixa (Collider ou Sprite; um ponto para Text) cruza o viewport **e** que é desenhada
+(Sprite visível com opacidade > 0, ou Text não vazio) ou tem Collider (paredes e gatilhos invisíveis contam).
+`inspect_game_state {onScreen: true}` usa o mesmo filtro.
 
 ### Expressões
 

@@ -1,4 +1,4 @@
-import { msToFrames } from '@vibe/engine';
+import { msToFrames, screenToWorld } from '@vibe/engine';
 import {
   AdvanceClockStepSchema,
   AssertStepSchema,
@@ -188,6 +188,57 @@ export const runtimeTools = [
   }),
 
   defineTool({
+    name: 'observe',
+    changesRun: true,
+    description:
+      'Everything about the current moment of the run in one call: game (frame, status, scene, clock, vars), players, entities on screen (with their box on screen), input (keys, mouse in screen and world coordinates), camera, events and console warnings/errors since the last action, and a screenshot. State says what happened; the screenshot shows how it looks. Does not advance time.',
+    input: z.object({
+      screenshot: z.boolean().default(true).describe('Attach a screenshot of the current frame (default true).'),
+      annotate: z.boolean().default(false).describe('Annotate the screenshot (colliders and ids).'),
+      entities: z.enum(['onScreen', 'all', 'none']).default('onScreen').describe('Which entities to list (default: those visible on screen).'),
+      components: z.boolean().default(false).describe('Include full component data of the listed entities.'),
+    }),
+    run: async (ctx, { screenshot, annotate, entities, components }) => {
+      const h = host(ctx);
+      const s = h.requireSession();
+      const g = s.game;
+      const obs = s.observe(); // new events and console entries since the last action
+      const state = g.getState({ ids: entities === 'none' ? [] : undefined, onScreen: entities === 'onScreen', components });
+      const MAX = 60;
+      const mouse = state.input.mouse;
+      const world = screenToWorld(g.world, mouse.x, mouse.y);
+      let shot: Record<string, unknown> | undefined;
+      let image: string | undefined;
+      if (screenshot) {
+        try {
+          const info = await h.screenshot(annotate);
+          shot = { path: info.path, frame: info.frame, ...(info.divergence && { warning: info.divergence }), ...(info.renderWarnings.length && { renderWarnings: info.renderWarnings }) };
+          image = info.absolutePath;
+        } catch (err) {
+          shot = { error: err instanceof Error ? err.message : String(err) };
+        }
+      }
+      const result = {
+        game: { frame: state.frame, time: state.time, status: state.status, scene: state.scene, clock: state.clock.iso, vars: state.vars },
+        ...(obs.players && { players: obs.players }),
+        ...(entities !== 'none' && {
+          entities: state.entities.slice(0, MAX),
+          ...(state.entities.length > MAX && { entitiesTruncated: state.entities.length - MAX }),
+          entityCount: state.entityCount,
+        }),
+        input: { keysDown: state.input.keys, mouse: { x: mouse.x, y: mouse.y, world: { x: Math.round(world.x * 100) / 100, y: Math.round(world.y * 100) / 100 }, buttons: mouse.buttons } },
+        camera: state.camera,
+        events: obs.events,
+        ...(obs.eventsTruncated && { eventsTruncated: obs.eventsTruncated }),
+        console: obs.console,
+        ...(shot && { screenshot: shot }),
+        ...(h.isStale() && { projectChanged: 'Project files changed after this run started; call restart_game to play the latest version.' }),
+      };
+      return image ? new WithImages(result, [{ path: image, mediaType: 'image/png' }]) : result;
+    },
+  }),
+
+  defineTool({
     name: 'inspect_game_state',
     description: 'Current state: status, variables, camera, clock, input, and entity snapshots (position, velocity, grounded, health). Filter by ids or tags; components=true adds full component data; storage=true adds the saved data.',
     input: z.object({
@@ -195,6 +246,7 @@ export const runtimeTools = [
       tags: z.array(z.string()).optional(),
       components: z.boolean().optional(),
       storage: z.boolean().optional().describe('Include the saved data (game.storage).'),
+      onScreen: z.boolean().optional().describe('Only entities drawn inside the viewport, each with its box on screen (`screen`).'),
     }),
     run: (ctx, query) => {
       const state = session(ctx).game.getState(query);

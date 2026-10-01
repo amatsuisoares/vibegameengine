@@ -141,6 +141,8 @@ export interface EntitySnapshot {
   /** Animator: clip showing and its frame index. */
   anim?: { clip: string | null; frame: number };
   components?: Record<string, unknown>;
+  /** Box on screen (only with `onScreen` queries). */
+  screen?: ScreenBox;
 }
 
 export interface GameState {
@@ -158,6 +160,14 @@ export interface GameState {
   storage?: Record<string, unknown>;
 }
 
+/** An entity's box in viewport pixels (top-left, size). */
+export interface ScreenBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface StateQuery {
   /** Only these entity ids. */
   ids?: string[];
@@ -167,6 +177,8 @@ export interface StateQuery {
   storage?: boolean;
   /** Include full component data (verbose). */
   components?: boolean;
+  /** Only active entities inside the viewport, each with its box on screen (`screen`). */
+  onScreen?: boolean;
 }
 
 export const msToFrames = (ms: number) => Math.max(0, Math.round((ms / 1000) / FIXED_DT));
@@ -341,6 +353,25 @@ export class Game {
     return expandInputSteps([step]);
   }
 
+  /**
+   * Where an active entity appears in the viewport: its box (Collider or Sprite; a point for entities
+   * without one, e.g. Text), not clipped, or null when it is entirely off screen or not drawn at all.
+   */
+  screenBoxOf(e: Entity): ScreenBox | null {
+    if (!e.active || e.destroyed) return null;
+    // Only what is drawn (a visible sprite or text) or physically there (a collider, e.g. an invisible wall).
+    const { Sprite: sp, Text: tx } = e.components;
+    const drawn = (sp && sp.visible && sp.opacity > 0) || (tx && tx.text !== '' && tx.opacity > 0);
+    if (!drawn && !e.aabb()) return null;
+    const b = hitBox(e) ?? { x: e.x, y: e.y, w: 0, h: 0 };
+    const p = worldToScreen(this.world, b.x, b.y);
+    const zoom = this.world.camera.zoom;
+    const box = { x: round2(p.x), y: round2(p.y), w: round2(b.w * zoom), h: round2(b.h * zoom) };
+    const { width, height } = this.project.config;
+    if (box.x > width || box.y > height || box.x + box.w < 0 || box.y + box.h < 0) return null;
+    return box;
+  }
+
   /** Viewport point at the center of an entity's box (Collider or Sprite); throws if it is not on screen. */
   screenPointOf(id: string): { x: number; y: number } {
     const e = this.world.get(id);
@@ -403,6 +434,14 @@ export class Game {
     let list = w.entities.filter((e) => !e.destroyed);
     if (query.ids) list = list.filter((e) => query.ids!.includes(e.id));
     if (query.tags) list = list.filter((e) => e.hasAnyTag(query.tags!));
+    const boxes = new Map<Entity, ScreenBox>();
+    if (query.onScreen) {
+      list = list.filter((e) => {
+        const box = this.screenBoxOf(e);
+        if (box) boxes.set(e, box);
+        return !!box;
+      });
+    }
     return {
       frame: w.frame,
       time: round2(w.time),
@@ -418,7 +457,11 @@ export class Game {
       },
       input: this.input.snapshot(),
       entityCount: w.entities.length,
-      entities: list.map((e) => snapshotEntity(w, e, !!query.components)),
+      entities: list.map((e) => {
+        const snap = snapshotEntity(w, e, !!query.components);
+        const box = boxes.get(e);
+        return box ? { ...snap, screen: box } : snap;
+      }),
       clock: this.clock.snapshot(),
       ...(query.storage && { storage: this.storage.snapshot() }),
     };

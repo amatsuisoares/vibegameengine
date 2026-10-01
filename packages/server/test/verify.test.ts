@@ -1,20 +1,8 @@
 import { existsSync } from 'node:fs';
-import { Game } from '@vibe/engine';
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, RuntimeHost, Screenshotter, type ShotRequest, type ShotResult } from '../src';
+import { ProjectStore, RuntimeHost, Screenshotter } from '../src';
 import { createAgentTools } from '../src/tools';
-import { demoCopy, fixedClock } from './helpers';
-
-/** Replays the run headless instead of in Chromium (same contract: PNG + replayed state). */
-class FakeScreenshotter extends Screenshotter {
-  readonly requests: ShotRequest[] = [];
-  override async shoot(req: ShotRequest): Promise<ShotResult> {
-    this.requests.push({ ...req, ops: [...req.ops] });
-    const game = Game.fromRaw(req.raw as Parameters<typeof Game.fromRaw>[0], { seed: req.seed, scene: req.scene, clock: req.clock, storage: req.storage });
-    for (const op of req.ops) game.apply(op);
-    return { png: Buffer.from('\x89PNG fake'), state: game.getState(), warnings: [] };
-  }
-}
+import { demoCopy, FakeScreenshotter, fixedClock } from './helpers';
 
 function setup() {
   const store = new ProjectStore(demoCopy(), { clock: fixedClock });
