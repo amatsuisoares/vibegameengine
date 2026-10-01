@@ -59,5 +59,10 @@ describe('meu-pet (regression)', () => {
     expect(pet.state).toBe(game.world.vars.acao);
     const visited = new Set(game.events(0, 'state_change').filter((e) => e.entity === 'pet').map((e) => e.to));
     expect(visited.size).toBeGreaterThan(2);
+
+    // Its weighted choice of activities is a UtilityAI fed by self.props (needs and traits).
+    expect(pet.ai!.scores.passear).toBe(3);
+    expect(pet.props).toMatchObject({ fome: expect.any(Number), brincalhao: expect.any(Boolean) });
+    expect(game.events(0, 'ai_choice').filter((e) => e.entity === 'pet').length).toBeGreaterThan(1);
   });
 });

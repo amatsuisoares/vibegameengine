@@ -1,6 +1,7 @@
 import type { Components, EntityData } from '@vibe/shared';
 import type { FsmState } from './fsm';
 import type { AABB } from './math';
+import type { AiState } from './utility';
 import type { ScriptInstance } from './scripts';
 
 /** Runtime instance of an entity. Component data is a deep copy of the scene data and may be mutated. */
@@ -40,6 +41,8 @@ export class Entity {
   interact?: { readyAt: number; uses: number };
   /** StateMachine state (created on first use; see fsm.ts). */
   fsm?: FsmState;
+  /** UtilityAI state (created on first use; see utility.ts). */
+  ai?: AiState;
   /** Script instance (created on first use by the ScriptRunner). */
   script?: ScriptInstance;
 

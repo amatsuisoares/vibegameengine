@@ -13,6 +13,7 @@ import { healthSystem } from './systems/health';
 import { RuleRunner } from './rules';
 import { hitBox, InteractionRunner, snapshotInteractable, type InteractableSnapshot } from './interact';
 import { fsmOf, StateMachineRunner, stateMs } from './fsm';
+import { aiOf, UtilityRunner } from './utility';
 import { SoundDirector, soundOf } from './sound';
 import { ScriptLibrary, ScriptRunner } from './scripts';
 import { findContacts, interactionSystem, pairKey } from './systems/interactions';
@@ -120,6 +121,10 @@ export interface EntitySnapshot {
   state?: string;
   stateMs?: number;
   prevState?: string;
+  /** UtilityAI: current choice and the scores of the last decision (null = option not available). */
+  ai?: { choice: string | null; scores: Record<string, number | null> };
+  /** Script props (per-entity values; scripts may change them). */
+  props?: Record<string, VarValue>;
   components?: Record<string, unknown>;
 }
 
@@ -171,6 +176,8 @@ export class Game {
   interactions!: InteractionRunner;
   /** State machines of the current scene. */
   stateMachines!: StateMachineRunner;
+  /** Utility AIs of the current scene. */
+  utility!: UtilityRunner;
   /** Music asset playing (for the `music` event when a scene without music follows one with music). */
   private music: string | null = null;
 
@@ -216,6 +223,7 @@ export class Game {
     this.ruleRunner = new RuleRunner(this.world, this);
     this.interactions = new InteractionRunner(this.world, this, this.scriptRunner);
     this.stateMachines = new StateMachineRunner(this.world, this, this.scriptRunner);
+    this.utility = new UtilityRunner(this.world, this, this.scriptRunner, this.stateMachines);
     this.soundDirector = new SoundDirector(this.world);
     const music = scene.music ? soundOf(scene.music) : null;
     if (music) this.world.emit('music', music);
@@ -270,6 +278,7 @@ export class Game {
         healthSystem(w, dt);
         animationSystem(w, dt);
         this.ruleRunner.run(entered);
+        this.utility.run();
         this.stateMachines.run();
         this.soundDirector.run();
         this.scriptRunner.events();
@@ -419,6 +428,10 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
     s.stateMs = stateMs(w, fsm);
     if (fsm.previous !== null) s.prevState = fsm.previous;
   }
+  const ai = aiOf(e);
+  if (ai) s.ai = { choice: ai.choice, scores: { ...ai.scores } };
+  const props = e.components.Script?.props;
+  if (props && Object.keys(props).length) s.props = { ...props };
   if (withComponents) s.components = structuredClone(e.components) as Record<string, unknown>;
   return s;
 }

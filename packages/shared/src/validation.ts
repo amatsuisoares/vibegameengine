@@ -87,6 +87,21 @@ export function stateMachineErrors(sm: NonNullable<Components['StateMachine']>, 
   return errors;
 }
 
+/** Options that name a state need a StateMachine with that state. */
+export function utilityErrors(c: Components, at: string): string[] {
+  const ai = c.UtilityAI;
+  if (!ai) return [];
+  const errors: string[] = [];
+  for (const [name, o] of Object.entries(ai.options)) {
+    if (o.state === undefined) continue;
+    if (!c.StateMachine) errors.push(`${at}.components.UtilityAI.options.${name}.state: the entity has no StateMachine`);
+    else if (!Object.hasOwn(c.StateMachine.states, o.state)) {
+      errors.push(`${at}.components.UtilityAI.options.${name}.state: state "${o.state}" does not exist (states: ${Object.keys(c.StateMachine.states).join(', ')})`);
+    }
+  }
+  return errors;
+}
+
 /** Every action list of a StateMachine (for checks that apply to all actions, e.g. sounds). */
 export function stateActions(sm: NonNullable<Components['StateMachine']> | undefined): [string, RuleAction[]][] {
   if (!sm) return [];
@@ -158,6 +173,7 @@ export function checkScene(scene: Scene, project?: Project): { errors: string[];
     }
     if (project && c.Interactable) warnings.push(...interactableWarnings(c.Interactable, project, ep));
     if (c.StateMachine) errors.push(...stateMachineErrors(c.StateMachine, `${ep}.components.StateMachine`, ids, project));
+    errors.push(...utilityErrors(c, ep));
   }
   return { errors, warnings };
 }
@@ -208,6 +224,7 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
     if (c.Sprite?.asset && !assetIds.has(c.Sprite.asset)) errors.push(`${at}.components.Sprite.asset: asset "${c.Sprite.asset}" does not exist`);
     if (c.FollowTarget?.targetId) warnings.push(`${at}.components.FollowTarget.targetId: prefabs should target by tag (ids differ per scene)`);
     if (c.StateMachine) errors.push(...stateMachineErrors(c.StateMachine, `${at}.components.StateMachine`, null, project));
+    errors.push(...utilityErrors(c, at));
   }
   for (const [key, scene] of Object.entries(project.scenes)) {
     if (key !== scene.id) errors.push(`scenes.${key}: key does not match scene id "${scene.id}"`);

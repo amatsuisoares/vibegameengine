@@ -90,7 +90,7 @@ export function checkScriptSyntax(file: string, source: string): string | null {
   }
 }
 
-/** Syntax errors in expressions: scene rules (`when.expr` and `if`), Interactable conditions, StateMachine `when`s. */
+/** Syntax errors in expressions: scene rules (`when.expr` and `if`), Interactable conditions, StateMachine and UtilityAI. */
 function expressionErrors(project: Project): string[] {
   const errors: string[] = [];
   const check = (src: string | undefined, at: string) => {
@@ -103,6 +103,14 @@ function expressionErrors(project: Project): string[] {
   };
   const checkEntity = (c: Components, at: string) => {
     check(c.Interactable?.condition, `${at}.components.Interactable.condition`);
+    const ai = c.UtilityAI;
+    if (ai) {
+      check(ai.decideWhen, `${at}.components.UtilityAI.decideWhen`);
+      for (const [name, o] of Object.entries(ai.options)) {
+        if (typeof o.score === 'string') check(o.score, `${at}.components.UtilityAI.options.${name}.score`);
+        check(o.when, `${at}.components.UtilityAI.options.${name}.when`);
+      }
+    }
     const sm = c.StateMachine;
     if (!sm) return;
     sm.transitions.forEach((t, i) => check(t.when, `${at}.components.StateMachine.transitions[${i}].when`));

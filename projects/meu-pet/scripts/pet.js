@@ -58,16 +58,6 @@ const isNightAt = (t) => {
 const ageHours = (now) => (now - pet.born) / HOUR;
 const pick = (game, list) => list[Math.floor(game.random() * list.length)];
 
-function weighted(game, options) {
-  const total = options.reduce((s, o) => s + Math.max(0, o.w), 0);
-  let r = game.random() * total;
-  for (const o of options) {
-    r -= Math.max(0, o.w);
-    if (r <= 0) return o.id;
-  }
-  return options[options.length - 1].id;
-}
-
 // ---------------------------------------------------------------- criação e save
 
 function newPet(game, name) {
@@ -330,25 +320,27 @@ function decide(game, self) {
     return;
   }
   const ball = game.entity('bola');
-  const options = [
-    { id: 'wander', w: 3 },
-    { id: 'idle', w: has('preguicoso') ? 4 : 2 },
-    { id: 'investigate', w: has('curioso') ? 3 : 0.7 },
-    { id: 'greet', w: (has('carinhoso') ? 2.5 : 0.8) + (n.afeto < 40 ? 2 : 0) },
-    { id: 'toy', w: ball && n.energia > 30 ? (has('brincalhao') ? 2.5 : 1) + (n.diversao < 40 ? 1.5 : 0) : 0 },
-    { id: 'sulk', w: has('irritavel') && n.diversao < 50 ? 1.2 : 0 },
-  ];
-  if (pet.sick) options.push({ id: 'idle', w: 6 });
-  const choice = weighted(game, options);
-  if (choice === 'wander') go(game, MIN_X + game.random() * (MAX_X - MIN_X), 'idle');
-  else if (choice === 'idle') mind = { act: 'idle', t: 2 + game.random() * (has('preguicoso') ? 6 : 3) };
-  else if (choice === 'investigate') {
+  // A escolha ponderada é da UtilityAI do pet (scenes/quarto.json): os pesos são expressões sobre self.props.
+  sincronizarProps(self, ball);
+  const choice = self.ai.decide();
+  if (choice === 'passear') go(game, MIN_X + game.random() * (MAX_X - MIN_X), 'idle');
+  else if (choice === 'investigar') {
     const target = pick(game, ['janela', 'lampada', 'planta', 'cama']);
     go(game, spot(game, target) + (game.random() - 0.5) * 30, 'investigate');
     mind.what = target;
-  } else if (choice === 'greet') go(game, 480, 'greet');
-  else if (choice === 'toy') go(game, ball.x - 60, 'toy');
-  else mind = { act: 'sulk', t: 4 };
+  } else if (choice === 'cumprimentar') go(game, 480, 'greet');
+  else if (choice === 'brincar' && ball) go(game, ball.x - 60, 'toy');
+  else if (choice === 'emburrar') mind = { act: 'sulk', t: 4 };
+  else mind = { act: 'idle', t: 2 + game.random() * (has('preguicoso') ? 6 : 3) };
+}
+
+/** Necessidades e traços que as expressões da UtilityAI leem (self.props.fome, self.props.curioso...). */
+function sincronizarProps(self, ball) {
+  const p = self.props;
+  for (const k of NEEDS) p[k] = Math.round(pet.needs[k]);
+  for (const t of TRAITS) p[t] = has(t);
+  p.doente = pet.sick;
+  p.temBola = !!ball;
 }
 
 function arrive(game, self, then) {

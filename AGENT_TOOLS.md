@@ -189,6 +189,46 @@ está sempre em um estado nomeado, e a engine troca de estado sozinha pelas tran
   com erro de sintaxe é recusado.
 - **Limites:** uma máquina por entidade; sem estados hierárquicos; `"$by"`/`"$entity"` não existem nas ações de estado.
 
+## Utility AI (`UtilityAI`)
+
+Implementado na V0.2 (`packages/engine/src/utility.ts`). A entidade escolhe **o que fazer** dando nota a cada opção com
+expressões sobre o estado do jogo. A engine não impõe fatores: necessidades e personalidade (`self.props`), distância,
+horário (`clock.hour`), variáveis, estado, cooldown... quem define é o jogo.
+
+```json
+"UtilityAI": {
+  "intervalMs": 500,
+  "options": {
+    "eat":   { "score": "1 - self.props.hunger / 100", "when": "exists('food')" },
+    "sleep": { "score": "1 - self.props.energy / 100 + (clock.hour >= 22) * 0.3" },
+    "play":  { "score": "self.props.playful * 0.6", "cooldownMs": 30000 },
+    "flee":  { "score": "clamp(150 - distance(self, 'wolf'), 0, 150) / 100", "state": "running" }
+  }
+}
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `options.<nome>.score` | — | número ou expressão; ≤ 0 = não escolhida |
+| `options.<nome>.when` | — | só concorre se a expressão for verdadeira |
+| `options.<nome>.cooldownMs` | `0` | depois de deixar de ser a escolha, espera isso antes de voltar |
+| `options.<nome>.state` | — | estado da `StateMachine` a entrar (padrão: um estado com o nome da opção, se existir) |
+| `select` | `"best"` | `best`: maior nota (empate: primeira opção). `weighted`: sorteio proporcional às notas (seed do jogo) |
+| `intervalMs` | `500` | intervalo entre decisões; `0` = só quando um script chama `self.ai.decide()` |
+| `decideWhen` | — | só decide enquanto a expressão vale (ex. `"self.state == 'idle'"`) |
+| `inertia` | `0.1` | somado à escolha atual no `best`, para notas próximas não ficarem trocando |
+| `noise` | `0` | soma um aleatório em [0, noise) a cada nota (seed: variado e reproduzível) |
+
+- **Escolha nova:** evento `ai_choice {entity, choice, from, score}`, entra no estado correspondente e chama o hook
+  `onDecision(self, {choice, from, scores}, game)`. Sem opção disponível, a escolha fica como está.
+- **Ver o porquê:** `inspect_game_state` traz `ai: {choice, scores}` (nota de cada opção na última decisão; `null` =
+  indisponível por `when` ou cooldown) e `props` (os `Script.props` da entidade, que scripts podem atualizar — ex.
+  necessidades). Expressões: `entity('npc').ai.choice`, `entity('npc').ai.scores.eat`.
+- **Scripts:** `self.ai.choice`, `self.ai.scores`, `self.ai.decide()` (decide agora e devolve a escolha).
+- **Erro** numa expressão: `ai_error {entity, message}` e a IA daquela entidade para até recarregar a cena.
+- **Validação ao gravar:** `state` precisa existir na `StateMachine` da entidade; expressões com erro de sintaxe são
+  recusadas.
+
 ## Assets e som
 
 Implementado na Etapa 8 (`tools/asset-tools.ts`, `sfx.ts`, `engine/src/sound.ts`, `runtime/src/audio.ts`).
@@ -242,6 +282,7 @@ function onCollision(self, other, game) {
 | `onEvent(self, event, game)` | cada evento do jogo (fim do frame), inclusive os emitidos por scripts e regras |
 | `onInteract(self, by, game, info)` | o `Interactable` da entidade foi usado (ver [Interações](#interações-interactable)) |
 | `onStateChange(self, change, game)` | a `StateMachine` da entidade trocou de estado: `change = {from, to}` (ver [Máquinas de estado](#máquinas-de-estado-statemachine)) |
+| `onDecision(self, decision, game)` | a `UtilityAI` da entidade escolheu algo novo: `{choice, from, scores}` (ver [Utility AI](#utility-ai-utilityai)) |
 
 - `self`: `id, name, tags, hasTag(t), x, y, vx, vy` (velocidade exige `Body`), `grounded, enabled, destroyed, health,
   props, state` (armazenamento livre), `get(tipo)` (dados vivos do componente), `damage(n)`, `destroy()`.
@@ -261,6 +302,7 @@ function onCollision(self, other, game) {
 - Entidades com a tag `clickable` (sem script) também recebem clique: gera o evento `click {entity}` para regras.
 - `game.interact(alvo, ator?)` e `game.nearbyInteractables(ator)`: ver [Interações](#interações-interactable).
 - `self.fsm` (`state, previous, time, is(...), go(estado)`): ver [Máquinas de estado](#máquinas-de-estado-statemachine).
+- `self.ai` (`choice, scores, decide()`): ver [Utility AI](#utility-ai-utilityai).
 - Também `console.log/warn/error` (vão para o console do jogo) e `Math` com `Math.random` usando a seed da run.
 - **Determinismo:** `Date`, timers, rede, `process`, `window` e `globalThis` não existem para o script. É uma API
   restrita para lógica de jogo, não uma sandbox de segurança.
@@ -311,11 +353,12 @@ do início da run, vem `projectChanged` pedindo `restart_game`.
 Usadas por `wait_until`, passos `waitUntil`/`assert` e `assertions` do `run_test`. São interpretadas por um
 parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 
-- Nomes: `status`, `frame`, `time`, `scene`, `vars`, `camera`, `clock`; `self` só em condições de `StateMachine` e
-  `Interactable` (a própria entidade)
-- Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState` e `interactable` quando há),
-  `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar uma),
-  `abs`, `min`, `max`
+- Nomes: `status`, `frame`, `time`, `scene`, `vars`, `camera`, `clock`; `self` só em expressões de `StateMachine`,
+  `UtilityAI` e `Interactable` (a própria entidade)
+- Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
+  há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
+  uma), `abs`, `min`, `max`, `clamp(x, min, max)`
+- Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").
 

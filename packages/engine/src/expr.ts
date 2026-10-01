@@ -7,7 +7,7 @@ import type { Game } from './game';
  *
  *   literals     12  1.5  'text'  "text"  true  false  null
  *   names        status  frame  time  scene  vars  camera  clock  self (StateMachine/Interactable conditions)
- *   functions    entity(id) exists(id) count(tag) events(type) distance(a,b) abs(x) min(a,b) max(a,b)
+ *   functions    entity(id) exists(id) count(tag) events(type) distance(a,b) abs(x) min(a,b) max(a,b) clamp(x,lo,hi)
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
  * Field access on null yields null (the assertion then fails and shows the null).
  */
@@ -222,6 +222,11 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
           });
           return a && b ? Math.round(Math.hypot(a.x - b.x, a.y - b.y) * 100) / 100 : null;
         }
+        case 'clamp': {
+          arity(3);
+          const [x, lo, hi] = args.map(Number);
+          return Math.min(hi, Math.max(lo, x));
+        }
         case 'abs':
           arity(1);
           return Math.abs(Number(args[0]));
@@ -230,7 +235,7 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'max':
           return Math.max(...args.map(Number));
         default:
-          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, count, events, distance, abs, min, max)`, src);
+          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, count, events, distance, abs, min, max, clamp)`, src);
       }
     }
     case 'unary': {

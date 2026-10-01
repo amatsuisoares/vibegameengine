@@ -2,6 +2,7 @@ import type { ComponentType, VarValue } from '@vibe/shared';
 import { checkSpeed, type GameClock } from './clock';
 import type { Entity } from './entity';
 import { fsmOf, stateMs, type StateMachineRunner } from './fsm';
+import { aiOf, type UtilityRunner } from './utility';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
 import type { GameStorage } from './storage';
@@ -20,6 +21,7 @@ import { FIXED_DT, type GameEvent, type World } from './world';
  *   function onEvent(self, event, game) {}        // every game event (end of frame), incl. custom ones
  *   function onInteract(self, by, game, info) {}  // self (an Interactable) was used; by = actor or null, info = { action, via }
  *   function onStateChange(self, change, game) {} // self's StateMachine changed state: change = { from, to } (from null at start)
+ *   function onDecision(self, decision, game) {}  // self's UtilityAI chose something new: { choice, from, scores }
  *
  * Top-level variables are per entity (each entity runs its own copy of the script).
  * Scripts only see `self`, `game`, `console` and a deterministic `Math` (Math.random is
@@ -34,9 +36,10 @@ export interface ScriptHooks {
   onEvent?: (self: ScriptEntity, event: GameEvent, game: ScriptGame) => void;
   onInteract?: (self: ScriptEntity, by: ScriptEntity | null, game: ScriptGame, info: { action: string; via: InteractVia }) => void;
   onStateChange?: (self: ScriptEntity, change: { from: string | null; to: string }, game: ScriptGame) => void;
+  onDecision?: (self: ScriptEntity, decision: { choice: string; from: string | null; scores: Record<string, number | null> }, game: ScriptGame) => void;
 }
 
-const HOOKS = ['onStart', 'onUpdate', 'onCollision', 'onClick', 'onEvent', 'onInteract', 'onStateChange'] as const;
+const HOOKS = ['onStart', 'onUpdate', 'onCollision', 'onClick', 'onEvent', 'onInteract', 'onStateChange', 'onDecision'] as const;
 
 /** What scripts reach beyond the world: the calendar clock, the saved data, interactions and state machines. */
 export interface ScriptHost {
@@ -44,6 +47,16 @@ export interface ScriptHost {
   storage: GameStorage;
   readonly interactions: InteractionRunner;
   readonly stateMachines: StateMachineRunner;
+  readonly utility: UtilityRunner;
+}
+
+/** self.ai: the entity's UtilityAI (choice is null without one or before the first decision). */
+export interface ScriptAi {
+  readonly choice: string | null;
+  /** Scores of the last decision (null = option not available). */
+  readonly scores: Record<string, number | null>;
+  /** Scores the options now and applies the choice; returns it. */
+  decide(): string | null;
 }
 
 /** self.fsm: the entity's StateMachine (state is null without one). */
@@ -150,6 +163,8 @@ export interface ScriptEntity {
   readonly state: Record<string, unknown>;
   /** The entity's StateMachine. */
   readonly fsm: ScriptFsm;
+  /** The entity's UtilityAI. */
+  readonly ai: ScriptAi;
   /** Live component data (changes apply immediately), or undefined. */
   get(type: ComponentType): Record<string, unknown> | undefined;
   damage(amount: number): boolean;
@@ -338,6 +353,15 @@ class ScriptApi {
       is: (...names) => names.includes(fsmOf(e)?.state as string),
       go: (to) => host.stateMachines.go(e, String(to)),
     };
+    const ai: ScriptAi = {
+      get choice() {
+        return aiOf(e)?.choice ?? null;
+      },
+      get scores() {
+        return { ...(aiOf(e)?.scores ?? {}) };
+      },
+      decide: () => host.utility.decide(e),
+    };
     api = {
       id: e.id,
       name: e.name,
@@ -411,6 +435,7 @@ class ScriptApi {
         return s;
       },
       fsm,
+      ai,
       get: (type) => e.components[type] as Record<string, unknown> | undefined,
       damage: (amount) => applyDamage(w, e, amount),
       destroy: () => w.destroy(e),
@@ -523,6 +548,14 @@ export class ScriptRunner {
     const inst = this.instance(target);
     if (inst && !inst.failed && inst.hooks.onClick) {
       this.call(target, inst, 'onClick', () => inst.hooks.onClick!(this.api.entity(target), this.api.game, pos));
+    }
+  }
+
+  /** onDecision of an entity whose UtilityAI chose something new. */
+  decided(e: Entity, decision: { choice: string; from: string | null; scores: Record<string, number | null> }) {
+    const inst = this.instance(e);
+    if (inst && !inst.failed && inst.hooks.onDecision && e.active) {
+      this.call(e, inst, 'onDecision', () => inst.hooks.onDecision!(this.api.entity(e), structuredClone(decision), this.api.game));
     }
   }
 

@@ -97,7 +97,12 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
   comum (`actions.ts`)
 - [x] meu-pet: as 14 atividades do pet são estados da `StateMachine` (sincronizadas pelo `pet.js`); regressão cobre
 - [x] 240 testes unitários + 15 e2e
-- [ ] Utility AI
+- [x] **Utility AI**: componente `UtilityAI` (opções com `score`/`when`/`cooldownMs`/`state`, `best` com inércia ou
+  `weighted`, `intervalMs`/`decideWhen` ou sob demanda, `noise` com seed), evento `ai_choice`/`ai_error`, `self.ai` e
+  `onDecision`, `ai` e `props` no estado, `clamp()` nas expressões
+- [x] meu-pet: o sorteio ponderado de atividades do pet virou `UtilityAI` (mesmos pesos, como expressões sobre
+  `self.props`); prioridades de sono/fome continuam no script
+- [x] 253 testes unitários + 15 e2e
 - [ ] Animation Controller
 - [ ] Timer / Scheduler
 - [ ] Tween

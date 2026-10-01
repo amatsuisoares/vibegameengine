@@ -17,3 +17,4 @@ export * from './storage';
 export * from './interact';
 export * from './fsm';
 export * from './actions';
+export * from './utility';

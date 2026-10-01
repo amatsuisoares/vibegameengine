@@ -177,3 +177,24 @@ describe('StateMachine', () => {
     ]);
   });
 });
+
+describe('UtilityAI', () => {
+  it('fills defaults and checks the states its options name', () => {
+    const ok = parseProject(project([{ id: 'npc', components: { UtilityAI: { options: { eat: { score: 1 } } } } }]));
+    if (!ok.ok) throw new Error(ok.errors.join());
+    expect(ok.value.scenes.main.entities[0].components.UtilityAI).toEqual({
+      options: { eat: { score: 1, cooldownMs: 0 } },
+      select: 'best',
+      intervalMs: 500,
+      inertia: 0.1,
+      noise: 0,
+    });
+    const noMachine = parseProject(project([{ id: 'npc', components: { UtilityAI: { options: { eat: { score: 1, state: 'eating' } } } } }]));
+    expect(noMachine.ok ? [] : noMachine.errors).toEqual(['scenes.main.entities(npc).components.UtilityAI.options.eat.state: the entity has no StateMachine']);
+    const wrong = parseProject(
+      project([{ id: 'npc', components: { StateMachine: { initial: 'idle', states: { idle: {} } }, UtilityAI: { options: { eat: { score: 1, state: 'eating' } } } } }]),
+    );
+    expect(wrong.ok ? [] : wrong.errors).toEqual(['scenes.main.entities(npc).components.UtilityAI.options.eat.state: state "eating" does not exist (states: idle)']);
+    expect(parseProject(project([{ id: 'npc', components: { UtilityAI: { options: {} } } }])).ok).toBe(false);
+  });
+});

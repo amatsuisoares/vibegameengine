@@ -95,6 +95,7 @@ Memória do agente em `.vibe/memory.json`.
 | `Animator` | clipes de spritesheet; seleção automática idle/run/jump/fall |
 | `Interactable` | algo que se usa (porta, NPC, tigela): por clique, tecla em alcance ou entrada; condição, cooldown, once, som |
 | `StateMachine` | estados nomeados com transições por condição, tempo no estado ou evento; ações de entrada/saída |
+| `UtilityAI` | escolhe o que fazer pela nota de cada opção (expressões); entra no estado correspondente |
 | `Script` | comportamento em JavaScript (`scripts/*.js`): `onStart/onUpdate/onCollision` com API restrita |
 | `Mover` | segue waypoints (vaivém ou loop, pausa); com Body kinematic vira plataforma móvel/elevador |
 
@@ -116,6 +117,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
         5. healthSystem               timers, queda no abismo (killY), morte
         6. animationSystem            flip e frames de animação
            RuleRunner.run             regras da cena (start/event/enter/expr/every → if → ações)
+           UtilityRunner.run          decisões da UtilityAI que venceram o intervalo (→ StateMachine.go)
            StateMachineRunner.run     estado inicial e transições das StateMachines (exit → state_change → enter)
            SoundDirector.run          eventos com som em config.sounds → evento sound
         7. flushDestroyed, cameraSystem
@@ -129,7 +131,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Contatos:** pares sobrepostos (tolerância 0,5 px, então “encostar” conta). Goal/Checkpoint usam
   semântica de *enter* (só no primeiro frame de contato).
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error` e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error` e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -177,6 +179,13 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   `state_change {entity, from, to}`, ações `enter` (target `"$self"`), hook `onStateChange`. Scripts usam `self.fsm`
   (`state`, `previous`, `time`, `is`, `go`); `go` troca na hora. Erro → `state_error`, máquina daquela entidade
   desligada até recarregar a cena. Trocas aninhadas (onStateChange → go...) param em 8 níveis.
+- **Utility AI** (`engine/src/utility.ts`, V0.2): `UtilityRunner` por mundo, entre as regras e as máquinas de estado.
+  Cada decisão avalia as opções (`when`, cooldown contado de quando a opção deixou de ser a escolha, `score` compilado
+  uma vez), guarda as notas em `Entity.ai.scores` (aparecem no snapshot) e escolhe por `best` (+ `inertia` da escolha
+  atual) ou `weighted` (RNG do mundo); `noise` também usa a RNG — tudo reproduzível pela seed. Escolha nova →
+  `ai_choice`, `StateMachineRunner.go` (estado com o nome da opção ou `state`) e `onDecision`. Decide a cada
+  `intervalMs` (com `decideWhen`) ou sob demanda (`self.ai.decide()`, `intervalMs: 0`). Os `Script.props` entram no
+  snapshot, então as notas leem necessidades e personalidade por entidade (`self.props.fome`).
 - **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
   conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).

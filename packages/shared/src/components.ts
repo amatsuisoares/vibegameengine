@@ -191,6 +191,27 @@ export const StateMachineSchema = z.strictObject({
   transitions: z.array(StateTransitionSchema).default(() => []).describe(`Transitions from any state, checked before the current state's (e.g. to "dead").`),
 });
 
+export const UtilityOptionSchema = z.strictObject({
+  score: z
+    .union([z.number(), z.string().min(1)])
+    .describe(`Utility: a number or an expression, e.g. "1 - self.props.hunger / 100" or "clamp(200 - distance(self, 'player'), 0, 200) / 200". <= 0 = not chosen.`),
+  when: z.string().min(1).optional().describe('Expression that must be true for the option to be considered.'),
+  cooldownMs: z.number().min(0).default(0).describe('After the option stops being the choice, it waits this long before it can be chosen again.'),
+  state: z.string().min(1).optional().describe('StateMachine state entered when chosen (default: a state with the option name, if any).'),
+});
+
+export const UtilityAISchema = z.strictObject({
+  options: z
+    .record(z.string(), UtilityOptionSchema)
+    .refine((o) => Object.keys(o).length > 0, 'needs at least one option')
+    .describe('Option name -> { score, when?, cooldownMs, state? }. Ties go to the first option.'),
+  select: z.enum(['best', 'weighted']).default('best').describe('best: highest score. weighted: random in proportion to the scores (seeded).'),
+  intervalMs: z.number().min(0).default(500).describe('Time between decisions. 0 = only when a script calls self.ai.decide().'),
+  decideWhen: z.string().min(1).optional().describe(`Only decide while this expression is true, e.g. "self.state == 'idle'".`),
+  inertia: z.number().min(0).default(0.1).describe("Added to the current choice's score (best) so close scores do not flip-flop."),
+  noise: z.number().min(0).default(0).describe('Random amount in [0, noise) added to each score (seeded; varied but reproducible).'),
+});
+
 /** Script file path: scripts/<name>.js (subfolders allowed). */
 export const SCRIPT_PATH = /^scripts\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*\.js$/;
 
@@ -224,6 +245,7 @@ export const ComponentSchemas = {
   Animator: AnimatorSchema,
   Interactable: InteractableSchema,
   StateMachine: StateMachineSchema,
+  UtilityAI: UtilityAISchema,
   Script: ScriptSchema,
 } as const;
 
@@ -248,6 +270,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Animator: 'Spritesheet animation clips; picks idle/run/jump/fall automatically.',
   Interactable: 'Something actors can interact with (open, talk, feed...) by click, key in range or entering; condition, cooldown, once; emits "interact".',
   StateMachine: 'Named states (idle, chase, sleeping...) with transitions by condition, time in state or event, and enter/exit actions.',
+  UtilityAI: 'Chooses what to do by scoring options (needs, distance, time, personality...) with expressions; enters the matching StateMachine state.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -270,6 +293,7 @@ export const ComponentsSchema = z.strictObject({
   Animator: AnimatorSchema.optional(),
   Interactable: InteractableSchema.optional(),
   StateMachine: StateMachineSchema.optional(),
+  UtilityAI: UtilityAISchema.optional(),
   Script: ScriptSchema.optional(),
 });
 

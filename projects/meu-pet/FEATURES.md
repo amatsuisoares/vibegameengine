@@ -111,7 +111,9 @@ Ordem da escolha:
 2. **Comida** se `fome < 45`: vai até a tigela; com ração, come (3 s, +35 de fome por porção); sem ração, fica
    olhando a tigela vazia ("?"). Para não ficar preso, só volta a olhar a tigela vazia depois de 20 s; no intervalo,
    metade das vezes vem até o jogador.
-3. Caso contrário, sorteio ponderado:
+3. Caso contrário, sorteio ponderado — feito pela `UtilityAI` da entidade `pet` (`select: weighted`; os pesos são
+   expressões sobre as necessidades e os traços que o `pet.js` coloca em `self.props`; as notas de cada opção aparecem
+   no estado do jogo em `ai.scores`):
 
 | Atividade | Peso |
 |---|---|
