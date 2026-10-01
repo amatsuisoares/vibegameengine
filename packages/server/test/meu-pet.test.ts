@@ -52,6 +52,8 @@ describe('meu-pet (regression)', () => {
     game.perform([{ type: 'click', entity: dirt[0].id }, { type: 'wait', ms: 100 }]);
     expect(game.world.withTag('sujeira').length).toBe(dirt.length - 1);
     expect(game.events(0, 'interact').at(-1)).toMatchObject({ entity: dirt[0].id, action: 'limpar' });
+    expect(game.events(0, 'particles').at(-1)).toMatchObject({ entity: dirt[0].id, count: 14 }); // a puff of dust
+    expect(game.world.particles.particles.some((p) => p.owner === dirt[0].id)).toBe(true); // still settling after the dirt is gone
 
     game.perform([{ type: 'wait', ms: 60_000 }]);
     expect(game.status).toBe('running');

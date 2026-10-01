@@ -106,6 +106,9 @@ export function runAction(w: World, a: RuleAction, target: (ref: string) => Enti
       w.tweens.start(target(ref), o);
       return;
     }
+    case 'burst':
+      w.particles.burst(target(a.target), a.count);
+      return;
     case 'spawn': {
       const at = a.at ? target(a.at) : null;
       w.spawn(a.prefab, (at?.x ?? 0) + (a.x ?? 0), (at?.y ?? 0) + (a.y ?? 0), a.id);

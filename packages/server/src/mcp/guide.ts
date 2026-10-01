@@ -7,12 +7,12 @@ export const VIBE_INSTRUCTIONS = `VibeGameEngine: a 2D game engine you drive wit
 PROJECTS
 - list_projects / open_project / create_project select what you work on. With a single project, it opens automatically.
 - A project is data: project.json (viewport size, gravity, input actions, assets) and scenes/<id>.json (world size, background, camera, killY, vars, entities). Entities have an id, tags, a transform and components.
-- Built-in components: Sprite, Body, Collider, PlatformerController, Patrol, FollowTarget, Health, Damage, Stompable, Collectible, Goal, Checkpoint, Text, Animator, Mover (waypoints; with a kinematic Body = moving platform that carries the player), Interactable, StateMachine, UtilityAI, NavAgent, Script. list_component_types shows them; pass types=[...] for full schemas with defaults.
+- Built-in components: Sprite, Body, Collider, PlatformerController, Patrol, FollowTarget, Health, Damage, Stompable, Collectible, Goal, Checkpoint, Text, Animator, Mover (waypoints; with a kinematic Body = moving platform that carries the player), Interactable, StateMachine, UtilityAI, NavAgent, ParticleEmitter, Script. list_component_types shows them; pass types=[...] for full schemas with defaults.
 - Prefer the scene/entity/component tools over raw file edits. Edits are incremental (JSON merge patches), validated before writing (a rejected edit writes nothing; read the error and retry), recorded in the history with your "reason", and undoable (undo/redo).
 
 RULES (events and conditions without code)
 - set_rule / delete_rule edit scene rules: {"id", "when", "if"?, "do": [actions], "once"?}. when: {"start":true} | {"event":"collect","match":{"entity":"coin1"}} | {"enter":"zoneId","tag":"player"} | {"expr":"vars.coins >= 3"} (fires on false->true) | {"every":1000}.
-- Actions: setVar, addVar, emit, win, lose, loadScene, destroy, setEnabled, setText, damage, heal, move, modify {target, component, set}, log, playSound, spawn, after {ms, do: [actions], id?} (delayed actions; not nested), cancelTimer {id}, tween {target, prop, to, ms, from?, ease?, yoyo?, repeat?}. target: entity id, "$by" (who entered / caused the event) or "$entity" (the zone / the event's entity). Use a disabled entity + setEnabled to make things appear. Each firing emits a "rule" event.
+- Actions: setVar, addVar, emit, win, lose, loadScene, destroy, setEnabled, setText, damage, heal, move, modify {target, component, set}, log, playSound, spawn, after {ms, do: [actions], id?} (delayed actions; not nested), cancelTimer {id}, tween {target, prop, to, ms, from?, ease?, yoyo?, repeat?}, burst {target, count?} (particles). target: entity id, "$by" (who entered / caused the event) or "$entity" (the zone / the event's entity). Use a disabled entity + setEnabled to make things appear. Each firing emits a "rule" event.
 
 INTERACTIONS (doors, NPCs, items, objects to use)
 - Interactable {action ("open", "talk", "feed"...), label?, via: ["click","key","enter"] (default click+key), key (default action "interact" = E), actorTags (default ["player"]), range (px between boxes, default 32), condition? (expression), cooldownMs, once, enabled, sound?}. Do not write a component or script per action: one Interactable + what it does.
@@ -46,6 +46,10 @@ TWEENS (smooth changes: pulse, float, fade, slide)
 PATHFINDING (top-down: NPCs walking to things around obstacles)
 - NavAgent {target (entity id, followed, or {x, y}; null = stop), speed, cell (16), diagonal, arriveDistance, repathMs, avoidTags}: plans an A* grid path around solid colliders (and avoidTags), re-plans as things move, emits "nav_arrived"/"nav_failed". With a Body it steers by velocity. Send it from a state with modify {component: "NavAgent", set: {target: "bed"}} and leave the state on event nav_arrived match {entity: "$self"}.
 - Scripts: self.nav.goTo(target) / stop() / status / path; game.findPath(from, to) -> {points, length} | null. Expressions: pathDistance(a, b) (null = unreachable) to verify reachability. inspect_game_state shows nav; annotated screenshots draw the path. Not for platformer jumps.
+
+PARTICLES (smoke, dust, hearts, stars, confetti, sparks)
+- ParticleEmitter {emitting, rate (per s; 0 = bursts only), burst (at start; default burst size), max, lifeMs, speed, angle (-90 = up), spread, gravity, drag, size, sizeEnd, colors [..], shape circle|rect, text (glyph like "♥"), fade, jitter, offsetX/Y, layer}. Seeded and reproducible; they are not entities.
+- Burst with the rule/state action burst {target, count} (e.g. on "interact" or "collect"), self.particles.burst(n) / .emitting, or game.emitParticles(x, y, n, options) anywhere. Each burst emits a "particles" event {entity|x,y, count}; the emitter shows particles {alive, emitting}; check the look with take_screenshot.
 
 SCRIPTS (when built-in components and rules are not enough)
 - Write scripts/<name>.js with write_file and attach it with the Script component: {"src":"scripts/<name>.js","props":{...}}. Broken syntax is rejected with file:line.

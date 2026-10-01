@@ -134,6 +134,8 @@ export interface EntitySnapshot {
   cooldowns?: Record<string, number>;
   /** NavAgent: target, status (idle|moving|arrived|failed), next waypoint and how many are left. */
   nav?: ReturnType<typeof snapshotNav>;
+  /** ParticleEmitter: particles alive from it and whether it is emitting. */
+  particles?: { alive: number; emitting: boolean };
   /** Tweens running on the entity. */
   tweens?: TweenInfo[];
   /** Animator: clip showing and its frame index. */
@@ -229,6 +231,7 @@ export class Game {
     const vars = { score: 0, ...structuredClone(scene.vars), ...carryVars };
     this.world = new World(this.project.config, structuredClone(scene), this.input, this.console, new Rng(this.seed), vars);
     this.world.prefabs = this.project.prefabs ?? {};
+    this.world.particles.reseed(this.seed);
     this.world.frame = prevFrame;
     this.world.time = prevTime;
     this.world.events.push(...prevEvents);
@@ -298,6 +301,7 @@ export class Game {
         this.stateMachines.run();
         w.timers.run();
         w.tweens.run();
+        w.particles.run(dt);
         animationSystem(w, dt);
         this.soundDirector.run();
         this.scriptRunner.events();
@@ -455,6 +459,8 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
   if (Object.keys(cds).length) s.cooldowns = cds;
   const nav = snapshotNav(e);
   if (nav) s.nav = nav;
+  const em = e.components.ParticleEmitter;
+  if (em) s.particles = { alive: w.particles.aliveOf(e.id), emitting: em.emitting };
   const tweens = w.tweens.list(e);
   if (tweens.length) s.tweens = tweens;
   if (e.components.Animator) s.anim = { clip: e.animName, frame: Math.max(0, animFrameIndex(e)) };

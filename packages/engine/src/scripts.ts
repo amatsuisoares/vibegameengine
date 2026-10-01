@@ -6,6 +6,7 @@ import { animFrameIndex } from './systems/animation';
 import { cooldown, type TimerInfo } from './timers';
 import { findPath, pathOptionsFor, type NavStatus, type PathResult, type Point } from './nav';
 import type { Ease, TweenInfo } from './tweens';
+import type { EmitterOptions } from './particles';
 import { aiOf, type UtilityRunner } from './utility';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
@@ -202,6 +203,8 @@ export interface ScriptEntity {
   readonly anim: ScriptAnim;
   /** The entity's NavAgent. */
   readonly nav: ScriptNav;
+  /** The entity's ParticleEmitter: burst(count?) now, emitting on/off, alive count. */
+  readonly particles: { burst(count?: number): number; emitting: boolean; readonly alive: number };
   /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
   after(ms: number, fn: () => void, id?: string): string;
   /** Runs fn every ms of game time until cancelled. */
@@ -276,6 +279,11 @@ export interface ScriptGame {
    * entity its box is the clearance. Options: cell (16), diagonal (true), avoidTags.
    */
   findPath(from: PlaceRef, to: PlaceRef, options?: { cell?: number; diagonal?: boolean; avoidTags?: string[] }): PathResult | null;
+  /**
+   * Visual particles at a world point (no emitter entity needed): count 1..500 and ParticleEmitter
+   * settings, e.g. { colors: ['#ff8fab'], text: '♥', speed: 80, gravity: -40, lifeMs: 900 }. Returns how many.
+   */
+  emitParticles(x: number, y: number, count: number, options?: EmitterOptions): number;
   /** Enabled interactables that `actor` may use and is in range of, nearest first. */
   nearbyInteractables(actor: string | ScriptEntity): NearbyInteractable[];
 }
@@ -401,6 +409,7 @@ class ScriptApi {
         const base = a.entity ? pathOptionsFor(a.entity) : {};
         return findPath(w, a.point, b.point, { ...base, ...options, ignore: [...(base.ignore ?? []), ...(b.entity ? [b.entity] : [])] });
       },
+      emitParticles: (x, y, count, options) => w.particles.emitAt(x, y, count, options),
       nearbyInteractables: (actor) => host.interactions.nearby(resolve(actor, 'game.nearbyInteractables')),
     };
   }
@@ -468,6 +477,23 @@ class ScriptApi {
       },
       stop: () => {
         navAgent().target = null;
+      },
+    };
+    const emitter = () => {
+      const em = e.components.ParticleEmitter;
+      if (!em) throw new Error(`entity "${e.id}" has no ParticleEmitter`);
+      return em;
+    };
+    const particles = {
+      burst: (count?: number) => w.particles.burst(e, count === undefined ? undefined : Math.max(1, Math.min(500, Math.round(finite(count, 'count'))))),
+      get emitting() {
+        return emitter().emitting;
+      },
+      set emitting(v: boolean) {
+        emitter().emitting = !!v;
+      },
+      get alive() {
+        return w.particles.aliveOf(e.id);
       },
     };
     const animator = () => {
@@ -575,6 +601,7 @@ class ScriptApi {
       ai,
       anim,
       nav,
+      particles,
       after: (ms, fn, id) => schedule(ms, undefined, fn, id),
       every: (ms, fn, id) => schedule(ms, ms, fn, id),
       cancel: (id) => w.timers.cancel(String(id), e),

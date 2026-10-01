@@ -18,6 +18,19 @@
       "screenSpace": false,
       "layer": 8
     },
-    "Interactable": { "action": "limpar", "via": ["click"] }
+    "Interactable": { "action": "limpar", "via": ["click"] },
+    "ParticleEmitter": {
+      "rate": 0,
+      "colors": ["#8b6b4a", "#a8865f", "#6b4423"],
+      "speed": 130,
+      "angle": -90,
+      "spread": 150,
+      "gravity": 260,
+      "lifeMs": 700,
+      "size": 9,
+      "sizeEnd": 3,
+      "max": 30,
+      "layer": 8
+    }
   }
 }

@@ -96,9 +96,32 @@ export function buildDrawList(world: World): DrawCmd[] {
       });
     }
   }
+  out.push(...particleCmds(world));
   out.push(...promptCmds(world));
   // Array.prototype.sort is stable: equal layers keep scene order.
   return out.sort((a, b) => a.layer - b.layer);
+}
+
+/** Particles as draw commands (circles/rects, or text glyphs), culled outside the view. */
+function particleCmds(world: World): DrawCmd[] {
+  const cam = world.camera;
+  const { width: vw, height: vh } = world.config;
+  const out: DrawCmd[] = [];
+  for (const p of world.particles.particles) {
+    const t = p.age / p.life;
+    const size = (p.size + (p.sizeEnd - p.size) * t) * cam.zoom;
+    const opacity = p.fade ? 1 - t : 1;
+    if (size <= 0 || opacity <= 0) continue;
+    const x = (p.x - cam.x) * cam.zoom;
+    const y = (p.y - cam.y) * cam.zoom;
+    if (x + size < 0 || x - size > vw || y + size < 0 || y - size > vh) continue;
+    if (p.text) {
+      out.push({ kind: 'text', id: 'particle', layer: p.layer, x, y, lines: [p.text], font: 'sans-serif', fontSize: size, color: p.color, align: 'center', baseline: 'middle', opacity });
+    } else {
+      out.push({ kind: 'sprite', id: 'particle', layer: p.layer, x, y, w: size, h: size, rotation: 0, flipX: false, flipY: false, opacity, shape: p.shape, color: p.color, frame: 0 });
+    }
+  }
+  return out;
 }
 
 export const PROMPT_LAYER = 1000;

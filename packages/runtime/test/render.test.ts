@@ -210,3 +210,23 @@ describe('debug: navigation paths', () => {
     expect(calls('lineTo').length).toBe(game.entity('npc')!.nav!.path.length);
   });
 });
+
+describe('particles', () => {
+  it('draws shapes and glyphs, fading and resizing over their life', () => {
+    const game = new Game(
+      project([
+        { id: 'dust', transform: { x: 100, y: 100 }, components: { ParticleEmitter: { rate: 0, burst: 3, shape: 'rect', size: 10, sizeEnd: 0, speed: 0, lifeMs: 1000, jitter: 0 } } },
+        { id: 'love', transform: { x: 200, y: 100 }, components: { ParticleEmitter: { rate: 0, burst: 2, text: '♥', colors: ['#f8a'], speed: 0, lifeMs: 1000, jitter: 0, fade: false } } },
+      ], { camera: { clampToBounds: false } }),
+    );
+    game.advance(500);
+    const cmds = buildDrawList(game.world).filter((c) => c.id === 'particle');
+    const rects = cmds.filter((c): c is SpriteCmd => c.kind === 'sprite');
+    const glyphs = cmds.filter((c): c is TextCmd => c.kind === 'text');
+    expect(rects).toHaveLength(3);
+    expect(rects[0]).toMatchObject({ shape: 'rect', x: 100, y: 100 });
+    expect(rects[0].w).toBeCloseTo(5, 0); // halfway from 10 to 0
+    expect(rects[0].opacity).toBeCloseTo(0.5, 1);
+    expect(glyphs.map((g) => [g.lines[0], g.color, g.opacity])).toEqual([['♥', '#f8a', 1], ['♥', '#f8a', 1]]);
+  });
+});

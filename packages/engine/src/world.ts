@@ -5,6 +5,7 @@ import type { Input } from './input';
 import { Rng } from './rng';
 import { Scheduler } from './timers';
 import { TweenRunner } from './tweens';
+import { ParticleSystem } from './particles';
 
 export type GameStatus = 'running' | 'won' | 'lost' | 'crashed';
 
@@ -44,6 +45,8 @@ export class World {
   readonly timers: Scheduler = new Scheduler(this);
   /** Tweens of this scene (self.tween, "tween" actions). */
   readonly tweens: TweenRunner = new TweenRunner(this);
+  /** Visual particles of this scene (reseeded from the game seed by the Game). */
+  readonly particles: ParticleSystem = new ParticleSystem(this);
   private eventCapacity = 2000;
 
   constructor(

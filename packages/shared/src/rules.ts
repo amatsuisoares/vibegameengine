@@ -69,6 +69,11 @@ const immediateActions = [
   }),
   z.strictObject({ action: z.literal('log'), message: z.string() }),
   z.strictObject({ action: z.literal('tween'), target: Target, ...TweenFields }),
+  z.strictObject({
+    action: z.literal('burst'),
+    target: Target.describe('Entity with a ParticleEmitter.'),
+    count: z.number().int().min(1).max(500).optional().describe("Particles (default: the emitter's burst, or 10)."),
+  }),
   z.strictObject({ action: z.literal('playSound'), asset: z.string().min(1), volume: z.number().min(0).max(1).default(1) }),
   z.strictObject({
     action: z.literal('spawn'),

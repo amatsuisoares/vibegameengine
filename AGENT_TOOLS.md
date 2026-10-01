@@ -102,7 +102,7 @@ Ações: `setVar {var, value}`, `addVar {var, amount}`, `emit {event, data?}`, `
 `heal {target, amount}`, `move {target, x?, y?}`, `modify {target, component, set}`, `log {message}`,
 `playSound {asset, volume?}`, `spawn {prefab, x?, y?, at?, id?}`, `after {ms, do: [ações], id?}` (roda as ações
 depois de um tempo; ver [Timers](#timers)), `cancelTimer {id}`, `tween {target, prop, to, ms, from?, ease?, yoyo?,
-repeat?}` (ver [Tweens](#tweens)).
+repeat?}` (ver [Tweens](#tweens)), `burst {target, count?}` (rajada de partículas; ver [Partículas](#partículas-particleemitter)).
 `target` é um id, `"$by"` (quem entrou na zona, ou o `by`/`entity` do evento) ou `"$entity"` (a zona, ou o `entity`
 do evento — por exemplo o objeto de um `interact`). `if` e `when.expr` usam as mesmas
 expressões do `wait_until`. Cada disparo gera o evento `rule`. Referências (ids, cenas, componentes) e expressões são
@@ -335,6 +335,39 @@ indo até objetos). Não resolve plataforma com pulo.
 - **Limites:** grade fixa por cena (sem navmesh); a posição do agente é o centro da entidade (offset do collider é
   ignorado na folga); sem desvio entre agentes (eles se atravessam).
 
+## Partículas (`ParticleEmitter`)
+
+Implementado na V0.2 (`packages/engine/src/particles.ts`). Efeitos leves: fumaça, poeira, corações, estrelas, confete,
+impacto, faíscas. Partículas não são entidades (não aparecem em `entities`): ficam numa lista da cena, simulada na
+engine. A aleatoriedade vem de uma RNG separada derivada da seed: reproduzível (igual no headless e no screenshot) e sem
+mudar os sorteios do jogo.
+
+```json
+"ParticleEmitter": { "rate": 0, "burst": 0, "colors": ["#8b6b4a", "#a8865f"], "speed": 130, "angle": -90, "spread": 150,
+                     "gravity": 260, "lifeMs": 700, "size": 9, "sizeEnd": 3 }
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `emitting` / `rate` | `true` / `10` | emissão contínua em partículas/s (`rate: 0` = só rajadas) |
+| `burst` | `0` | rajada quando a entidade começa (e quantidade padrão de uma rajada) |
+| `max` | `100` | máximo vivo deste emissor (e 2000 por cena) |
+| `lifeMs`, `speed`, `size`, `sizeEnd` | 1000, 60, 6, = size | vida, velocidade (px/s), tamanho inicial e final |
+| `angle`, `spread` | `-90`, `360` | direção em graus (0 = direita, -90 = cima) e abertura |
+| `gravity`, `drag` | `0`, `0` | px/s² (positivo = para baixo) e perda de velocidade por segundo |
+| `colors`, `shape`, `text` | branco, `circle` | cores (sorteia uma), `circle`/`rect`, ou um caractere (`"♥"`, `"★"`) |
+| `fade`, `jitter` | `true`, `0.3` | some ao longo da vida; variação aleatória de vida/velocidade/tamanho |
+| `offsetX/Y`, `layer` | 0, `50` | ponto de emissão e camada de desenho |
+
+- **Sem código:** ação `burst {target, count?}` em regras e estados (ex. no `interact`, no `collect`, ao entrar num
+  estado); liga/desliga emissão contínua com `modify {component: "ParticleEmitter", set: {emitting: false}}`.
+- **Scripts:** `self.particles.burst(n?)`, `self.particles.emitting`, `self.particles.alive`;
+  `game.emitParticles(x, y, n, opções)` solta partículas em qualquer ponto sem precisar de entidade (opções = campos do
+  `ParticleEmitter`; inválidas dão erro).
+- **Para o agente:** cada rajada gera o evento `particles {entity | x, y, count}` (verificável em `read_events` /
+  `events('particles')`); a entidade emissora mostra `particles: {alive, emitting}` no estado; o visual aparece no
+  screenshot. As partículas continuam depois que o emissor é destruído.
+
 ## Assets e som
 
 Implementado na Etapa 8 (`tools/asset-tools.ts`, `sfx.ts`, `engine/src/sound.ts`, `runtime/src/audio.ts`).
@@ -411,6 +444,7 @@ function onCollision(self, other, game) {
 - `self.ai` (`choice, scores, decide()`): ver [Utility AI](#utility-ai-utilityai).
 - `self.tween/stopTween/tweens`: ver [Tweens](#tweens).
 - `self.nav` e `game.findPath`: ver [Pathfinding](#pathfinding-navagent-findpath).
+- `self.particles` e `game.emitParticles`: ver [Partículas](#partículas-particleemitter).
 - `self.after/every/cancel/timers/cooldown`: ver [Timers](#timers). Não há `setTimeout` (tempo real quebraria o replay).
 - Também `console.log/warn/error` (vão para o console do jogo) e `Math` com `Math.random` usando a seed da run.
 - **Determinismo:** `Date`, timers, rede, `process`, `window` e `globalThis` não existem para o script. É uma API

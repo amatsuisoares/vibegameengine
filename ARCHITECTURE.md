@@ -97,6 +97,7 @@ Memória do agente em `.vibe/memory.json`.
 | `StateMachine` | estados nomeados com transições por condição, tempo no estado ou evento; ações de entrada/saída |
 | `UtilityAI` | escolhe o que fazer pela nota de cada opção (expressões); entra no estado correspondente |
 | `NavAgent` | anda até um alvo (entidade ou ponto) por um caminho A* em grade, desviando de sólidos (visão de cima) |
+| `ParticleEmitter` | partículas visuais (taxa contínua e rajadas, gravidade, arrasto, fade, cores, glifos) |
 | `Script` | comportamento em JavaScript (`scripts/*.js`): `onStart/onUpdate/onCollision` com API restrita |
 | `Mover` | segue waypoints (vaivém ou loop, pausa); com Body kinematic vira plataforma móvel/elevador |
 
@@ -122,6 +123,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
            StateMachineRunner.run     estado inicial e transições das StateMachines (exit → state_change → enter)
            Scheduler.run              timers vencidos (self.after/every, ações "after" de regras e estados)
            TweenRunner.run            um passo de cada tween (valor = from + (to - from) × ease(t))
+           ParticleSystem.run         emissores (rajada inicial, taxa) e movimento/vida das partículas
            animationSystem            flip; clipe do Animator (script > estado > auto > base), quadro, eventos de quadro
            SoundDirector.run          eventos com som em config.sounds → evento sound
         7. flushDestroyed, cameraSystem
@@ -135,7 +137,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Contatos:** pares sobrepostos (tolerância 0,5 px, então “encostar” conta). Goal/Checkpoint usam
   semântica de *enter* (só no primeiro frame de contato).
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed, particles` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -212,6 +214,10 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   `NavRunner` (por mundo, antes da física) guarda em `Entity.nav` o alvo planejado, status, pontos e o próximo
   replanejamento; chegar = esgotar o caminho. Sem cache de grade: custo O(entidades + células) por plano, ok para cenas
   pequenas/médias. `paintDebug` desenha o caminho restante.
+- **Partículas** (`engine/src/particles.ts`, V0.2): `ParticleSystem` por `World` (`world.particles`), lista plana de
+  partículas (posição, velocidade, idade/vida, tamanho, cor, forma/glifo, gravidade, arrasto, camada, emissor). RNG
+  própria (`reseed(seed)` a cada cena), então efeitos não mudam a RNG do jogo. `buildDrawList` converte partículas
+  visíveis em `SpriteCmd`/`TextCmd` (id `particle`), com tamanho e opacidade interpolados pela idade.
 - **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
   conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).

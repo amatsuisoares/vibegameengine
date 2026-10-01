@@ -6,8 +6,8 @@ Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa,
 > vê screenshots, testa e corrige, usando as tools do servidor MCP `vibe`. O jogo aparece num painel do VS Code,
 > com hot reload e um modo que segue ao vivo o que o agente está jogando. Além dos componentes prontos há scripts,
 > regras de evento/condição, prefabs, som, plataformas móveis e memória do projeto.
-> Em andamento: **V0.2** (engine orientada a comportamento) — prontos: **interações** (`Interactable`: clique, tecla
-> em alcance, entrada numa área, scripts), **máquinas de estado** (`StateMachine`), **Utility AI** (`UtilityAI`), **animação por estado** (`Animator`), **timers**, **tweens** e **pathfinding** (`NavAgent`).
+> **V0.2 concluída** (engine orientada a comportamento): **interações** (`Interactable`: clique, tecla
+> em alcance, entrada numa área, scripts), **máquinas de estado** (`StateMachine`), **Utility AI** (`UtilityAI`), **animação por estado** (`Animator`), **timers**, **tweens**, **pathfinding** (`NavAgent`) e **partículas** (`ParticleEmitter`). Próxima: V0.3 (QA do agente).
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos

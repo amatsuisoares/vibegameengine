@@ -21,3 +21,4 @@ export * from './utility';
 export * from './timers';
 export * from './tweens';
 export * from './nav';
+export * from './particles';

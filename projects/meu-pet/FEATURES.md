@@ -142,7 +142,7 @@ ao investigar, postura caída emburrado, tremor doente, pulsar ao evoluir. Vira 
 | Encher a tigela | clicar na tigela | 3 porções (som); se o pet está acordado e com fome < 70, vai comer |
 | Petisco | botão | fome +10, afeto +8, diversão +5; mais de 4 por dia ou fome > 95: saúde −2 e "não parece muito interessado" |
 | Jogar a bola | clicar na bola | a bola voa e rola; o pet corre atrás se tiver energia > 20, não estiver doente e diversão < 85 (brincalhão sempre); brinca 4 s: diversão +30, energia −8, afeto +5, "ficou animado!" |
-| Limpar | clicar na sujeira | higiene +18; sem sujeira: "parece mais à vontade com o quarto limpo" |
+| Limpar | clicar na sujeira | uma nuvem de poeira (partículas); higiene +18; sem sujeira: "parece mais à vontade com o quarto limpo" |
 | Remédio | botão | doente: cura, saúde +25; saudável: "não parece muito interessado" |
 | Luz | clicar na lâmpada | acende/apaga; dormir no escuro recupera energia mais rápido; dormindo com luz à noite: "parece incomodado com a luz" |
 

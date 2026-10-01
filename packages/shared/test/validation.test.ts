@@ -272,3 +272,13 @@ describe('NavAgent', () => {
     expect(bad.ok ? [] : bad.errors).toEqual(['scenes.main.entities(npc).components.NavAgent.target: entity "bed" does not exist']);
   });
 });
+
+describe('ParticleEmitter', () => {
+  it('fills defaults; "burst" actions need an existing target', () => {
+    const r = parseProject(project([{ id: 'fx', components: { ParticleEmitter: {} } }]));
+    if (!r.ok) throw new Error(r.errors.join());
+    expect(r.value.scenes.main.entities[0].components.ParticleEmitter).toMatchObject({ emitting: true, rate: 10, colors: ['#ffffff'], shape: 'circle', fade: true });
+    const bad = parseProject(project([], { rules: [{ id: 'r', when: { start: true }, do: [{ action: 'burst', target: 'smoke' }] }] }));
+    expect(bad.ok ? [] : bad.errors).toEqual(['scenes.main.rules(r).do[0].target: entity "smoke" does not exist']);
+  });
+});

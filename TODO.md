@@ -82,7 +82,7 @@ comportamento, um quarto, interações com o mouse, evolução bebê → juvenil
   em disco, coleção de pets anteriores ("pokédex")
 - [ ] Ajustes a partir do teste da usuária (balanceamento, visual, arte de dormir/comer)
 
-## V0.2 — Engine orientada a comportamento (em andamento)
+## ✅ V0.2 — Engine orientada a comportamento (concluída)
 Roadmap de evolução: cada sistema só avança com testes passando. Sistemas genéricos na engine; regras de cada jogo
 ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na engine).
 - [x] **Interaction System**: componente `Interactable` (ação, rótulo, via click/key/enter, alcance, condição,
@@ -122,7 +122,19 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
   `nav_failed`, `self.nav`, `nav` no estado, `pathDistance()` nas expressões, caminho no screenshot anotado
 - [x] meu-pet não usa (o pet anda em 1D no chão sem obstáculos); validado com um labirinto nos testes e no Chromium
 - [x] 295 testes unitários + 15 e2e
-- [ ] Particles / VFX
+- [x] **Particles / VFX**: `ParticleEmitter` (taxa, rajada, max, vida, velocidade, ângulo/abertura, gravidade, arrasto,
+  tamanho inicial/final, cores, círculo/retângulo/glifo, fade, jitter), RNG própria derivada da seed, `self.particles`,
+  `game.emitParticles`, ação `burst`, evento `particles`, render
+- [x] meu-pet: limpar a sujeira solta uma nuvem de poeira (emissor no prefab `sujeira` + `self.particles.burst`)
+- [x] 303 testes unitários + 15 e2e
+- [x] **V0.2 concluída**: os 8 sistemas de comportamento (interação, máquina de estados, Utility AI, animação, timers,
+  tweens, pathfinding, partículas)
+
+## V0.3 — Camada de QA do agente (próxima)
+- [ ] `verify_game` (playbook: ações + asserções + screenshot → relatório)
+- [ ] Asserções de gameplay estruturadas
+- [ ] Playbooks reutilizáveis (regressão)
+- [ ] Relatório de diagnóstico
 
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.

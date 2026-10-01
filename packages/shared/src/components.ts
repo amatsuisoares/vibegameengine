@@ -241,6 +241,29 @@ export const NavAgentSchema = z.strictObject({
   avoidTags: z.array(z.string()).default(() => []).describe('Entities with these tags are obstacles too (solid colliders always are).'),
 });
 
+export const ParticleEmitterSchema = z.strictObject({
+  emitting: z.boolean().default(true).describe('Emits `rate` particles per second while true (scripts and "modify" toggle it).'),
+  rate: z.number().min(0).default(10).describe('Particles per second while emitting (0 = bursts only).'),
+  burst: z.number().int().min(0).default(0).describe('Particles emitted at once when the entity starts (and the default count of a "burst").'),
+  max: z.number().int().min(1).max(1000).default(100).describe('Most particles alive from this emitter.'),
+  lifeMs: z.number().positive().default(1000),
+  speed: z.number().min(0).default(60).describe('px/s.'),
+  angle: z.number().default(-90).describe('Direction in degrees: 0 = right, 90 = down, -90 = up.'),
+  spread: z.number().min(0).max(360).default(360).describe('Random spread around `angle`, degrees (360 = every direction).'),
+  gravity: z.number().default(0).describe('px/s^2, positive = down.'),
+  drag: z.number().min(0).default(0).describe('Fraction of the speed lost per second (1 = stops in about a second).'),
+  size: z.number().positive().default(6).describe('Diameter (or font size for `text`), px.'),
+  sizeEnd: z.number().min(0).optional().describe('Size at the end of life (default: same as size).'),
+  colors: z.array(z.string()).min(1).default(() => ['#ffffff']).describe('Each particle picks one of these colors.'),
+  shape: z.enum(['circle', 'rect']).default('circle'),
+  text: z.string().min(1).optional().describe('Draw this glyph instead of a shape, e.g. "♥" or "★".'),
+  fade: z.boolean().default(true).describe('Fade out over the lifetime.'),
+  jitter: z.number().min(0).max(1).default(0.3).describe('Random variation of lifetime, speed and size (0..1).'),
+  offsetX: z.number().default(0),
+  offsetY: z.number().default(0),
+  layer: z.number().default(50),
+});
+
 /** Script file path: scripts/<name>.js (subfolders allowed). */
 export const SCRIPT_PATH = /^scripts\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*\.js$/;
 
@@ -276,6 +299,7 @@ export const ComponentSchemas = {
   StateMachine: StateMachineSchema,
   UtilityAI: UtilityAISchema,
   NavAgent: NavAgentSchema,
+  ParticleEmitter: ParticleEmitterSchema,
   Script: ScriptSchema,
 } as const;
 
@@ -302,6 +326,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   StateMachine: 'Named states (idle, chase, sleeping...) with transitions by condition, time in state or event, and enter/exit actions.',
   UtilityAI: 'Chooses what to do by scoring options (needs, distance, time, personality...) with expressions; enters the matching StateMachine state.',
   NavAgent: 'Walks to a target (entity or point) along a grid path (A*) around solid colliders, re-planning as things move (top-down).',
+  ParticleEmitter: 'Light visual particles (smoke, dust, hearts, stars, confetti, sparks): continuous rate and/or bursts, gravity, fade; seeded.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -326,6 +351,7 @@ export const ComponentsSchema = z.strictObject({
   StateMachine: StateMachineSchema.optional(),
   UtilityAI: UtilityAISchema.optional(),
   NavAgent: NavAgentSchema.optional(),
+  ParticleEmitter: ParticleEmitterSchema.optional(),
   Script: ScriptSchema.optional(),
 });
 
