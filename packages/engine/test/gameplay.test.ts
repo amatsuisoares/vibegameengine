@@ -268,7 +268,7 @@ describe('determinism and state', () => {
 });
 
 describe('demo project', () => {
-  const dir = fileURLToPath(new URL('../../../projects/demo-platformer', import.meta.url));
+  const dir = fileURLToPath(new URL('../../../test-fixtures/demo-platformer', import.meta.url));
 
   it('loads, validates and the player lands on the ground', () => {
     const game = Game.fromRaw(readProjectDir(dir));

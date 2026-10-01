@@ -9,7 +9,7 @@ Plataforma de jogos 2D guiada por agente de IA. Leia ARCHITECTURE.md antes de mu
 - `npm run vibe -- <cmd>` — CLI das tools (`tools`, `call <projeto> <tool> <json|@arquivo>`, `script <projeto> @passos.json`,
   `history`, `undo`). Tools de runtime precisam de `script` (a run vive só durante o processo).
 - `npm run test:e2e` — Chromium headless via Playwright (`packages/*/e2e/**/*.e2e.test.ts`); screenshots em
-  `projects/demo-platformer/.vibe/runs/`
+  `test-results/screenshots/` (fixture dos testes: `test-fixtures/demo-platformer`)
 
 ## Convenções
 - Monorepo npm workspaces; pacotes exportam `src/index.ts` diretamente (sem build). Aliases `@vibe/*`

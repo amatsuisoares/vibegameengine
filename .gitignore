@@ -14,3 +14,5 @@ projects/e2e-tmp/
 projects/*/.vibe/live.json
 # saved data of played games (game.storage)
 projects/*/.vibe/save.json
+# screenshots written by the e2e tests
+test-results/

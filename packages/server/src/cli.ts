@@ -18,9 +18,9 @@ const USAGE = `Usage: npm run vibe -- <command>
 
 <project> is a folder name under projects/ or a path.
 Examples:
-  npm run vibe -- call demo-platformer get_scene '{"scene":"level1"}'
-  npm run vibe -- call demo-platformer modify_game_object @patch.json --as agent
-  npm run vibe -- script demo-platformer @play.json`;
+  npm run vibe -- call meu-pet get_scene '{"scene":"quarto"}'
+  npm run vibe -- call meu-pet modify_game_object @patch.json --as agent
+  npm run vibe -- script meu-pet @play.json`;
 
 const PROJECTS = fileURLToPath(new URL('../../../projects/', import.meta.url));
 

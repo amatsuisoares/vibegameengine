@@ -14,7 +14,7 @@ declare global {
 }
 
 const repo = (p: string) => fileURLToPath(new URL(`../../../${p}`, import.meta.url));
-const RUNS_DIR = repo('projects/demo-platformer/.vibe/runs');
+const RUNS_DIR = repo('test-results/screenshots');
 const TMP_PROJECT = repo('projects/e2e-tmp');
 
 let server: ViteDevServer;
@@ -24,7 +24,7 @@ let baseUrl: string;
 beforeAll(async () => {
   mkdirSync(RUNS_DIR, { recursive: true });
   rmSync(TMP_PROJECT, { recursive: true, force: true });
-  cpSync(repo('projects/demo-platformer'), TMP_PROJECT, { recursive: true, filter: (src) => !src.includes('.vibe') });
+  cpSync(repo('test-fixtures/demo-platformer'), TMP_PROJECT, { recursive: true, filter: (src) => !src.includes('.vibe') });
   server = await createServer({ configFile: repo('packages/runtime/vite.config.ts'), configLoader: 'runner', server: { port: 0 }, logLevel: 'error' });
   await server.listen();
   baseUrl = server.resolvedUrls!.local[0];
@@ -61,7 +61,7 @@ const shot = (page: Page, name: string) => page.locator('canvas').screenshot({ p
 
 describe('runtime page (Chromium)', () => {
   it('loads the demo, its assets, and draws the scene', async () => {
-    const { page, errors } = await open('project=demo-platformer&paused=1');
+    const { page, errors } = await open('project=e2e-tmp&paused=1');
     expect(await page.evaluate(() => window.__vibeError)).toBeUndefined();
     await vibe(page, (v) => v.advance(500));
     const state = await vibe(page, (v) => v.getState({ ids: ['player', 'coin1'] }));
@@ -82,7 +82,7 @@ describe('runtime page (Chromium)', () => {
   });
 
   it('loads and decodes the demo sounds', async () => {
-    const { page, errors } = await open('project=demo-platformer');
+    const { page, errors } = await open('project=e2e-tmp');
     await page.waitForFunction(() => /Audio: \d+\/\d+ sounds loaded/.test(document.getElementById('console')!.textContent ?? ''), undefined, {
       timeout: 10_000,
     });
@@ -95,7 +95,7 @@ describe('runtime page (Chromium)', () => {
   });
 
   it('is fully controllable through window.__vibe and shows the outcome', async () => {
-    const { page } = await open('project=demo-platformer&paused=1&debug=1');
+    const { page } = await open('project=e2e-tmp&paused=1&debug=1');
     const before = await vibe(page, (v) => v.getState({ ids: ['player'] }).entities[0].x);
     await vibe(page, (v) => v.perform([{ type: 'hold', key: 'D', ms: 1000 }]));
     const after = await vibe(page, (v) => v.getState({ ids: ['player'] }).entities[0].x);
@@ -130,7 +130,7 @@ describe('runtime page (Chromium)', () => {
   });
 
   it('plays in real time with the real keyboard', async () => {
-    const { page, errors } = await open('project=demo-platformer');
+    const { page, errors } = await open('project=e2e-tmp');
     await page.waitForFunction(() => window.__vibe!.getState().frame > 30);
     const x0 = await vibe(page, (v) => v.getState({ ids: ['player'] }).entities[0].x);
     await page.keyboard.down('d');
@@ -166,7 +166,7 @@ describe('runtime page (Chromium)', () => {
 
   it('shows agent tool edits live and reverts them with undo', async () => {
     // The previous test leaves the scene invalid on purpose.
-    cpSync(repo('projects/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
+    cpSync(repo('test-fixtures/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
     const { page } = await open('project=e2e-tmp&paused=1');
     const store = new ProjectStore(TMP_PROJECT);
     const tools = createEditingTools();

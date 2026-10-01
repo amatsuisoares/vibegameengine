@@ -4,9 +4,9 @@ import { join, resolve } from 'node:path';
 import { parseProject } from '@vibe/shared';
 import { describe, expect, it } from 'vitest';
 import { handleProjectRequest, handleSaveRequest, liveRunOfFile, projectOfFile, readProjectDir, resolveInside } from '../vite/project-files';
-import { PROJECTS_ROOT } from './helpers';
+import { FIXTURES_ROOT } from './helpers';
 
-const get = (url: string) => handleProjectRequest(PROJECTS_ROOT, url);
+const get = (url: string) => handleProjectRequest(FIXTURES_ROOT, url);
 const json = (url: string) => JSON.parse(String(get(url)!.body));
 
 describe('project files', () => {
@@ -19,7 +19,7 @@ describe('project files', () => {
   });
 
   it('reads the demo project into a valid project', () => {
-    const r = parseProject(readProjectDir(join(PROJECTS_ROOT, 'demo-platformer')));
+    const r = parseProject(readProjectDir(join(FIXTURES_ROOT, 'demo-platformer')));
     expect(r.ok).toBe(true);
   });
 });
@@ -54,12 +54,12 @@ describe('dev server routes', () => {
   });
 
   it('maps changed files to their project, ignoring run artifacts', () => {
-    expect(projectOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', 'scenes', 'level1.json'))).toEqual({
+    expect(projectOfFile(FIXTURES_ROOT, join(FIXTURES_ROOT, 'demo-platformer', 'scenes', 'level1.json'))).toEqual({
       name: 'demo-platformer',
       file: 'scenes/level1.json',
     });
-    expect(projectOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', '.vibe', 'runs', 'a.png'))).toBeNull();
-    expect(projectOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, '..', 'package.json'))).toBeNull();
+    expect(projectOfFile(FIXTURES_ROOT, join(FIXTURES_ROOT, 'demo-platformer', '.vibe', 'runs', 'a.png'))).toBeNull();
+    expect(projectOfFile(FIXTURES_ROOT, join(FIXTURES_ROOT, '..', 'package.json'))).toBeNull();
   });
 
   it('serves the agent run published in .vibe/live.json, or an inactive one', () => {
@@ -102,9 +102,9 @@ describe('dev server routes', () => {
   });
 
   it('recognizes the published run file among project files', () => {
-    expect(liveRunOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', '.vibe', 'live.json'))).toBe('demo-platformer');
-    expect(liveRunOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', '.vibe', 'history.jsonl'))).toBeNull();
-    expect(liveRunOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', 'live.json'))).toBeNull();
-    expect(projectOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', '.vibe', 'live.json'))).toBeNull();
+    expect(liveRunOfFile(FIXTURES_ROOT, join(FIXTURES_ROOT, 'demo-platformer', '.vibe', 'live.json'))).toBe('demo-platformer');
+    expect(liveRunOfFile(FIXTURES_ROOT, join(FIXTURES_ROOT, 'demo-platformer', '.vibe', 'history.jsonl'))).toBeNull();
+    expect(liveRunOfFile(FIXTURES_ROOT, join(FIXTURES_ROOT, 'demo-platformer', 'live.json'))).toBeNull();
+    expect(projectOfFile(FIXTURES_ROOT, join(FIXTURES_ROOT, 'demo-platformer', '.vibe', 'live.json'))).toBeNull();
   });
 });

@@ -3,10 +3,11 @@ import { assertProject, type EntityInput, type Project } from '@vibe/shared';
 import { readProjectDir } from '../vite/project-files';
 import type { CanvasLike, Scheduler } from '../src';
 
-export const PROJECTS_ROOT = fileURLToPath(new URL('../../../projects', import.meta.url));
+/** Projects used by the tests (served like projects/, but not real games). */
+export const FIXTURES_ROOT = fileURLToPath(new URL('../../../test-fixtures', import.meta.url));
 
 export function demoProject(): Project {
-  return assertProject(readProjectDir(`${PROJECTS_ROOT}/demo-platformer`));
+  return assertProject(readProjectDir(`${FIXTURES_ROOT}/demo-platformer`));
 }
 
 export function project(entities: EntityInput[], scene: Record<string, unknown> = {}, config: Record<string, unknown> = {}): Project {

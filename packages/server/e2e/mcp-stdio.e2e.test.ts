@@ -13,7 +13,7 @@ describe('MCP server launched from .mcp.json (as Claude Code does)', () => {
   it('starts, plays, returns a screenshot image and shuts down cleanly', async () => {
     const config = JSON.parse(readFileSync(join(REPO, '.mcp.json'), 'utf8')).mcpServers.vibe as { command: string; args: string[] };
     const root = mkdtempSync(join(tmpdir(), 'vibe-stdio-'));
-    cpSync(join(REPO, 'projects', 'demo-platformer'), join(root, 'demo-platformer'), { recursive: true, filter: (s) => !s.includes('.vibe') });
+    cpSync(join(REPO, 'test-fixtures', 'demo-platformer'), join(root, 'demo-platformer'), { recursive: true, filter: (s) => !s.includes('.vibe') });
 
     const transport = new StdioClientTransport({
       command: config.command,

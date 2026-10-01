@@ -7,7 +7,7 @@
 - [x] Engine headless: passo fixo, física AABB, one-way, input virtual com latch, câmera
 - [x] Gameplay: controle de plataforma, patrulha, perseguição, vida, dano, pisão, coleta, checkpoint, goal, troca de cena
 - [x] Estado estruturado, eventos, console, determinismo (seed)
-- [x] Projeto demo `projects/demo-platformer`
+- [x] Projeto demo (hoje fixture dos testes em `test-fixtures/demo-platformer`)
 - [x] 45 testes
 
 ## ✅ Etapa 2 — Renderer + runtime no browser (concluída)

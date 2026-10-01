@@ -4,7 +4,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { RuntimeHost } from '../src';
 import { setup } from '../test/helpers';
 
-const RUNS_DIR = fileURLToPath(new URL('../../../projects/demo-platformer/.vibe/runs', import.meta.url));
+const RUNS_DIR = fileURLToPath(new URL('../../../test-results/screenshots', import.meta.url));
 const hosts: RuntimeHost[] = [];
 afterAll(async () => {
   for (const h of hosts) await h.close();

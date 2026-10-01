@@ -8,7 +8,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createVibeMcpServer, Workspace } from '../src';
 
-const DEMO = fileURLToPath(new URL('../../../projects/demo-platformer', import.meta.url));
+const DEMO = fileURLToPath(new URL('../../../test-fixtures/demo-platformer', import.meta.url));
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
   while (cleanups.length) await cleanups.pop()!();

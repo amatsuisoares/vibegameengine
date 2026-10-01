@@ -44,13 +44,13 @@ npm run vibe -- tools   # CLI das tools de edição (ver abaixo)
 ### Tools pela CLI
 
 ```bash
-npm run vibe -- call demo-platformer get_project_summary
-npm run vibe -- call demo-platformer modify_component @patch.json --as agent   # JSON inline, @arquivo ou - (stdin)
-npm run vibe -- history demo-platformer
-npm run vibe -- undo demo-platformer
+npm run vibe -- call meu-pet get_project_summary
+npm run vibe -- call meu-pet modify_component @patch.json --as agent   # JSON inline, @arquivo ou - (stdin)
+npm run vibe -- history meu-pet
+npm run vibe -- undo meu-pet
 npm run vibe -- schema modify_game_object      # JSON Schema no formato de tool use
-npm run vibe -- format demo-platformer         # normaliza o JSON do projeto
-npm run vibe -- script demo-platformer @play.json   # várias tools numa mesma run (jogar + screenshot)
+npm run vibe -- format meu-pet         # normaliza o JSON do projeto
+npm run vibe -- script meu-pet @play.json   # várias tools numa mesma run (jogar + screenshot)
 ```
 
 Exemplo de `play.json` — anda, pula e fotografa com colliders anotados:
@@ -75,7 +75,7 @@ A barra superior tem seletor de projeto, Restart, Pause/Resume, Step (1 frame), 
 Seguir agente. O som começa depois do primeiro clique ou tecla na página (regra dos navegadores).
 Editar arquivos em `projects/<nome>/` recarrega o jogo automaticamente; erros de validação aparecem no console.
 
-Parâmetros de URL: `?project=demo-platformer&scene=level1&seed=7&debug=1&paused=1&live=1`.
+Parâmetros de URL: `?project=meu-pet&scene=quarto&seed=7&debug=1&paused=1&live=1`.
 Com `paused=1` nada avança sozinho — o jogo só anda por `window.__vibe` (modo usado por hosts externos).
 Com `live=1` a página segue a run do agente (`.vibe/live.json`) em vez de ser jogada.
 
@@ -92,7 +92,7 @@ packages/
     vite/   plugin do dev server: serve projects/ e avisa a página quando arquivos mudam
     e2e/    testes no Chromium (Playwright)
 projects/
-  demo-platformer/   projeto de exemplo (project.json + scenes/*.json + assets/*.svg)
+  meu-pet/           o jogo de pet virtual (project.json + scenes/ + scripts/ + prefabs/ + assets/)
 docs/
   PROMPT_ORIGINAL.md pedido original do projeto (escopo e prioridades)
 ```

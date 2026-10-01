@@ -6,7 +6,7 @@ import { afterEach } from 'vitest';
 import { ProjectStore, RuntimeHost } from '../src';
 import { createAgentTools, type ToolResult } from '../src/tools';
 
-const DEMO = fileURLToPath(new URL('../../../projects/demo-platformer', import.meta.url));
+const DEMO = fileURLToPath(new URL('../../../test-fixtures/demo-platformer', import.meta.url));
 const temps: string[] = [];
 
 afterEach(() => {

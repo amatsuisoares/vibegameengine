@@ -15,7 +15,7 @@ declare global {
 }
 
 const repo = (p: string) => fileURLToPath(new URL(`../../../${p}`, import.meta.url));
-const RUNS_DIR = repo('projects/demo-platformer/.vibe/runs');
+const RUNS_DIR = repo('test-results/screenshots');
 const NAME = 'e2e-follow';
 const TMP_PROJECT = repo(`projects/${NAME}`);
 
@@ -26,7 +26,7 @@ let baseUrl: string;
 beforeAll(async () => {
   mkdirSync(RUNS_DIR, { recursive: true });
   rmSync(TMP_PROJECT, { recursive: true, force: true });
-  cpSync(repo('projects/demo-platformer'), TMP_PROJECT, { recursive: true, filter: (src) => !src.includes('.vibe') });
+  cpSync(repo('test-fixtures/demo-platformer'), TMP_PROJECT, { recursive: true, filter: (src) => !src.includes('.vibe') });
   server = await createServer({ configFile: repo('packages/runtime/vite.config.ts'), configLoader: 'runner', server: { port: 0 }, logLevel: 'error' });
   await server.listen();
   baseUrl = server.resolvedUrls!.local[0];
