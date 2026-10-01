@@ -69,6 +69,7 @@ function checkExpr(game: Game, expr: string, sinceFrame: number) {
 export const runtimeTools = [
   defineTool({
     name: 'run_game',
+    changesRun: true,
     description:
       'Starts a new headless run of the current project (replacing any previous run). Time only advances through wait/perform_inputs, so runs are deterministic.',
     input: z.object({
@@ -84,6 +85,7 @@ export const runtimeTools = [
 
   defineTool({
     name: 'restart_game',
+    changesRun: true,
     description: 'Restarts the run from the beginning with the latest project files (same scene and seed). Use after editing the project.',
     input: z.object({}),
     run: (ctx) => {
@@ -96,6 +98,7 @@ export const runtimeTools = [
 
   defineTool({
     name: 'stop_game',
+    changesRun: true,
     description: 'Ends the current run.',
     input: z.object({}),
     run: (ctx) => ({ stopped: host(ctx).stop() }),
@@ -103,6 +106,7 @@ export const runtimeTools = [
 
   defineTool({
     name: 'press_key',
+    changesRun: true,
     description: 'Presses and holds a key (it stays down until release_key). Time does not advance: call wait afterwards.',
     input: z.object({ key: Key }),
     run: (ctx, { key }) => {
@@ -113,6 +117,7 @@ export const runtimeTools = [
 
   defineTool({
     name: 'release_key',
+    changesRun: true,
     description: 'Releases a key previously pressed with press_key.',
     input: z.object({ key: Key }),
     run: (ctx, { key }) => {
@@ -123,6 +128,7 @@ export const runtimeTools = [
 
   defineTool({
     name: 'move_mouse',
+    changesRun: true,
     description: 'Moves the virtual mouse to viewport coordinates (pixels, origin top-left of the game view).',
     input: z.object({ x: z.number(), y: z.number() }),
     run: (ctx, { x, y }) => {
@@ -133,6 +139,7 @@ export const runtimeTools = [
 
   defineTool({
     name: 'click_mouse',
+    changesRun: true,
     description: 'Clicks (press, 1 frame, release), optionally moving to viewport coordinates first.',
     input: z.object({ x: z.number().optional(), y: z.number().optional(), button: Button.optional() }),
     run: (ctx, input) => {
@@ -143,6 +150,7 @@ export const runtimeTools = [
 
   defineTool({
     name: 'wait',
+    changesRun: true,
     description: `Advances simulated time (runs faster than real time). Returns what happened: player state, new events, new warnings/errors. Max ${MAX_WAIT_MS} ms.`,
     input: z.object({ ms: Ms(MAX_WAIT_MS) }),
     run: (ctx, { ms }) => {
@@ -153,6 +161,7 @@ export const runtimeTools = [
 
   defineTool({
     name: 'wait_until',
+    changesRun: true,
     description: 'Advances time until an expression becomes true (or maxMs passes, or the game ends). Returns ok=false on timeout.',
     input: z.object({ expr: Expr, maxMs: Ms(MAX_WAIT_MS).optional().describe('Default 5000.') }),
     run: (ctx, { expr, maxMs = 5000 }) => {
@@ -163,6 +172,7 @@ export const runtimeTools = [
 
   defineTool({
     name: 'perform_inputs',
+    changesRun: true,
     description:
       'Runs a sequence of input steps in the current run, e.g. [{"type":"hold","key":"D","ms":800},{"type":"tap","key":"Space"},{"type":"wait","ms":500}]. tap/hold/wait advance time.',
     input: z.object({ steps: z.array(InputStepSchema).min(1) }),

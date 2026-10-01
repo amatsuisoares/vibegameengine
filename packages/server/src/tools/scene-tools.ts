@@ -183,7 +183,7 @@ export const sceneTools = [
     name: 'delete_scene',
     description: 'Deletes a scene file. Fails if other data still references the scene (startScene, Goal.scene).',
     mutates: true,
-    destructive: () => true,
+    destructive: true,
     input: z.object({ scene: SceneId }),
     run: ({ store }, { scene }, meta) =>
       changeInfo(store.edit(meta(`Delete scene ${scene}`), (tx) => tx.delete(tx.sceneFile(scene)))),
@@ -257,7 +257,7 @@ export const sceneTools = [
     name: 'delete_game_object',
     description: 'Removes an entity. Fails if something still references it (camera.follow, FollowTarget.targetId).',
     mutates: true,
-    destructive: () => true,
+    destructive: true,
     input: z.object({ scene: SceneId, id: EntityId }),
     run: (ctx, { scene, id }, meta) =>
       editScene(ctx, meta(`Delete ${id} from ${scene}`), scene, (s) => {

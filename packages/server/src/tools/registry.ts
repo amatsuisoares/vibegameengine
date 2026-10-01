@@ -31,8 +31,10 @@ export interface ToolDef<S extends z.ZodObject = z.ZodObject> {
   input: S;
   /** Mutating tools get an optional `reason` parameter that is recorded in the history. */
   mutates?: boolean;
-  /** Whether this call deletes or overwrites data (the agent loop can ask the user first). */
-  destructive?: (input: z.output<S>, ctx: ToolContext) => boolean;
+  /** Changes the state of the current game run (not the project files). */
+  changesRun?: boolean;
+  /** Deletes or may overwrite data (reported to MCP clients as destructiveHint). */
+  destructive?: boolean;
   run(ctx: ToolContext, input: z.output<S>, meta: (summary: string) => ChangeMeta): unknown | Promise<unknown>;
 }
 
@@ -69,12 +71,11 @@ export class ToolRegistry {
     return this.tools.has(name);
   }
 
-  /** True when the call would delete or overwrite data. Invalid input is not destructive (it will be rejected). */
-  isDestructive(name: string, input: unknown, ctx: ToolContext): boolean {
+  /** Behavior hints for MCP clients. Only editing tools change files; runtime tools only change the current run. */
+  annotations(name: string) {
     const tool = this.tools.get(name);
-    if (!tool?.destructive) return false;
-    const parsed = tool.input.safeParse(input ?? {});
-    return parsed.success && tool.destructive(parsed.data, ctx);
+    if (!tool) return undefined;
+    return { readOnlyHint: !tool.mutates && !tool.changesRun, destructiveHint: !!tool.destructive };
   }
 
   definitions(): ToolDefinition[] {

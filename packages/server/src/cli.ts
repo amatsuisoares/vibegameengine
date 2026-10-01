@@ -1,9 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
-import { formatEvent } from './agent/console-view';
-import { DEFAULT_LIMITS, runAgent } from './agent/loop';
-import { ClaudeProvider, ScriptedProvider, type Effort, type LLMProvider, type ScriptedTurn } from './agent/provider';
 import { isProjectDataFile, ProjectStore } from './project-store';
 import { RuntimeHost } from './runtime/host';
 import { createAgentTools } from './tools';
@@ -12,19 +8,10 @@ import type { Author } from './history';
 const USAGE = `Usage: npm run vibe -- <command>
 
   tools                                   list tools
-  schema [tool]                           tool definitions (Claude tool format, JSON Schema)
+  schema [tool]                           tool definitions (JSON Schema)
   call <project> <tool> [json | @file | -] [--as agent|user]
   script <project> [json | @file | -]     run [{"tool": "...", "input": {...}}, ...] in one session
                                           (runtime tools like run_game/wait/take_screenshot need this)
-  agent <project> "<prompt>" [options]   let the AI agent build/fix the game (needs ANTHROPIC_API_KEY)
-      --model <id>           default claude-opus-5-5
-      --effort <level>       low | medium | high (default) | xhigh | max
-      --max-iterations <n>   default ${DEFAULT_LIMITS.maxIterations}
-      --max-cost <usd>       default ${DEFAULT_LIMITS.maxCostUsd}
-      --timeout <minutes>    default ${DEFAULT_LIMITS.timeoutMs / 60000}
-      --yes                  do not ask before deleting/overwriting
-      --no-fallback          disable server-side refusal fallback
-      --scripted <file>      replay scripted model turns instead of calling the API
   history <project> [limit]
   format <project>                        rewrite project.json and scenes/*.json in the canonical format
   undo <project> | redo <project>
@@ -50,101 +37,6 @@ function readInput(arg: string | undefined): unknown {
     return JSON.parse(text);
   } catch (err) {
     throw new Error(`Input is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-
-/** Removes `--name value` (or a bare `--name` flag when `isFlag`) from argv and returns it. */
-function takeOption(argv: string[], name: string, isFlag = false): string | undefined {
-  const i = argv.indexOf(`--${name}`);
-  if (i < 0) return undefined;
-  if (isFlag) {
-    argv.splice(i, 1);
-    return 'true';
-  }
-  const v = argv[i + 1];
-  if (v === undefined || v.startsWith('--')) throw new Error(`--${name} needs a value`);
-  argv.splice(i, 2);
-  return v;
-}
-
-function numberOption(argv: string[], name: string): number | undefined {
-  const v = takeOption(argv, name);
-  if (v === undefined) return undefined;
-  const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) throw new Error(`--${name} must be a positive number`);
-  return n;
-}
-
-async function agentCommand(argv: string[]): Promise<number> {
-  const model = takeOption(argv, 'model');
-  const effort = takeOption(argv, 'effort') as Effort | undefined;
-  const maxIterations = numberOption(argv, 'max-iterations');
-  const maxCostUsd = numberOption(argv, 'max-cost');
-  const timeoutMin = numberOption(argv, 'timeout');
-  const yes = takeOption(argv, 'yes', true) === 'true';
-  const noFallback = takeOption(argv, 'no-fallback', true) === 'true';
-  const scripted = takeOption(argv, 'scripted');
-  const [projectArg, prompt] = argv;
-  if (!prompt) throw new Error('Usage: agent <project> "<prompt>" [options]');
-  if (effort && !['low', 'medium', 'high', 'xhigh', 'max'].includes(effort)) throw new Error('--effort must be low, medium, high, xhigh or max');
-
-  const store = openStore(projectArg);
-  const host = new RuntimeHost(store);
-  const provider: LLMProvider = scripted
-    ? new ScriptedProvider(JSON.parse(readFileSync(scripted, 'utf8')) as ScriptedTurn[])
-    : new ClaudeProvider({ model, effort, fallbacks: !noFallback });
-  if (!scripted && !noFallback) console.log('(server-side refusal fallback enabled; --no-fallback to disable)');
-
-  const rl = process.stdin.isTTY ? createInterface({ input: process.stdin, output: process.stdout }) : null;
-  const abort = new AbortController();
-  const onSigint = () => {
-    if (abort.signal.aborted) process.exit(130);
-    console.log('\n(stopping after the current step; press Ctrl+C again to quit now)');
-    abort.abort();
-  };
-  process.on('SIGINT', onSigint);
-
-  let midLine = false;
-  try {
-    const result = await runAgent(prompt, {
-      provider,
-      store,
-      host,
-      tools: createAgentTools(),
-      signal: abort.signal,
-      limits: {
-        ...(maxIterations && { maxIterations }),
-        ...(maxCostUsd && { maxCostUsd }),
-        ...(timeoutMin && { timeoutMs: timeoutMin * 60_000 }),
-      },
-      confirm: yes
-        ? undefined
-        : async ({ name, input }) => {
-            if (!rl) {
-              console.log(`  ✗ ${name} needs confirmation; not a terminal, declined (use --yes to allow)`);
-              return false;
-            }
-            const answer = await rl.question(`  ? allow ${name} ${JSON.stringify(input).slice(0, 160)} [y/N] `);
-            return /^y(es)?$/i.test(answer.trim());
-          },
-      onText: (delta) => {
-        process.stdout.write(delta);
-        midLine = !delta.endsWith('\n');
-      },
-      onEvent: (e) => {
-        if (midLine) process.stdout.write('\n');
-        midLine = false;
-        if (e.type === 'text') return; // already streamed
-        const line = formatEvent(e);
-        if (line) console.log(line);
-      },
-    });
-    console.log(`log: ${store.path(result.logPath)}`);
-    return result.status === 'completed' ? 0 : 2;
-  } finally {
-    process.off('SIGINT', onSigint);
-    rl?.close();
-    await host.close();
   }
 }
 
@@ -187,8 +79,6 @@ async function main(argv: string[]): Promise<number> {
     }
     case 'call':
       return run(openStore(rest[0]), rest[1] ?? '', readInput(rest[2]));
-    case 'agent':
-      return agentCommand(rest);
     case 'script': {
       const store = openStore(rest[0]);
       const steps = readInput(rest[1]) as { tool: string; input?: unknown }[];
