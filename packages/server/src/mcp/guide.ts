@@ -30,6 +30,11 @@ UTILITY AI (choosing what to do: eat, sleep, play, flee, explore...)
 - Scores are expressions over anything: self.props (per-entity needs/personality kept in Script props; scripts update them), distance(self, 'x'), clock.hour, vars, self.state; booleans count as 0/1, clamp(x, lo, hi) shapes curves. The game defines the factors, not the engine.
 - A new choice emits "ai_choice" {entity, choice, from, score}, enters the StateMachine state with the option name (or "state") and calls onDecision(self, {choice, from, scores}, game). inspect_game_state shows ai {choice, scores} (null = unavailable) and props: use it to explain why an NPC did something.
 
+ANIMATION (Animator)
+- animations: {clip: {frames (spritesheet indexes, or image asset ids one per frame), fps, loop, asset? (spritesheet of the clip), next? (after a one-shot), events? ({"2": "footstep"}: event emitted when that frame shows; map it to a sound in config.sounds)}}, initial, auto (idle/run/jump/fall from the Body), states? ({stateName: clip}), speed.
+- The clip follows the StateMachine state automatically (a clip with the state's name, or states[state]); do not swap sprites in scripts. Priority: self.anim.play(clip) > state > auto > initial/next. One-shots (loop false) emit "anim_end". inspect_game_state shows anim {clip, frame}.
+- Scripts: self.anim.name / frame / play(clip) / stop() / speed.
+
 SCRIPTS (when built-in components and rules are not enough)
 - Write scripts/<name>.js with write_file and attach it with the Script component: {"src":"scripts/<name>.js","props":{...}}. Broken syntax is rejected with file:line.
 - A script defines any of: onStart(self, game), onUpdate(self, game, dt) (every frame, before physics), onCollision(self, other, game) (when a contact begins), onClick(self, game, pos) (left click on the entity: topmost by Sprite layer whose Collider/Sprite box contains it; entities tagged "clickable" also get a "click" event for rules), onEvent(self, event, game) (every game event, end of frame), onInteract(self, by, game, info) (its Interactable was used), onStateChange(self, change, game) (its StateMachine changed state), onDecision(self, decision, game) (its UtilityAI chose something new). Top-level variables are per entity. No imports.

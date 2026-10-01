@@ -137,15 +137,29 @@ export const TextSchema = z.strictObject({
 });
 
 export const AnimationClipSchema = z.strictObject({
-  frames: z.array(z.number().int().min(0)).min(1),
+  frames: z
+    .array(z.union([z.number().int().min(0), z.string().min(1)]))
+    .min(1)
+    .describe('Frame indexes of the spritesheet, or image asset ids (one image per frame), e.g. [0, 1, 2] or ["cat_1", "cat_2"].'),
   fps: z.number().positive().default(8),
-  loop: z.boolean().default(true),
+  loop: z.boolean().default(true).describe('false: plays once, holds the last frame and emits "anim_end".'),
+  asset: z.string().optional().describe('Spritesheet for this clip (default: the Sprite asset).'),
+  next: z.string().optional().describe('Clip to play after a non-looping clip ends.'),
+  events: z
+    .record(z.string().regex(/^\d+$/, 'must be a frame index'), z.string().min(1))
+    .optional()
+    .describe('Frame index -> event type emitted when the frame shows, e.g. {"2": "footstep"} (map it to a sound in config.sounds).'),
 });
 
 export const AnimatorSchema = z.strictObject({
   animations: z.record(z.string(), AnimationClipSchema).default(() => ({})),
   initial: z.string().default('idle'),
   auto: z.boolean().default(true).describe('Pick idle/run/jump/fall from the body state automatically.'),
+  states: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe('StateMachine state -> clip. Without an entry, a clip with the state name is used if it exists.'),
+  speed: z.number().min(0).default(1).describe('Playback speed multiplier (0 = paused).'),
 });
 
 export const InteractableSchema = z.strictObject({
@@ -267,7 +281,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Goal: 'Win or load another scene on contact; can require minimum variable values.',
   Checkpoint: 'Sets the respawn point of the entity that touches it.',
   Text: 'Text/HUD with {var} and {entity.health} placeholders; screen or world space.',
-  Animator: 'Spritesheet animation clips; picks idle/run/jump/fall automatically.',
+  Animator: 'Animation clips (spritesheet frames or images); picks the clip from the StateMachine state or idle/run/jump/fall; frame events, one-shots.',
   Interactable: 'Something actors can interact with (open, talk, feed...) by click, key in range or entering; condition, cooldown, once; emits "interact".',
   StateMachine: 'Named states (idle, chase, sleeping...) with transitions by condition, time in state or event, and enter/exit actions.',
   UtilityAI: 'Chooses what to do by scoring options (needs, distance, time, personality...) with expressions; enters the matching StateMachine state.',

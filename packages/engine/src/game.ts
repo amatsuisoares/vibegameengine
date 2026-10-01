@@ -5,7 +5,7 @@ import { Input, type MouseButton } from './input';
 import { GameStorage } from './storage';
 import { round2 } from './math';
 import { Rng } from './rng';
-import { animationSystem } from './systems/animation';
+import { animationSystem, animFrameIndex } from './systems/animation';
 import { cameraSystem, worldToScreen } from './systems/camera';
 import { controllerSystem } from './systems/controllers';
 import { moverSystem } from './systems/mover';
@@ -125,6 +125,8 @@ export interface EntitySnapshot {
   ai?: { choice: string | null; scores: Record<string, number | null> };
   /** Script props (per-entity values; scripts may change them). */
   props?: Record<string, VarValue>;
+  /** Animator: clip showing and its frame index. */
+  anim?: { clip: string | null; frame: number };
   components?: Record<string, unknown>;
 }
 
@@ -276,10 +278,10 @@ export class Game {
         this.scriptRunner.collisions(entered);
         this.interactions.proximity();
         healthSystem(w, dt);
-        animationSystem(w, dt);
         this.ruleRunner.run(entered);
         this.utility.run();
         this.stateMachines.run();
+        animationSystem(w, dt);
         this.soundDirector.run();
         this.scriptRunner.events();
         w.flushDestroyed();
@@ -430,6 +432,7 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
   }
   const ai = aiOf(e);
   if (ai) s.ai = { choice: ai.choice, scores: { ...ai.scores } };
+  if (e.components.Animator) s.anim = { clip: e.animName, frame: Math.max(0, animFrameIndex(e)) };
   const props = e.components.Script?.props;
   if (props && Object.keys(props).length) s.props = { ...props };
   if (withComponents) s.components = structuredClone(e.components) as Record<string, unknown>;

@@ -126,7 +126,8 @@ Ordem da escolha:
 
 Velocidade base 90 px/s (brincalhão ×1,25, preguiçoso ×0,7, doente ×0,5, energia < 25 ×0,7).
 
-**Animações procedurais** (os sprites só têm a pose parada): respiração (escala), alternância dos 2 quadros de idle,
+**Animações** (os sprites só têm a pose parada): a alternância dos 2 quadros de idle é um clipe do `Animator` (quadros
+da forma atual, mais lento doente ou dormindo); o resto é procedural: respiração (escala),
 pulinhos ao andar, achatar ao dormir, balançar ao comer, pular de alegria, bocejo (estica e encolhe), inclinar a cabeça
 ao investigar, postura caída emburrado, tremor doente, pulsar ao evoluir. Vira para o lado em que anda.
 

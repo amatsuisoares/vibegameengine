@@ -102,6 +102,39 @@ export function utilityErrors(c: Components, at: string): string[] {
   return errors;
 }
 
+/** Clip references (next, states, frame events) and assets; `project` enables the asset checks. */
+export function animatorErrors(c: Components, at: string, project?: Project): string[] {
+  const a = c.Animator;
+  if (!a) return [];
+  const errors: string[] = [];
+  const p = `${at}.components.Animator`;
+  const clips = Object.keys(a.animations);
+  const known = (n: string) => Object.hasOwn(a.animations, n);
+  const assets = project && new Map(project.config.assets.map((x) => [x.id, x.type]));
+  const checkAsset = (id: string, where: string, types: string[]) => {
+    if (!assets) return;
+    const type = assets.get(id);
+    if (!type) errors.push(`${where}: asset "${id}" does not exist`);
+    else if (!types.includes(type)) errors.push(`${where}: asset "${id}" is ${type}, not ${types.join(' or ')}`);
+  };
+  for (const [name, clip] of Object.entries(a.animations)) {
+    const cp = `${p}.animations.${name}`;
+    if (clip.next !== undefined && !known(clip.next)) errors.push(`${cp}.next: animation "${clip.next}" does not exist (animations: ${clips.join(', ')})`);
+    if (clip.asset !== undefined) checkAsset(clip.asset, `${cp}.asset`, ['spritesheet']);
+    clip.frames.forEach((f, i) => typeof f === 'string' && checkAsset(f, `${cp}.frames[${i}]`, ['image', 'spritesheet']));
+    for (const index of Object.keys(clip.events ?? {})) {
+      if (Number(index) >= clip.frames.length) errors.push(`${cp}.events.${index}: the clip has ${clip.frames.length} frames (0-${clip.frames.length - 1})`);
+    }
+  }
+  for (const [state, clip] of Object.entries(a.states ?? {})) {
+    if (!known(clip)) errors.push(`${p}.states.${state}: animation "${clip}" does not exist (animations: ${clips.join(', ')})`);
+    if (c.StateMachine && !Object.hasOwn(c.StateMachine.states, state)) {
+      errors.push(`${p}.states.${state}: the StateMachine has no state "${state}" (states: ${Object.keys(c.StateMachine.states).join(', ')})`);
+    }
+  }
+  return errors;
+}
+
 /** Every action list of a StateMachine (for checks that apply to all actions, e.g. sounds). */
 export function stateActions(sm: NonNullable<Components['StateMachine']> | undefined): [string, RuleAction[]][] {
   if (!sm) return [];
@@ -174,6 +207,7 @@ export function checkScene(scene: Scene, project?: Project): { errors: string[];
     if (project && c.Interactable) warnings.push(...interactableWarnings(c.Interactable, project, ep));
     if (c.StateMachine) errors.push(...stateMachineErrors(c.StateMachine, `${ep}.components.StateMachine`, ids, project));
     errors.push(...utilityErrors(c, ep));
+    errors.push(...animatorErrors(c, ep, project));
   }
   return { errors, warnings };
 }
@@ -225,6 +259,7 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
     if (c.FollowTarget?.targetId) warnings.push(`${at}.components.FollowTarget.targetId: prefabs should target by tag (ids differ per scene)`);
     if (c.StateMachine) errors.push(...stateMachineErrors(c.StateMachine, `${at}.components.StateMachine`, null, project));
     errors.push(...utilityErrors(c, at));
+    errors.push(...animatorErrors(c, at, project));
   }
   for (const [key, scene] of Object.entries(project.scenes)) {
     if (key !== scene.id) errors.push(`scenes.${key}: key does not match scene id "${scene.id}"`);

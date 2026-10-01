@@ -103,7 +103,11 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
 - [x] meu-pet: o sorteio ponderado de atividades do pet virou `UtilityAI` (mesmos pesos, como expressões sobre
   `self.props`); prioridades de sono/fome continuam no script
 - [x] 253 testes unitários + 15 e2e
-- [ ] Animation Controller
+- [x] **Animation Controller**: `Animator` escolhe o clipe pelo estado da `StateMachine` (`states` ou mesmo nome), quadros
+  de imagem ou spritesheet por clipe, `speed`, eventos de quadro, `anim_end` e `next` em one-shots, `self.anim`
+  (`play/stop/speed`), `anim` no estado; validação das referências; animação passou a rodar depois das máquinas de estado
+- [x] meu-pet: a alternância dos quadros de idle do pet virou um clipe do `Animator` (quadros da forma atual)
+- [x] 262 testes unitários + 15 e2e
 - [ ] Timer / Scheduler
 - [ ] Tween
 - [ ] Pathfinding

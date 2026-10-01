@@ -176,6 +176,11 @@
             },
             "emburrar": { "score": 1.2, "when": "self.props.irritavel && self.props.diversao < 50" }
           }
+        },
+        "Animator": {
+          "initial": "idle",
+          "auto": false,
+          "animations": { "idle": { "frames": ["bebe_1", "bebe_2"], "fps": 2 } }
         }
       }
     },

@@ -92,7 +92,7 @@ Memória do agente em `.vibe/memory.json`.
 | `Goal` | vitória ou troca de cena; `require` exige variáveis mínimas |
 | `Checkpoint` | define ponto de respawn |
 | `Text` | texto/HUD com placeholders `{coins}`, `{player.health}` |
-| `Animator` | clipes de spritesheet; seleção automática idle/run/jump/fall |
+| `Animator` | clipes (quadros de spritesheet ou imagens); clipe pelo estado da `StateMachine` ou idle/run/jump/fall; eventos de quadro, one-shots, velocidade |
 | `Interactable` | algo que se usa (porta, NPC, tigela): por clique, tecla em alcance ou entrada; condição, cooldown, once, som |
 | `StateMachine` | estados nomeados com transições por condição, tempo no estado ou evento; ações de entrada/saída |
 | `UtilityAI` | escolhe o que fazer pela nota de cada opção (expressões); entra no estado correspondente |
@@ -115,10 +115,10 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
            ScriptRunner.collisions    onCollision dos contatos que começaram neste frame
            InteractionRunner.proximity  Interactable via "enter" (ator entrou no alcance) + foco da tecla
         5. healthSystem               timers, queda no abismo (killY), morte
-        6. animationSystem            flip e frames de animação
-           RuleRunner.run             regras da cena (start/event/enter/expr/every → if → ações)
+        6. RuleRunner.run             regras da cena (start/event/enter/expr/every → if → ações)
            UtilityRunner.run          decisões da UtilityAI que venceram o intervalo (→ StateMachine.go)
            StateMachineRunner.run     estado inicial e transições das StateMachines (exit → state_change → enter)
+           animationSystem            flip; clipe do Animator (script > estado > auto > base), quadro, eventos de quadro
            SoundDirector.run          eventos com som em config.sounds → evento sound
         7. flushDestroyed, cameraSystem
 ```
@@ -131,7 +131,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Contatos:** pares sobrepostos (tolerância 0,5 px, então “encostar” conta). Goal/Checkpoint usam
   semântica de *enter* (só no primeiro frame de contato).
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error` e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -186,6 +186,13 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   `ai_choice`, `StateMachineRunner.go` (estado com o nome da opção ou `state`) e `onDecision`. Decide a cada
   `intervalMs` (com `decideWhen`) ou sob demanda (`self.ai.decide()`, `intervalMs: 0`). Os `Script.props` entram no
   snapshot, então as notas leem necessidades e personalidade por entidade (`self.props.fome`).
+- **Animação** (`engine/src/systems/animation.ts`, V0.2): roda depois das máquinas de estado, então o clipe já reflete o
+  estado do frame. Escolha do clipe: o tocado por script (`self.anim.play`, `Entity.animOverride`) > o do estado
+  (`states[estado]` ou clipe com o nome do estado) > automático pelo corpo (idle/run/jump/fall) > o clipe base
+  (`initial`, que segue `next` quando um one-shot termina). O tempo avança `dt × speed`; `animStep` (passos de quadro
+  já mostrados) garante que eventos de quadro não se percam quando o fps passa de 60. Quadro numérico = índice da
+  spritesheet (do `Sprite` ou do `asset` do clipe); texto = id de imagem, trocado em `Sprite.asset`. O render não
+  mudou: só lê `Sprite.asset`/`frame`.
 - **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
   conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).

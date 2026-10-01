@@ -33,8 +33,14 @@ export class Entity {
   stunTimer = 0;
   invulnTimer = 0;
   patrolDir: number;
+  /** Animator: clip showing, time in it (s), last frame step shown, whether a one-shot ended. */
   animName: string | null = null;
   animTime = 0;
+  animStep = -1;
+  animEnded = false;
+  /** Clip played by a script (self.anim.play) and the base clip (initial / next). */
+  animOverride: string | null = null;
+  animBase: string | null = null;
   /** Mover progress: waypoint index, direction (ping-pong) and remaining pause in frames. */
   mover?: { target: number; dir: number; wait: number };
   /** Interactable state: frame from which it can be used again, successful uses. */

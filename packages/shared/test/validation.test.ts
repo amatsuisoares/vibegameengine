@@ -198,3 +198,41 @@ describe('UtilityAI', () => {
     expect(parseProject(project([{ id: 'npc', components: { UtilityAI: { options: {} } } }])).ok).toBe(false);
   });
 });
+
+describe('Animator', () => {
+  it('checks clip references, frame events and assets', () => {
+    const r = parseProject({
+      config: { name: 'p', startScene: 'main', assets: [{ id: 'img', type: 'image', path: 'a.png' }, { id: 'sfx', type: 'audio', path: 'a.wav' }] },
+      scenes: {
+        main: {
+          id: 'main',
+          entities: [
+            {
+              id: 'cat',
+              components: {
+                Sprite: {},
+                StateMachine: { initial: 'idle', states: { idle: {} } },
+                Animator: {
+                  animations: {
+                    idle: { frames: ['img', 'nope', 'sfx'], next: 'gone', events: { '3': 'step' } },
+                    hit: { frames: [0], asset: 'img' },
+                  },
+                  states: { idle: 'missing', running: 'hit' },
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+    expect(r.ok ? [] : r.errors).toEqual([
+      'scenes.main.entities(cat).components.Animator.animations.idle.next: animation "gone" does not exist (animations: idle, hit)',
+      'scenes.main.entities(cat).components.Animator.animations.idle.frames[1]: asset "nope" does not exist',
+      'scenes.main.entities(cat).components.Animator.animations.idle.frames[2]: asset "sfx" is audio, not image or spritesheet',
+      'scenes.main.entities(cat).components.Animator.animations.idle.events.3: the clip has 3 frames (0-2)',
+      'scenes.main.entities(cat).components.Animator.animations.hit.asset: asset "img" is image, not spritesheet',
+      'scenes.main.entities(cat).components.Animator.states.idle: animation "missing" does not exist (animations: idle, hit)',
+      'scenes.main.entities(cat).components.Animator.states.running: the StateMachine has no state "running" (states: idle)',
+    ]);
+  });
+});

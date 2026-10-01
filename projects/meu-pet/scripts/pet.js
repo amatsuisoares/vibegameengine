@@ -279,6 +279,8 @@ function applyStage(self) {
   const st = STAGES[pet.stage];
   const s = self.get('Sprite');
   s.asset = st.frames[0];
+  // O Animator alterna os quadros de idle; cada forma tem os seus (1 ou 2).
+  self.get('Animator').animations.idle.frames = [...st.frames];
   s.width = st.size;
   s.height = st.size;
 }
@@ -697,8 +699,8 @@ function animate(self, game) {
   const s = self.get('Sprite');
   const st = STAGES[pet.stage];
   const slow = pet.sick || pet.asleep ? 0.4 : 1;
-  // Dois quadros de idle (bebê e jovens).
-  if (st.frames.length > 1) s.asset = st.frames[Math.floor(anim * 2 * slow) % 2];
+  // Os dois quadros de idle (bebê e jovens) são do Animator; doente ou dormindo, mais devagar.
+  self.anim.speed = slow;
   let sx = 1;
   let sy = 1;
   let rot = 0;

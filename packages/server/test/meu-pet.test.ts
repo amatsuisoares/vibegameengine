@@ -64,5 +64,16 @@ describe('meu-pet (regression)', () => {
     expect(pet.ai!.scores.passear).toBe(3);
     expect(pet.props).toMatchObject({ fome: expect.any(Number), brincalhao: expect.any(Boolean) });
     expect(game.events(0, 'ai_choice').filter((e) => e.entity === 'pet').length).toBeGreaterThan(1);
+
+    // Its idle frames come from the Animator (image frames of the current form, updated when it evolves).
+    expect(pet.anim?.clip).toBe('idle');
+    const seen = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      game.step(5);
+      seen.add(String(game.entity('pet')!.components.Sprite!.asset));
+    }
+    const form = String(game.world.vars.estagio); // it grew up during the day away
+    expect(form).toMatch(/^juvenil/);
+    expect([...seen].sort()).toEqual([`${form}_1`, `${form}_2`]);
   });
 });

@@ -229,6 +229,44 @@ horário (`clock.hour`), variáveis, estado, cooldown... quem define é o jogo.
 - **Validação ao gravar:** `state` precisa existir na `StateMachine` da entidade; expressões com erro de sintaxe são
   recusadas.
 
+## Animação (`Animator`)
+
+Atualizado na V0.2 (`packages/engine/src/systems/animation.ts`). Basta o estado do jogo mudar (`state = "walk"`) para o
+clipe certo tocar — sem `if (state == ...)` em script para trocar sprite.
+
+```json
+"Animator": {
+  "initial": "idle",
+  "states": { "sleeping": "sleep" },
+  "animations": {
+    "idle":   { "frames": ["cat_idle1", "cat_idle2"], "fps": 2 },
+    "walk":   { "frames": [0, 1, 2, 3], "fps": 10, "asset": "cat_walk", "events": { "1": "footstep", "3": "footstep" } },
+    "sleep":  { "frames": ["cat_sleep"] },
+    "attack": { "frames": [4, 5, 6], "fps": 12, "loop": false, "next": "idle" }
+  }
+}
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `animations.<clipe>.frames` | — | índices da spritesheet ou ids de imagens (um asset por quadro) |
+| `.fps` / `.loop` | `8` / `true` | `loop: false` toca uma vez, segura o último quadro e emite `anim_end` |
+| `.asset` | — | spritesheet do clipe (padrão: a do `Sprite`) |
+| `.next` | — | clipe seguinte quando um clipe sem loop termina |
+| `.events` | — | quadro → tipo de evento emitido quando ele aparece (`{entity, anim, frame}`); com `config.sounds` vira som |
+| `initial` | `"idle"` | clipe base |
+| `auto` | `true` | com `Body`: escolhe `jump`/`fall`/`run`/`idle` pelo movimento |
+| `states` | — | estado da `StateMachine` → clipe (sem entrada: clipe com o nome do estado, se existir) |
+| `speed` | `1` | multiplicador de velocidade (0 = pausado) |
+
+- **Qual clipe toca:** o tocado por script > o do estado da `StateMachine` > o automático (`auto` com `Body`) > o clipe
+  base (`initial`, seguindo `next`).
+- **Scripts:** `self.anim.name`, `self.anim.frame`, `self.anim.play('attack')` (por cima do estado; um clipe sem loop
+  termina sozinho e segue o `next`; tocar de novo reinicia), `self.anim.stop()`, `self.anim.speed`.
+- **Estado:** `inspect_game_state` mostra `anim: {clip, frame}`; expressões leem `entity('cat').anim.clip`.
+- **Validação ao gravar:** `next`, `states` e índices de `events` precisam existir; quadros de imagem precisam ser
+  assets de imagem/spritesheet; `asset` do clipe precisa ser spritesheet; `states` só com estados da `StateMachine`.
+
 ## Assets e som
 
 Implementado na Etapa 8 (`tools/asset-tools.ts`, `sfx.ts`, `engine/src/sound.ts`, `runtime/src/audio.ts`).

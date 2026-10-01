@@ -2,6 +2,7 @@ import type { ComponentType, VarValue } from '@vibe/shared';
 import { checkSpeed, type GameClock } from './clock';
 import type { Entity } from './entity';
 import { fsmOf, stateMs, type StateMachineRunner } from './fsm';
+import { animFrameIndex } from './systems/animation';
 import { aiOf, type UtilityRunner } from './utility';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
@@ -48,6 +49,20 @@ export interface ScriptHost {
   readonly interactions: InteractionRunner;
   readonly stateMachines: StateMachineRunner;
   readonly utility: UtilityRunner;
+}
+
+/** self.anim: the entity's Animator. */
+export interface ScriptAnim {
+  /** Clip showing (null without an Animator or clip). */
+  readonly name: string | null;
+  /** Index of the frame showing within the clip. */
+  readonly frame: number;
+  /** Plays a clip over the state/auto choice; a non-looping one ends by itself (then its `next`). */
+  play(clip: string): void;
+  /** Stops a clip started with play() (back to the state/auto choice). */
+  stop(): void;
+  /** Playback speed multiplier (Animator.speed). */
+  speed: number;
 }
 
 /** self.ai: the entity's UtilityAI (choice is null without one or before the first decision). */
@@ -165,6 +180,8 @@ export interface ScriptEntity {
   readonly fsm: ScriptFsm;
   /** The entity's UtilityAI. */
   readonly ai: ScriptAi;
+  /** The entity's Animator. */
+  readonly anim: ScriptAnim;
   /** Live component data (changes apply immediately), or undefined. */
   get(type: ComponentType): Record<string, unknown> | undefined;
   damage(amount: number): boolean;
@@ -362,6 +379,35 @@ class ScriptApi {
       },
       decide: () => host.utility.decide(e),
     };
+    const animator = () => {
+      const a = e.components.Animator;
+      if (!a) throw new Error(`entity "${e.id}" has no Animator`);
+      return a;
+    };
+    const anim: ScriptAnim = {
+      get name() {
+        return e.animName;
+      },
+      get frame() {
+        return Math.max(0, animFrameIndex(e));
+      },
+      play: (clip) => {
+        const a = animator();
+        if (!Object.hasOwn(a.animations, clip)) throw new Error(`animation "${clip}" does not exist (animations: ${Object.keys(a.animations).join(', ')})`);
+        e.animOverride = clip;
+        // Playing the same one-shot again restarts it.
+        if (e.animName === clip) e.animName = null;
+      },
+      stop: () => {
+        e.animOverride = null;
+      },
+      get speed() {
+        return animator().speed;
+      },
+      set speed(v) {
+        animator().speed = Math.max(0, finite(v, 'anim.speed'));
+      },
+    };
     api = {
       id: e.id,
       name: e.name,
@@ -436,6 +482,7 @@ class ScriptApi {
       },
       fsm,
       ai,
+      anim,
       get: (type) => e.components[type] as Record<string, unknown> | undefined,
       damage: (amount) => applyDamage(w, e, amount),
       destroy: () => w.destroy(e),
