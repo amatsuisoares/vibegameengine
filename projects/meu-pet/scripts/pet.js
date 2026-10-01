@@ -37,8 +37,6 @@ let pet; // dados salvos
 let mind; // comportamento do momento (não salvo)
 let lastNow = 0;
 let localOffset = 0;
-let saveTimer = 0;
-let checkTimer = 0;
 let anim = 0;
 let lastNoteReal = -99;
 let lastPetReal = -99;
@@ -595,6 +593,12 @@ function onStart(self, game) {
   game.vars.petName = pet.name;
   discover(game, pet.stage);
   save(game);
+  // Timers da engine (tempo de jogo em frames, reproduzível): observações a cada 1 s, save a cada 3 s.
+  self.every(1000, () => {
+    checkObservations(game, self);
+    checkEvolution(game, self);
+  }, 'observar');
+  self.every(SAVE_EVERY * 1000, () => save(game), 'salvar');
 }
 
 function onUpdate(self, game, dt) {
@@ -622,17 +626,6 @@ function onUpdate(self, game, dt) {
   behave(self, game, dt);
   animate(self, game);
 
-  checkTimer += dt;
-  if (checkTimer >= 1) {
-    checkTimer = 0;
-    checkObservations(game, self);
-    checkEvolution(game, self);
-  }
-  saveTimer += dt;
-  if (saveTimer >= SAVE_EVERY) {
-    saveTimer = 0;
-    save(game);
-  }
   game.vars.fome = Math.round(pet.needs.fome);
   game.vars.energia = Math.round(pet.needs.energia);
   game.vars.diversao = Math.round(pet.needs.diversao);

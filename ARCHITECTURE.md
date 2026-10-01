@@ -118,6 +118,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
         6. RuleRunner.run             regras da cena (start/event/enter/expr/every → if → ações)
            UtilityRunner.run          decisões da UtilityAI que venceram o intervalo (→ StateMachine.go)
            StateMachineRunner.run     estado inicial e transições das StateMachines (exit → state_change → enter)
+           Scheduler.run              timers vencidos (self.after/every, ações "after" de regras e estados)
            animationSystem            flip; clipe do Animator (script > estado > auto > base), quadro, eventos de quadro
            SoundDirector.run          eventos com som em config.sounds → evento sound
         7. flushDestroyed, cameraSystem
@@ -131,7 +132,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Contatos:** pares sobrepostos (tolerância 0,5 px, então “encostar” conta). Goal/Checkpoint usam
   semântica de *enter* (só no primeiro frame de contato).
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -193,6 +194,11 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   já mostrados) garante que eventos de quadro não se percam quando o fps passa de 60. Quadro numérico = índice da
   spritesheet (do `Sprite` ou do `asset` do clipe); texto = id de imagem, trocado em `Sprite.asset`. O render não
   mudou: só lê `Sprite.asset`/`frame`.
+- **Timers** (`engine/src/timers.ts`, V0.2): um `Scheduler` por `World` (`world.timers`). Cada timer tem id, frame em
+  que dispara, período opcional (frames, mínimo 1) e dono opcional (entidade): de dono destruído é descartado; de dono
+  desligado espera. Vencidos disparam em ordem (frame, criação); um timer cancelado por outro no mesmo frame não
+  dispara. Mesmo id (por dono) substitui. Cooldowns de script ficam em `Entity.cooldowns` (frame em que libera).
+  Timers não sobrevivem a troca de cena/restart (o mundo é recriado), como o resto do estado de cena.
 - **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
   conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).

@@ -47,6 +47,8 @@ export class Entity {
   interact?: { readyAt: number; uses: number };
   /** StateMachine state (created on first use; see fsm.ts). */
   fsm?: FsmState;
+  /** Cooldowns started with self.cooldown(): name -> frame it is ready again. */
+  cooldowns?: Record<string, number>;
   /** UtilityAI state (created on first use; see utility.ts). */
   ai?: AiState;
   /** Script instance (created on first use by the ScriptRunner). */

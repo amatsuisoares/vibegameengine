@@ -78,6 +78,29 @@ export function runAction(w: World, a: RuleAction, target: (ref: string) => Enti
     case 'playSound':
       emitSound(w, a.asset, a.volume, origin.source);
       return;
+    case 'after': {
+      const owner = origin.kind === 'state' ? w.get(origin.data.entity) : undefined;
+      const id = w.timers.schedule({
+        id: a.id,
+        ms: a.ms,
+        owner,
+        run: () => {
+          for (const sub of a.do) {
+            if (w.status !== 'running') return;
+            runAction(w, sub, target, origin);
+          }
+        },
+        onError: (err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          w.console.error(`Timer "${id}" of ${origin.label}: ${message}`, origin.source);
+          w.emit('timer_error', { timer: id, message, ...origin.data });
+        },
+      });
+      return;
+    }
+    case 'cancelTimer':
+      w.timers.cancel(a.id, origin.kind === 'state' ? w.get(origin.data.entity) : undefined);
+      return;
     case 'spawn': {
       const at = a.at ? target(a.at) : null;
       w.spawn(a.prefab, (at?.x ?? 0) + (a.x ?? 0), (at?.y ?? 0) + (a.y ?? 0), a.id);

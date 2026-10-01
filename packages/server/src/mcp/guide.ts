@@ -12,7 +12,7 @@ PROJECTS
 
 RULES (events and conditions without code)
 - set_rule / delete_rule edit scene rules: {"id", "when", "if"?, "do": [actions], "once"?}. when: {"start":true} | {"event":"collect","match":{"entity":"coin1"}} | {"enter":"zoneId","tag":"player"} | {"expr":"vars.coins >= 3"} (fires on false->true) | {"every":1000}.
-- Actions: setVar, addVar, emit, win, lose, loadScene, destroy, setEnabled, setText, damage, heal, move, modify {target, component, set}, log. target: entity id, "$by" (who entered / caused the event) or "$entity" (the zone / the event's entity). Use a disabled entity + setEnabled to make things appear. Each firing emits a "rule" event.
+- Actions: setVar, addVar, emit, win, lose, loadScene, destroy, setEnabled, setText, damage, heal, move, modify {target, component, set}, log, playSound, spawn, after {ms, do: [actions], id?} (delayed actions; not nested), cancelTimer {id}. target: entity id, "$by" (who entered / caused the event) or "$entity" (the zone / the event's entity). Use a disabled entity + setEnabled to make things appear. Each firing emits a "rule" event.
 
 INTERACTIONS (doors, NPCs, items, objects to use)
 - Interactable {action ("open", "talk", "feed"...), label?, via: ["click","key","enter"] (default click+key), key (default action "interact" = E), actorTags (default ["player"]), range (px between boxes, default 32), condition? (expression), cooldownMs, once, enabled, sound?}. Do not write a component or script per action: one Interactable + what it does.
@@ -34,6 +34,10 @@ ANIMATION (Animator)
 - animations: {clip: {frames (spritesheet indexes, or image asset ids one per frame), fps, loop, asset? (spritesheet of the clip), next? (after a one-shot), events? ({"2": "footstep"}: event emitted when that frame shows; map it to a sound in config.sounds)}}, initial, auto (idle/run/jump/fall from the Body), states? ({stateName: clip}), speed.
 - The clip follows the StateMachine state automatically (a clip with the state's name, or states[state]); do not swap sprites in scripts. Priority: self.anim.play(clip) > state > auto > initial/next. One-shots (loop false) emit "anim_end". inspect_game_state shows anim {clip, frame}.
 - Scripts: self.anim.name / frame / play(clip) / stop() / speed.
+
+TIMERS (deterministic, in game frames)
+- Scripts: self.after(ms, fn, id?), self.every(ms, fn, id?), self.cancel(id), self.timers, self.cooldown(name, ms) -> true if ready (and starts it). Timers belong to the entity (gone if it is destroyed). Never count time by hand in onUpdate.
+- Data: rule/state action after {ms, do, id?}; cancelTimer {id}. inspect_game_state shows timers [{id, ms, every?}] and cooldowns per entity.
 
 SCRIPTS (when built-in components and rules are not enough)
 - Write scripts/<name>.js with write_file and attach it with the Script component: {"src":"scripts/<name>.js","props":{...}}. Broken syntax is rejected with file:line.

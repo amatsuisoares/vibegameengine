@@ -236,3 +236,19 @@ describe('Animator', () => {
     ]);
   });
 });
+
+describe('"after" actions', () => {
+  it('validate their delayed actions like the others', () => {
+    const r = parseProject(
+      project([{ id: 'door' }], {
+        rules: [{ id: 'r', when: { start: true }, do: [{ action: 'after', ms: 100, do: [{ action: 'destroy', target: 'ghost' }, { action: 'playSound', asset: 'x' }] }] }],
+      }),
+    );
+    expect(r.ok ? [] : r.errors).toEqual([
+      'scenes.main.rules(r).do[0].do[1].asset: audio asset "x" does not exist',
+      'scenes.main.rules(r).do[0].do[0].target: entity "ghost" does not exist',
+    ]);
+    const nested = parseProject(project([], { rules: [{ id: 'r', when: { start: true }, do: [{ action: 'after', ms: 1, do: [{ action: 'after', ms: 1, do: [{ action: 'win' }] }] }] }] }));
+    expect(nested.ok).toBe(false);
+  });
+});

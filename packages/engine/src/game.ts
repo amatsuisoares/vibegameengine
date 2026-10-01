@@ -14,6 +14,7 @@ import { RuleRunner } from './rules';
 import { hitBox, InteractionRunner, snapshotInteractable, type InteractableSnapshot } from './interact';
 import { fsmOf, StateMachineRunner, stateMs } from './fsm';
 import { aiOf, UtilityRunner } from './utility';
+import { cooldownsLeft, type TimerInfo } from './timers';
 import { SoundDirector, soundOf } from './sound';
 import { ScriptLibrary, ScriptRunner } from './scripts';
 import { findContacts, interactionSystem, pairKey } from './systems/interactions';
@@ -125,6 +126,10 @@ export interface EntitySnapshot {
   ai?: { choice: string | null; scores: Record<string, number | null> };
   /** Script props (per-entity values; scripts may change them). */
   props?: Record<string, VarValue>;
+  /** Timers of the entity (self.after / every, "after" actions of its states). */
+  timers?: TimerInfo[];
+  /** Cooldowns running (self.cooldown): ms left by name. */
+  cooldowns?: Record<string, number>;
   /** Animator: clip showing and its frame index. */
   anim?: { clip: string | null; frame: number };
   components?: Record<string, unknown>;
@@ -281,6 +286,7 @@ export class Game {
         this.ruleRunner.run(entered);
         this.utility.run();
         this.stateMachines.run();
+        w.timers.run();
         animationSystem(w, dt);
         this.soundDirector.run();
         this.scriptRunner.events();
@@ -432,6 +438,10 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
   }
   const ai = aiOf(e);
   if (ai) s.ai = { choice: ai.choice, scores: { ...ai.scores } };
+  const timers = w.timers.list(e);
+  if (timers.length) s.timers = timers;
+  const cds = cooldownsLeft(w, e);
+  if (Object.keys(cds).length) s.cooldowns = cds;
   if (e.components.Animator) s.anim = { clip: e.animName, frame: Math.max(0, animFrameIndex(e)) };
   const props = e.components.Script?.props;
   if (props && Object.keys(props).length) s.props = { ...props };

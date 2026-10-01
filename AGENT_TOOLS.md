@@ -100,7 +100,8 @@ script: `quando → se → faça`, guardada em `rules` da cena e avaliada todo f
 Ações: `setVar {var, value}`, `addVar {var, amount}`, `emit {event, data?}`, `win`, `lose`, `loadScene {scene}`,
 `destroy {target}`, `setEnabled {target, enabled}`, `setText {target, text}`, `damage {target, amount}`,
 `heal {target, amount}`, `move {target, x?, y?}`, `modify {target, component, set}`, `log {message}`,
-`playSound {asset, volume?}`, `spawn {prefab, x?, y?, at?, id?}`.
+`playSound {asset, volume?}`, `spawn {prefab, x?, y?, at?, id?}`, `after {ms, do: [ações], id?}` (roda as ações
+depois de um tempo; ver [Timers](#timers)), `cancelTimer {id}`.
 `target` é um id, `"$by"` (quem entrou na zona, ou o `by`/`entity` do evento) ou `"$entity"` (a zona, ou o `entity`
 do evento — por exemplo o objeto de um `interact`). `if` e `when.expr` usam as mesmas
 expressões do `wait_until`. Cada disparo gera o evento `rule`. Referências (ids, cenas, componentes) e expressões são
@@ -267,6 +268,25 @@ clipe certo tocar — sem `if (state == ...)` em script para trocar sprite.
 - **Validação ao gravar:** `next`, `states` e índices de `events` precisam existir; quadros de imagem precisam ser
   assets de imagem/spritesheet; `asset` do clipe precisa ser spritesheet; `states` só com estados da `StateMachine`.
 
+## Timers
+
+Implementado na V0.2 (`packages/engine/src/timers.ts`). Tempo de jogo contado em frames (nunca o relógio real): mesma
+seed e mesmo input ⇒ os timers disparam nos mesmos frames.
+
+- **Scripts** (timers da entidade; somem se ela for destruída e esperam enquanto ela estiver desligada):
+  `self.after(ms, fn, id?)` (uma vez), `self.every(ms, fn, id?)` (repete), `self.cancel(id)`, `self.timers` (lista) e
+  `self.cooldown(nome, ms)` (devolve `true` e inicia o cooldown se ele não estiver correndo; `false` se estiver —
+  ex. `if (self.cooldown('latir', 2000)) game.playSound('latido')`). Agendar o mesmo `id` de novo reinicia o timer.
+  Erro dentro do `fn` é erro de script daquela entidade (`script_error`).
+- **Regras e estados:** ação `after {ms, do, id?}` adia uma lista de ações (sem outro `after` dentro); `cancelTimer {id}`
+  cancela. Numa regra o timer é global e o `$by` do disparo vale no `do`; num estado da `StateMachine` o timer é da
+  entidade (`$self`). Erro numa ação adiada: `timer_error` + console.
+- **Estado:** `inspect_game_state` mostra `timers: [{id, ms, every?}]` (tempo que falta, do mais próximo) e
+  `cooldowns: {nome: ms}` por entidade; expressões leem `entity('lamp').cooldowns.x`.
+- **Ordem no frame:** timers vencidos disparam depois das regras e das máquinas de estado, antes da animação.
+- O mesmo para "depois de X segundos" sem código: `after` numa regra, `every` como gatilho de regra, `after` numa
+  transição da `StateMachine`, `cooldownMs` do `Interactable` e da `UtilityAI`.
+
 ## Assets e som
 
 Implementado na Etapa 8 (`tools/asset-tools.ts`, `sfx.ts`, `engine/src/sound.ts`, `runtime/src/audio.ts`).
@@ -341,6 +361,7 @@ function onCollision(self, other, game) {
 - `game.interact(alvo, ator?)` e `game.nearbyInteractables(ator)`: ver [Interações](#interações-interactable).
 - `self.fsm` (`state, previous, time, is(...), go(estado)`): ver [Máquinas de estado](#máquinas-de-estado-statemachine).
 - `self.ai` (`choice, scores, decide()`): ver [Utility AI](#utility-ai-utilityai).
+- `self.after/every/cancel/timers/cooldown`: ver [Timers](#timers). Não há `setTimeout` (tempo real quebraria o replay).
 - Também `console.log/warn/error` (vão para o console do jogo) e `Math` com `Math.random` usando a seed da run.
 - **Determinismo:** `Date`, timers, rede, `process`, `window` e `globalThis` não existem para o script. É uma API
   restrita para lógica de jogo, não uma sandbox de segurança.

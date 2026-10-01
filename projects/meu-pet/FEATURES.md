@@ -179,7 +179,8 @@ procurando alguma coisa." · "{n} ficou animado!" · "{n} parece gostar do carin
 - **Relógio:** data e hora reais do computador. A janela mostra o céu (dia 7h–18h, entardecer 18h–20h, noite,
   amanhecer 5h–7h) e o quarto escurece à noite (pouco com a luz acesa, bastante apagada).
 - **Velocidade:** botão alterna 1× → 60× (1 minuto de jogo por segundo) → 600× (10 minutos por segundo). Fica salva.
-- **Save automático:** a cada 3 s e a cada ação importante, no arquivo `.vibe/save.json` do projeto (sobrevive a fechar
+- **Save automático:** a cada 3 s (timer `salvar` da engine; as observações usam o timer `observar`, a cada 1 s) e a
+  cada ação importante, no arquivo `.vibe/save.json` do projeto (sobrevive a fechar
   o VS Code). Botão "Apagar save" na barra da página recomeça do zero.
 - **Tempo fora:** ao reabrir (ou quando o relógio pula mais de 5 min, como uma aba em segundo plano), o jogo simula o
   intervalo em passos de 15 min (até 7 dias): o pet dorme quando precisa, acorda, come da tigela se houver ração, as

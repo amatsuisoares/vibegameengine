@@ -3,6 +3,7 @@ import type { GameConsole } from './console';
 import { Entity } from './entity';
 import type { Input } from './input';
 import { Rng } from './rng';
+import { Scheduler } from './timers';
 
 export type GameStatus = 'running' | 'won' | 'lost' | 'crashed';
 
@@ -38,6 +39,8 @@ export class World {
   /** Interactable that the interaction key would use now, and by which actor (for the on-screen prompt). */
   interactFocus: { entity: string; by: string } | null = null;
   readonly events: GameEvent[] = [];
+  /** Timers of this scene (scripts' self.after/every, rule and state "after" actions). */
+  readonly timers: Scheduler = new Scheduler(this);
   private eventCapacity = 2000;
 
   constructor(

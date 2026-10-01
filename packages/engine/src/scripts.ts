@@ -3,6 +3,7 @@ import { checkSpeed, type GameClock } from './clock';
 import type { Entity } from './entity';
 import { fsmOf, stateMs, type StateMachineRunner } from './fsm';
 import { animFrameIndex } from './systems/animation';
+import { cooldown, type TimerInfo } from './timers';
 import { aiOf, type UtilityRunner } from './utility';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
@@ -182,6 +183,16 @@ export interface ScriptEntity {
   readonly ai: ScriptAi;
   /** The entity's Animator. */
   readonly anim: ScriptAnim;
+  /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
+  after(ms: number, fn: () => void, id?: string): string;
+  /** Runs fn every ms of game time until cancelled. */
+  every(ms: number, fn: () => void, id?: string): string;
+  /** Cancels a timer of this entity; returns whether it existed. */
+  cancel(id: string): boolean;
+  /** Timers of this entity, soonest first. */
+  readonly timers: TimerInfo[];
+  /** True (and starts the cooldown) if `name` is not cooling down; false otherwise. */
+  cooldown(name: string, ms: number): boolean;
   /** Live component data (changes apply immediately), or undefined. */
   get(type: ComponentType): Record<string, unknown> | undefined;
   damage(amount: number): boolean;
@@ -246,6 +257,8 @@ class ScriptApi {
   constructor(
     private readonly world: World,
     private readonly host: ScriptHost,
+    /** Reports an error thrown by script code of entity `e` outside a hook call (timer callbacks). */
+    private readonly report: (e: Entity, err: unknown, where: string) => void,
   ) {
     const w = world;
     const input = w.input;
@@ -379,6 +392,12 @@ class ScriptApi {
       },
       decide: () => host.utility.decide(e),
     };
+    const schedule = (ms: number, every: number | undefined, fn: () => void, id?: string) => {
+      if (typeof fn !== 'function') throw new Error('timer callback must be a function');
+      if (id !== undefined && (typeof id !== 'string' || !id)) throw new Error('timer id must be a non-empty string');
+      const timerId: string = w.timers.schedule({ id, ms, every, owner: e, run: fn, onError: (err) => this.report(e, err, `timer "${timerId}"`) });
+      return timerId;
+    };
     const animator = () => {
       const a = e.components.Animator;
       if (!a) throw new Error(`entity "${e.id}" has no Animator`);
@@ -483,6 +502,13 @@ class ScriptApi {
       fsm,
       ai,
       anim,
+      after: (ms, fn, id) => schedule(ms, undefined, fn, id),
+      every: (ms, fn, id) => schedule(ms, ms, fn, id),
+      cancel: (id) => w.timers.cancel(String(id), e),
+      get timers() {
+        return w.timers.list(e);
+      },
+      cooldown: (name, ms) => cooldown(w, e, String(name), finite(ms, 'cooldown ms')),
       get: (type) => e.components[type] as Record<string, unknown> | undefined,
       damage: (amount) => applyDamage(w, e, amount),
       destroy: () => w.destroy(e),
@@ -522,7 +548,10 @@ export class ScriptRunner {
     private readonly library: ScriptLibrary,
     host: ScriptHost,
   ) {
-    this.api = new ScriptApi(world, host);
+    this.api = new ScriptApi(world, host, (e, err, where) => {
+      const inst = e.script;
+      if (inst && !inst.failed) this.fail(e, inst, describe(err, inst.file, e, where));
+    });
     this.math = seededMath(world);
     this.processed = world.emitted;
   }

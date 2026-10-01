@@ -31,7 +31,8 @@ export const RuleTriggerSchema = z.union([
   z.strictObject({ every: z.number().positive().describe('Fires every N milliseconds of game time.') }),
 ]);
 
-export const RuleActionSchema = z.discriminatedUnion('action', [
+/** Actions that run at once (also the ones an "after" action can delay). */
+const immediateActions = [
   z.strictObject({ action: z.literal('setVar'), var: z.string().min(1), value: Value }),
   z.strictObject({ action: z.literal('addVar'), var: z.string().min(1), amount: z.number() }),
   z.strictObject({ action: z.literal('emit'), event: z.string().min(1), data: z.record(z.string(), Value).optional() }),
@@ -60,6 +61,21 @@ export const RuleActionSchema = z.discriminatedUnion('action', [
     at: Target.optional().describe('Spawn at this entity\'s position (x/y become offsets).'),
     id: z.string().optional().describe('Id of the new entity (default: <prefab><n>).'),
   }),
+] as const;
+
+export const ImmediateActionSchema = z.discriminatedUnion('action', [...immediateActions]);
+
+const TimerId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]*$/, 'must start with a letter and contain only letters, digits, "_" or "-"');
+
+export const RuleActionSchema = z.discriminatedUnion('action', [
+  ...immediateActions,
+  z.strictObject({
+    action: z.literal('after'),
+    ms: z.number().min(0).describe('Delay in ms of game time.'),
+    do: z.array(ImmediateActionSchema).min(1).describe('Actions run after the delay (not another "after").'),
+    id: TimerId.optional().describe('Timer id: scheduling the same id again restarts it; cancelTimer stops it.'),
+  }),
+  z.strictObject({ action: z.literal('cancelTimer'), id: TimerId }),
 ]);
 
 export const RuleSchema = z.strictObject({

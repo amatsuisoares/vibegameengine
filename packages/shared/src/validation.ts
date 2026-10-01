@@ -63,6 +63,7 @@ function actionErrors(
     if (a.action === 'modify' && !(COMPONENT_TYPES as string[]).includes(a.component)) {
       errors.push(`${at}[${i}].component: unknown component "${a.component}"`);
     }
+    if (a.action === 'after') errors.push(...actionErrors(a.do, `${at}[${i}].do`, ids, project, refProblem));
   });
   return errors;
 }
@@ -133,6 +134,11 @@ export function animatorErrors(c: Components, at: string, project?: Project): st
     }
   }
   return errors;
+}
+
+/** Actions with their paths, including the ones delayed by "after". */
+function flatActions(actions: RuleAction[], at: string): [string, RuleAction][] {
+  return actions.flatMap((a, i): [string, RuleAction][] => [[`${at}[${i}]`, a], ...(a.action === 'after' ? flatActions(a.do, `${at}[${i}].do`) : [])]);
 }
 
 /** Every action list of a StateMachine (for checks that apply to all actions, e.g. sounds). */
@@ -239,7 +245,7 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
   const checkEntitySounds = (c: Components, at: string) => {
     checkSound(c.Interactable?.sound, `${at}.components.Interactable.sound`);
     for (const [where, actions] of stateActions(c.StateMachine)) {
-      actions.forEach((a, i) => a.action === 'playSound' && checkSound(a.asset, `${at}.components.StateMachine.${where}[${i}].asset`));
+      for (const [path, a] of flatActions(actions, `${at}.components.StateMachine.${where}`)) if (a.action === 'playSound') checkSound(a.asset, `${path}.asset`);
     }
   };
   for (const [id, prefab] of Object.entries(project.prefabs)) checkEntitySounds(prefab.components, `prefabs.${id}`);
@@ -247,7 +253,7 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
     checkSound(scene.music, `scenes.${scene.id}.music`);
     for (const e of scene.entities) checkEntitySounds(e.components, `scenes.${scene.id}.entities(${e.id})`);
     for (const r of scene.rules) {
-      r.do.forEach((a, i) => a.action === 'playSound' && checkSound(a.asset, `scenes.${scene.id}.rules(${r.id}).do[${i}].asset`));
+      for (const [path, a] of flatActions(r.do, `scenes.${scene.id}.rules(${r.id}).do`)) if (a.action === 'playSound') checkSound(a.asset, `${path}.asset`);
     }
   }
   for (const [id, prefab] of Object.entries(project.prefabs)) {

@@ -108,7 +108,11 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
   (`play/stop/speed`), `anim` no estado; validação das referências; animação passou a rodar depois das máquinas de estado
 - [x] meu-pet: a alternância dos quadros de idle do pet virou um clipe do `Animator` (quadros da forma atual)
 - [x] 262 testes unitários + 15 e2e
-- [ ] Timer / Scheduler
+- [x] **Timer / Scheduler**: `Scheduler` por cena em frames; scripts com `self.after/every/cancel/timers/cooldown`
+  (timers da entidade); ações `after {ms, do, id?}` e `cancelTimer` em regras e estados; `timers`/`cooldowns` no
+  estado; evento `timer_error`
+- [x] meu-pet: observações (1 s) e save (3 s) do pet viraram `self.every` em vez de contadores manuais
+- [x] 272 testes unitários + 15 e2e
 - [ ] Tween
 - [ ] Pathfinding
 - [ ] Particles / VFX
