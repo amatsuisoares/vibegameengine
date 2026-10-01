@@ -22,7 +22,7 @@
 ```
 
 Implementado até agora: `shared` e `engine` (Etapa 1), `runtime` no browser (Etapa 2), `server` com
-ProjectStore + tools de edição (Etapa 3).
+ProjectStore + tools de edição (Etapa 3) e RuntimeHost com runs headless, testes e screenshots (Etapa 4).
 
 ## Princípios
 
@@ -174,16 +174,29 @@ ToolRegistry.call(name, input, {store, author})
 - **Escrita atômica** com retry em `EPERM/EBUSY` (Windows: watchers e antivírus seguram arquivos).
 - O runtime (`npm run dev`) observa `projects/` e recarrega a cada commit — o agente vê o efeito na hora.
 
-## Comunicação agente ↔ runtime (planejada, etapas 4–6)
+## Comunicação agente ↔ runtime (`packages/server/src/runtime`)
 
 ```
-Agent ──tool call──▶ Server/ToolRegistry ──▶ RuntimeHost ──▶ Game (headless)  → estado, eventos, console
-                                                        └─▶ Chromium (Playwright) → screenshot PNG
+Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
+                                     ├─ GameSession: Game headless + log de GameOp ─▶ estado, eventos, console
+                                     └─ Screenshotter: Vite dev server + Chromium (Playwright)
+                                          página ?paused=1 ◀─ projeto da run (route interception)
+                                          __vibe.apply(ops novas) → canvas.screenshot() → PNG
 ```
 
-- Modo **headless**: a instância `Game` roda no próprio servidor; input do agente = `game.perform()`.
-- Modo **visual**: página `runtime` (`?paused=1`) carrega o mesmo projeto em Chromium headless; o servidor
-  envia input e lê estado por `page.evaluate(window.__vibe...)`, captura PNG por `locator('canvas').screenshot()`.
-  Esse caminho já é exercitado pelos testes e2e (`packages/runtime/e2e`). Como a simulação
-  é determinística e o tempo é controlado pelo host, os dois modos produzem o mesmo estado.
-- O agente só alcança o que as tools expõem: arquivos dentro do diretório do projeto e o runtime.
+- **GameOp** (`keyDown/keyUp/mouseMove/mouseDown/mouseUp/step/restart/loadScene`) é a unidade de controle.
+  `Game.perform(steps)` expande os passos em ops (`expandInputSteps`) e aplica com `Game.apply(op)`; a run
+  grava cada op aplicada. Reaplicar o log num jogo novo (mesmo projeto e seed) reproduz o estado exatamente.
+- **Run headless** = fonte da verdade (estado, eventos, console). **Chromium** só para ver: a página recebe o
+  JSON exato da run (não o disco, que pode ter mudado), reaplica as ops novas e fotografa o canvas. O host
+  compara o estado do browser com o headless depois de cada foto.
+- **Run desatualizada:** a run guarda o hash do projeto; se os arquivos mudam, as respostas trazem
+  `projectChanged` até `restart_game`.
+- **Observação incremental:** cada ação devolve os eventos e avisos novos desde a anterior (rastreados pelo
+  último evento visto, não por frame — eventos do frame 0 surgem antes e depois do primeiro passo).
+- **Avisos visuais:** problemas de asset só aparecem ao desenhar; o screenshot devolve `renderWarnings`, e o
+  `ProjectStore` já avisa na validação quando o arquivo de um asset não existe.
+- **Sandbox:** o agente só alcança o que as tools expõem — arquivos dentro do projeto, a run e a página do
+  runtime. O Chromium só navega para o dev server local; nenhum input chega ao sistema operacional.
+- O dev server é carregado com `configLoader: 'runner'` (a config importa `@vibe/server`, que é TypeScript sem
+  build).

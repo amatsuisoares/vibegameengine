@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { ProjectStore, ToolError } from '@vibe/server';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 
 /** Node-side access to project folders (projects/<name>/project.json + scenes/*.json + assets/). */
@@ -29,33 +30,17 @@ export function listProjects(projectsRoot: string): { name: string; title: strin
     });
 }
 
-function readJson(dir: string, file: string): unknown {
-  const text = readFileSync(join(dir, file), 'utf8');
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    throw new Error(`${file}: invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-
 /**
- * Reads a project folder into the raw `{ config, scenes }` shape (not validated;
- * validation happens where the project is used so errors can be shown there).
+ * Reads a project folder into the raw `{ config, scenes }` shape through the ProjectStore
+ * (not validated; the page validates so it can show the errors).
  */
 export function readProjectDir(dir: string): { config: unknown; scenes: Record<string, unknown> } {
-  const config = readJson(dir, 'project.json');
-  const scenes: Record<string, unknown> = {};
-  const scenesDir = join(dir, 'scenes');
-  if (existsSync(scenesDir)) {
-    for (const f of readdirSync(scenesDir).sort()) {
-      if (!f.endsWith('.json')) continue;
-      const scene = readJson(dir, `scenes/${f}`) as { id?: unknown };
-      // Keyed by the id inside the file; fall back to the file name so a missing id is reported by validation.
-      const key = typeof scene?.id === 'string' ? scene.id : f.slice(0, -5);
-      scenes[key] = scene;
-    }
+  try {
+    return new ProjectStore(dir).rawProject();
+  } catch (err) {
+    if (err instanceof ToolError && err.details.length) throw new Error(err.details.join('\n'));
+    throw err;
   }
-  return { config, scenes };
 }
 
 export const MIME_TYPES: Record<string, string> = {

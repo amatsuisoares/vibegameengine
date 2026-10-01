@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isProjectDataFile, ProjectStore } from './project-store';
-import { createEditingTools } from './tools';
+import { RuntimeHost } from './runtime/host';
+import { createAgentTools } from './tools';
 import type { Author } from './history';
 
 const USAGE = `Usage: npm run vibe -- <command>
@@ -9,6 +10,8 @@ const USAGE = `Usage: npm run vibe -- <command>
   tools                                   list tools
   schema [tool]                           tool definitions (Claude tool format, JSON Schema)
   call <project> <tool> [json | @file | -] [--as agent|user]
+  script <project> [json | @file | -]     run [{"tool": "...", "input": {...}}, ...] in one session
+                                          (runtime tools like run_game/wait/take_screenshot need this)
   history <project> [limit]
   format <project>                        rewrite project.json and scenes/*.json in the canonical format
   undo <project> | redo <project>
@@ -16,7 +19,8 @@ const USAGE = `Usage: npm run vibe -- <command>
 <project> is a folder name under projects/ or a path.
 Examples:
   npm run vibe -- call demo-platformer get_scene '{"scene":"level1"}'
-  npm run vibe -- call demo-platformer modify_game_object @patch.json --as agent`;
+  npm run vibe -- call demo-platformer modify_game_object @patch.json --as agent
+  npm run vibe -- script demo-platformer @play.json`;
 
 const PROJECTS = fileURLToPath(new URL('../../../projects/', import.meta.url));
 
@@ -36,7 +40,7 @@ function readInput(arg: string | undefined): unknown {
   }
 }
 
-function main(argv: string[]): number {
+async function main(argv: string[]): Promise<number> {
   const asIdx = argv.indexOf('--as');
   let author: Author = 'user';
   if (asIdx >= 0) {
@@ -45,11 +49,11 @@ function main(argv: string[]): number {
     author = v;
   }
   const [cmd, ...rest] = argv;
-  const tools = createEditingTools();
+  const tools = createAgentTools();
   const print = (v: unknown) => console.log(typeof v === 'string' ? v : JSON.stringify(v, null, 2));
 
-  const run = (store: ProjectStore, tool: string, input: unknown) => {
-    const r = tools.call(tool, input, { store, author });
+  const run = async (store: ProjectStore, tool: string, input: unknown, host = new RuntimeHost(store)) => {
+    const r = await tools.call(tool, input, { store, author, host });
     if (!r.ok) {
       print(r);
       return 1;
@@ -60,6 +64,7 @@ function main(argv: string[]): number {
       print(meta);
       console.log(diff);
     } else print(result);
+    for (const img of r.images ?? []) console.log(`[image] ${img.path}`);
     return 0;
   };
 
@@ -74,6 +79,21 @@ function main(argv: string[]): number {
     }
     case 'call':
       return run(openStore(rest[0]), rest[1] ?? '', readInput(rest[2]));
+    case 'script': {
+      const store = openStore(rest[0]);
+      const steps = readInput(rest[1]) as { tool: string; input?: unknown }[];
+      if (!Array.isArray(steps)) throw new Error('Script must be a JSON array of {"tool", "input"}');
+      const host = new RuntimeHost(store);
+      try {
+        for (const [i, step] of steps.entries()) {
+          console.log(`\n### ${i + 1}. ${step.tool} ${JSON.stringify(step.input ?? {})}`);
+          if ((await run(store, step.tool, step.input ?? {}, host)) !== 0) return 1;
+        }
+      } finally {
+        await host.close();
+      }
+      return 0;
+    }
     case 'history':
       return run(openStore(rest[0]), 'get_history', rest[1] ? { limit: Number(rest[1]) } : {});
     case 'format': {
@@ -95,9 +115,10 @@ function main(argv: string[]): number {
   }
 }
 
-try {
-  process.exitCode = main(process.argv.slice(2));
-} catch (err) {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exitCode = 1;
-}
+main(process.argv.slice(2)).then(
+  (code) => (process.exitCode = code),
+  (err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+  },
+);

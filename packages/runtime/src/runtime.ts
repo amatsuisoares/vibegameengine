@@ -142,7 +142,7 @@ export class Runtime {
       assets: this.assets,
       onAssetError: (message) => this.reportAssetError(message),
     });
-    if (this.debug) paintDebug(this.ctx, world, { fps: this.running ? this.fps : undefined, paused: this._paused });
+    if (this.debug) paintDebug(this.ctx, world, { fps: this.running && !this._paused ? this.fps : undefined, paused: this._paused });
     if (this.options.statusOverlay ?? true) {
       const crash = world.status === 'crashed' ? world.events.findLast((e) => e.type === 'crash') : undefined;
       paintStatusOverlay(this.ctx, world.status, config.width, config.height, crash?.message as string | undefined);

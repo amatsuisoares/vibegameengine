@@ -6,7 +6,7 @@ Especificação das tools que o agente usa.
 |---|---|
 | Projeto, cenas, entidades, componentes, arquivos, histórico | **implementado** (Etapa 3, `packages/server/src/tools`) |
 | Runtime no browser (`window.__vibe`) | **implementado** (Etapa 2) |
-| Tools de runtime (`run_game`, `press_key`, `take_screenshot`...) | planejado (Etapa 4) |
+| Tools de runtime (`run_game`, `press_key`, `take_screenshot`, `run_test`...) | **implementado** (Etapa 4) |
 | Memória | planejado (Etapa 6) |
 
 Convenções:
@@ -75,32 +75,72 @@ Id inexistente sugere ids parecidos (`Did you mean: enemy1, enemy2?`).
 
 ## Runtime
 
-| Tool | Parâmetros | Engine |
+Implementado na Etapa 4 (`packages/server/src/tools/runtime-tools.ts`). As tools usam um `RuntimeHost` no contexto.
+Uma run é um `Game` headless no servidor: **o tempo só avança com `wait`/`wait_until`/`perform_inputs`/`click_mouse`**
+(mais rápido que tempo real e determinístico). Cada ação é gravada como `GameOp` primitiva, o que permite
+reproduzir a run no Chromium para o screenshot.
+
+| Tool | Parâmetros | Retorno / observação |
 |---|---|---|
-| `run_game` | `scene?, seed?` | `new Game(project)` |
-| `stop_game` / `restart_game` / `pause_game` | — | `game.restart()` |
-| `press_key` / `release_key` | `key` | `input.keyDown/keyUp` |
-| `move_mouse` / `click_mouse` | `x, y` / `button` | `input.mouseMove/mouseDown` |
-| `wait` | `ms` (tempo simulado) | `game.advance(ms)` |
-| `perform_inputs` | `steps: InputStep[]` | `game.perform()` |
-| `inspect_game_state` | `ids?, tags?, components?` | `game.getState()` |
-| `read_events` | `sinceFrame?, type?` | `game.events()` |
-| `read_console` | `since?, level?` | `game.console.read()` |
-| `take_screenshot` | `annotate?` (desenha ids/caixas) | PNG via Chromium |
-| `run_test` | `steps, assertions[]` | executa em instância nova e relata cada asserção |
+| `run_game` | `scene?, seed?` | nova run com o projeto atual (substitui a anterior) |
+| `restart_game` | — | recomeça com os **arquivos atuais** (mesma cena/seed) — use depois de editar |
+| `stop_game` | — | encerra a run |
+| `press_key` / `release_key` | `key` | tecla fica pressionada até soltar; não avança o tempo |
+| `move_mouse` / `click_mouse` | `x, y` / `x?, y?, button?` | coordenadas do viewport; o clique avança 1 frame |
+| `wait` | `ms` (máx. 60000) | avança o tempo simulado |
+| `wait_until` | `expr, maxMs?` | avança até a expressão valer (ou timeout / fim de jogo); `ok`, `waitedMs` |
+| `perform_inputs` | `steps` | sequência `keyDown/keyUp/tap/hold/wait/mouseMove/mouseDown/mouseUp/click` |
+| `inspect_game_state` | `ids?, tags?, components?` | estado completo (vars, câmera, entidades com posição, velocidade, vida...) |
+| `read_events` | `sinceFrame?, type?, limit?` | eventos de gameplay com frame |
+| `read_console` | `since?, level?` | logs, avisos, erros com stack |
+| `take_screenshot` | `annotate?` | PNG (imagem anexada ao resultado), `path`, `frame`, `camera`; `renderWarnings` se algum sprite não pôde ser desenhado |
+| `run_test` | `steps, assertions, scene?, seed?` | roda num jogo novo (não mexe na run atual) e relata cada checagem |
+
+**Observação após cada ação.** `run_game`, `restart_game`, `wait`, `wait_until`, `perform_inputs` e `click_mouse`
+devolvem o que aconteceu desde a ação anterior: `frame`, `status`, `scene`, `keysDown`, `players` (entidades com
+tag `player`), `events` novos (máx. 30) e avisos/erros novos do console. Se os arquivos do projeto mudaram depois
+do início da run, vem `projectChanged` pedindo `restart_game`.
+
+### Expressões
+
+Usadas por `wait_until`, passos `waitUntil`/`assert` e `assertions` do `run_test`. São interpretadas por um
+parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
+
+- Nomes: `status`, `frame`, `time`, `scene`, `vars`, `camera`
+- Funções: `entity(id)` (snapshot ou `null`), `exists(id)`, `count(tag)`, `events(type)`, `abs`, `min`, `max`
+- Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
+- Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").
+
+Cada checagem retorna `observed` com os valores dos dois lados das comparações — o agente vê *por que* falhou:
+
+```json
+{ "expr": "entity('player').x > 2000", "pass": false, "observed": { "entity(\"player\").x": 278.4 } }
+```
 
 Exemplo de `run_test`:
 
 ```json
 {
-  "steps": [{ "type": "hold", "key": "D", "ms": 1500 }, { "type": "tap", "key": "Space" }, { "type": "wait", "ms": 800 }],
-  "assertions": [
-    { "expr": "entity('player').x > 300" },
-    { "expr": "vars.coins >= 1" },
-    { "expr": "status == 'running'" }
-  ]
+  "steps": [
+    { "type": "wait", "ms": 300 },
+    { "type": "assert", "expr": "entity('player').grounded" },
+    { "type": "keyDown", "key": "D" },
+    { "type": "waitUntil", "expr": "vars.coins == 1", "maxMs": 3000 },
+    { "type": "keyUp", "key": "D" }
+  ],
+  "assertions": ["status == 'running'", "events('collect') == 1"]
 }
 ```
+
+Retorno: `passed`, `checks[]`, `final` (status, vars, players), `eventCounts`, `errors`. Limite de 300 s simulados.
+
+### Screenshots
+
+`take_screenshot` sobe (uma vez, sob demanda) o dev server do runtime e um Chromium headless. A página abre
+pausada e recebe **exatamente o projeto da run** por interceptação de requisições (assets lidos da pasta do
+projeto); as `GameOp` da run são reaplicadas por `window.__vibe.apply()` — só as novas, nas fotos seguintes da
+mesma run. O PNG é salvo em `.vibe/runs/<runId>/NNN-f<frame>[-debug].png`. Depois da foto, o estado do browser é
+comparado com o da run headless; divergência viraria `warning` (nunca deve acontecer — testado).
 
 ## Runtime no browser (`window.__vibe`)
 
@@ -112,7 +152,7 @@ Para execuções determinísticas, abra a página com `?paused=1`.
 |---|---|---|
 | `info()` | `{project, scenes, scene, width, height, paused, debug}` | |
 | `pause()` / `resume()` | — | pausa só o loop de tempo real |
-| `step(frames=1)` / `advance(ms)` / `perform(steps)` | `{frame, status, scene}` | redesenha em seguida |
+| `step(frames=1)` / `advance(ms)` / `perform(steps)` / `apply(ops)` | `{frame, status, scene}` | redesenha em seguida; `apply` reaplica `GameOp`s |
 | `keyDown(key)` / `keyUp(key)` | — | mesmo `normalizeKey` da engine |
 | `mouseMove(x, y)` / `mouseDown(btn)` / `mouseUp(btn)` | — | coordenadas do viewport |
 | `getState(query?)` | `GameState` | igual a `game.getState` |
@@ -121,7 +161,7 @@ Para execuções determinísticas, abra a página com `?paused=1`.
 | `setDebug(on)` / `render()` | — | debug desenha colliders e ids (útil antes de screenshot) |
 
 `window.__vibeError` (lista de mensagens) é definido quando o projeto não carrega ou uma edição o deixa inválido.
-`take_screenshot` = `setDebug(annotate)` + `render()` + screenshot do elemento `canvas`.
+`take_screenshot` = `apply(ops novas)` + `setDebug(annotate)` + `render()` + screenshot do elemento `canvas`.
 
 ## Memória
 

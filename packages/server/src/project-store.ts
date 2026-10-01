@@ -151,7 +151,19 @@ export class ProjectStore {
     if (errors.length) return { ok: false, errors, warnings: [] };
     const r = parseProject({ config: snap.config, scenes });
     if (!r.ok) return { ok: false, errors: r.errors, warnings: r.warnings };
-    return { ok: true, project: r.value, errors: [], warnings: r.warnings };
+    const warnings = [...r.warnings];
+    for (const a of r.value.config.assets) {
+      if (!existsSync(join(this.dir, 'assets', a.path))) warnings.push(`config.assets(${a.id}): file assets/${a.path} not found`);
+    }
+    return { ok: true, project: r.value, errors: [], warnings };
+  }
+
+  /** Raw `{ config, scenes }` as stored on disk (not validated); throws if a file is not valid JSON. */
+  rawProject(): { config: unknown; scenes: Record<string, unknown> } {
+    const snap = this.snapshot();
+    const errors = [snap.configError, ...snap.scenes.map((s) => s.error)].filter((e): e is string => !!e);
+    if (errors.length) throw new ToolError('Project files contain invalid JSON', errors);
+    return { config: snap.config, scenes: Object.fromEntries(snap.scenes.map((s) => [s.id, s.data])) };
   }
 
   /** The validated, normalized project; throws a ToolError listing problems if it is invalid. */

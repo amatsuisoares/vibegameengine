@@ -1,4 +1,4 @@
-import type { GameEvent, GameState, InputStep, LogEntry, LogLevel, MouseButton, StateQuery } from '@vibe/engine';
+import type { GameEvent, GameOp, GameState, InputStep, LogEntry, LogLevel, MouseButton, StateQuery } from '@vibe/engine';
 import type { Runtime } from './runtime';
 
 export interface StepResult {
@@ -23,6 +23,8 @@ export interface VibeApi {
   step(frames?: number): StepResult;
   advance(ms: number): StepResult;
   perform(steps: InputStep[]): StepResult;
+  /** Replays primitive ops (the RuntimeHost uses this to mirror a headless session for screenshots). */
+  apply(ops: GameOp[]): StepResult;
   keyDown(key: string): void;
   keyUp(key: string): void;
   mouseMove(x: number, y: number): void;
@@ -64,6 +66,7 @@ export function createVibeApi(runtime: Runtime, projectName: string): VibeApi {
     step: (frames = 1) => mutate(() => runtime.game.step(frames)),
     advance: (ms) => mutate(() => runtime.game.advance(ms)),
     perform: (steps) => mutate(() => runtime.game.perform(steps)),
+    apply: (ops) => mutate(() => ops.forEach((op) => runtime.game.apply(op))),
     keyDown: (key) => runtime.game.input.keyDown(key),
     keyUp: (key) => runtime.game.input.keyUp(key),
     mouseMove: (x, y) => runtime.game.input.mouseMove(x, y),

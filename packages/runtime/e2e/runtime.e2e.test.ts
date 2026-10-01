@@ -25,7 +25,7 @@ beforeAll(async () => {
   mkdirSync(RUNS_DIR, { recursive: true });
   rmSync(TMP_PROJECT, { recursive: true, force: true });
   cpSync(repo('projects/demo-platformer'), TMP_PROJECT, { recursive: true, filter: (src) => !src.includes('.vibe') });
-  server = await createServer({ configFile: repo('packages/runtime/vite.config.ts'), server: { port: 0 }, logLevel: 'error' });
+  server = await createServer({ configFile: repo('packages/runtime/vite.config.ts'), configLoader: 'runner', server: { port: 0 }, logLevel: 'error' });
   await server.listen();
   baseUrl = server.resolvedUrls!.local[0];
   browser = await chromium.launch();
@@ -161,12 +161,12 @@ describe('runtime page (Chromium)', () => {
     const coinCount = () => vibe(page, (v) => v.getState({ tags: ['coin'] }).entities.length);
     const before = await coinCount();
 
-    expect(call('duplicate_game_object', { scene: 'level1', id: 'coin1', newId: 'coin9', patch: { transform: { x: 300 } } }).ok).toBe(true);
+    expect((await call('duplicate_game_object', { scene: 'level1', id: 'coin1', newId: 'coin9', patch: { transform: { x: 300 } } })).ok).toBe(true);
     await page.waitForFunction((n) => window.__vibe!.getState({ tags: ['coin'] }).entities.length === n + 1, before, { timeout: 10_000 });
     const coin = await vibe(page, (v) => v.getState({ ids: ['coin9'] }).entities[0]);
     expect(coin.x).toBe(300);
 
-    expect(call('undo', {}).ok).toBe(true);
+    expect((await call('undo', {})).ok).toBe(true);
     await page.waitForFunction((n) => window.__vibe!.getState({ tags: ['coin'] }).entities.length === n, before, { timeout: 10_000 });
     await page.close();
   });

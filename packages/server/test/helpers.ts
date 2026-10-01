@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach } from 'vitest';
-import { ProjectStore } from '../src';
-import { createEditingTools, type ToolResult } from '../src/tools';
+import { ProjectStore, RuntimeHost } from '../src';
+import { createAgentTools, type ToolResult } from '../src/tools';
 
 const DEMO = fileURLToPath(new URL('../../../projects/demo-platformer', import.meta.url));
 const temps: string[] = [];
@@ -31,18 +31,19 @@ export const fixedClock = () => new Date(Date.UTC(2026, 0, 1, 0, 0, tick++));
 export function setup() {
   const dir = demoCopy();
   const store = new ProjectStore(dir, { clock: fixedClock });
-  const tools = createEditingTools();
-  const call = (name: string, input: unknown = {}, author: 'agent' | 'user' = 'agent') => tools.call(name, input, { store, author });
+  const tools = createAgentTools();
+  const host = new RuntimeHost(store);
+  const call = (name: string, input: unknown = {}, author: 'agent' | 'user' = 'agent') => tools.call(name, input, { store, author, host });
   /** Calls a tool and returns its result, failing the test with the error if it did not succeed. */
-  const ok = <T = Record<string, unknown>>(name: string, input: unknown = {}) => {
-    const r = call(name, input);
+  const ok = async <T = Record<string, unknown>>(name: string, input: unknown = {}) => {
+    const r = await call(name, input);
     if (!r.ok) throw new Error(`${name} failed: ${r.error}\n${(r.details ?? []).join('\n')}`);
     return r.result as T;
   };
-  const fail = (name: string, input: unknown = {}) => {
-    const r = call(name, input);
+  const fail = async (name: string, input: unknown = {}) => {
+    const r = await call(name, input);
     if (r.ok) throw new Error(`${name} unexpectedly succeeded`);
     return r as Extract<ToolResult, { ok: false }>;
   };
-  return { dir, store, tools, call, ok, fail };
+  return { dir, store, tools, host, call, ok, fail };
 }

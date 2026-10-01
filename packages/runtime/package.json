@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@vibe/engine": "*",
+    "@vibe/server": "*",
     "@vibe/shared": "*"
   }
 }

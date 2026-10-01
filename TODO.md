@@ -28,10 +28,15 @@
 - [x] JSON canônico (diffs mínimos); CLI `npm run vibe`
 - [x] 122 testes unitários + e2e: edição por tool aparece ao vivo no browser e é desfeita
 
-## Etapa 4 — RuntimeHost
-- [ ] Sessões de jogo headless (run/stop/restart/input/wait/state/console/events)
-- [ ] `run_test` com asserções
-- [ ] Screenshots via Playwright (Chromium headless), opção anotada
+## ✅ Etapa 4 — RuntimeHost (concluída)
+- [x] Sessões de jogo headless (run/stop/restart/input/wait/wait_until/state/console/events), 14 tools de runtime
+- [x] Observação incremental após cada ação; aviso de run desatualizada (`projectChanged`)
+- [x] Linguagem de expressões segura (sem eval) com valores observados nas falhas
+- [x] `run_test` com passos `waitUntil`/`assert` e asserções finais
+- [x] Screenshots via Playwright (Chromium headless) por replay de `GameOp`, opção anotada, checagem de divergência
+- [x] Avisos de asset ausente na validação e no screenshot; CLI `script` para várias tools numa run
+- [x] Leitura de projeto unificada (dev server usa o `ProjectStore`)
+- [x] 137 testes unitários + 7 e2e no Chromium
 
 ## Etapa 5 — Agente
 - [ ] Interface `LLMProvider` + provider Claude + provider roteirizado (testes sem API)
@@ -63,8 +68,8 @@
 - Áudio é declarado mas não carregado (Etapa 8).
 - Hot reload reinicia o jogo do começo (não preserva estado).
 - O servidor de projetos existe só no dev server do Vite; build de produção do runtime ainda não existe.
-- Leitura de projeto duplicada: `runtime/vite/project-files.ts` e `ProjectStore` (unificar quando o server
-  passar a servir o runtime, Etapa 4).
+- Uma run por projeto/host. O screenshot sobe Vite + Chromium na primeira foto (~1-2 s).
+- Sem áudio nas runs (Etapa 8); screenshots mostram um frame (sem vídeo/GIF).
 - Ids de entidade não são renomeáveis (duplicar + apagar). Edições feitas fora do store não entram no histórico.
 - Sem trava entre processos: dois processos escrevendo no mesmo projeto ao mesmo tempo podem conflitar.
 - Física sem colisão contínua: sólidos finos (< 16 px) podem ser atravessados em queda rápida.

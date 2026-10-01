@@ -2,10 +2,27 @@ import { z } from 'zod';
 import { formatIssues } from '@vibe/shared';
 import type { Author } from '../history';
 import { ToolError, type ChangeMeta, type ProjectStore } from '../project-store';
+import type { RuntimeHost } from '../runtime/host';
 
 export interface ToolContext {
   store: ProjectStore;
   author: Author;
+  /** Needed by runtime tools (run_game, wait, take_screenshot...). */
+  host?: RuntimeHost;
+}
+
+export interface ToolImage {
+  /** Absolute path of the image file. */
+  path: string;
+  mediaType: 'image/png';
+}
+
+/** Return this from a tool to attach images (e.g. screenshots) to its JSON result. */
+export class WithImages {
+  constructor(
+    readonly result: unknown,
+    readonly images: ToolImage[],
+  ) {}
 }
 
 export interface ToolDef<S extends z.ZodObject = z.ZodObject> {
@@ -14,14 +31,14 @@ export interface ToolDef<S extends z.ZodObject = z.ZodObject> {
   input: S;
   /** Mutating tools get an optional `reason` parameter that is recorded in the history. */
   mutates?: boolean;
-  run(ctx: ToolContext, input: z.output<S>, meta: (summary: string) => ChangeMeta): unknown;
+  run(ctx: ToolContext, input: z.output<S>, meta: (summary: string) => ChangeMeta): unknown | Promise<unknown>;
 }
 
 export function defineTool<S extends z.ZodObject>(def: ToolDef<S>): ToolDef {
   return def as unknown as ToolDef;
 }
 
-export type ToolResult = { ok: true; result: unknown } | { ok: false; error: string; details?: string[] };
+export type ToolResult = { ok: true; result: unknown; images?: ToolImage[] } | { ok: false; error: string; details?: string[] };
 
 /** Tool definition in the shape the Claude Messages API expects. */
 export interface ToolDefinition {
@@ -58,7 +75,7 @@ export class ToolRegistry {
   }
 
   /** Never throws: invalid input, tool errors and crashes all come back as `{ ok: false }`. */
-  call(name: string, input: unknown, ctx: ToolContext): ToolResult {
+  async call(name: string, input: unknown, ctx: ToolContext): Promise<ToolResult> {
     const tool = this.tools.get(name);
     if (!tool) return { ok: false, error: `Unknown tool "${name}". Available: ${this.names().join(', ')}` };
     const parsed = tool.input.safeParse(input ?? {});
@@ -66,7 +83,8 @@ export class ToolRegistry {
     const data = parsed.data as { reason?: string };
     const meta = (summary: string): ChangeMeta => ({ author: ctx.author, tool: name, reason: data.reason, summary });
     try {
-      return { ok: true, result: tool.run(ctx, parsed.data, meta) };
+      const out = await tool.run(ctx, parsed.data, meta);
+      return out instanceof WithImages ? { ok: true, result: out.result, images: out.images } : { ok: true, result: out };
     } catch (err) {
       if (err instanceof ToolError) return { ok: false, error: err.message, ...(err.details.length && { details: err.details }) };
       return { ok: false, error: `Internal error in ${name}: ${err instanceof Error ? err.message : String(err)}` };

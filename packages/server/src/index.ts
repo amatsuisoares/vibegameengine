@@ -4,3 +4,6 @@ export * from './json-format';
 export * from './merge-patch';
 export * from './fs-atomic';
 export * from './tools';
+export * from './runtime/host';
+export * from './runtime/session';
+export * from './runtime/screenshotter';

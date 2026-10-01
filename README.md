@@ -2,8 +2,8 @@
 
 Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa, joga, observa e corrige** o próprio jogo.
 
-> Status: **Etapa 3 concluída** — engine headless determinística, runtime no browser (Canvas2D) e
-> ProjectStore com histórico/undo + tools de edição para o agente (com CLI).
+> Status: **Etapa 4 concluída** — engine headless determinística, runtime no browser (Canvas2D),
+> ProjectStore com histórico/undo, e as tools com que o agente edita, joga, testa e fotografa o jogo (com CLI).
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos
@@ -31,7 +31,21 @@ npm run vibe -- history demo-platformer
 npm run vibe -- undo demo-platformer
 npm run vibe -- schema modify_game_object      # JSON Schema no formato de tool use
 npm run vibe -- format demo-platformer         # normaliza o JSON do projeto
+npm run vibe -- script demo-platformer @play.json   # várias tools numa mesma run (jogar + screenshot)
 ```
+
+Exemplo de `play.json` — anda, pula e fotografa com colliders anotados:
+
+```json
+[
+  { "tool": "run_game" },
+  { "tool": "perform_inputs", "input": { "steps": [{ "type": "hold", "key": "D", "ms": 1200 }, { "type": "tap", "key": "Space" }] } },
+  { "tool": "take_screenshot", "input": { "annotate": true } },
+  { "tool": "run_test", "input": { "steps": [{ "type": "keyDown", "key": "D" }, { "type": "waitUntil", "expr": "vars.coins == 1" }], "assertions": ["status == 'running'"] } }
+]
+```
+
+Screenshots ficam em `projects/<nome>/.vibe/runs/`.
 
 Com `npm run dev` aberto, cada alteração aparece no jogo na hora (hot reload).
 
@@ -50,7 +64,8 @@ Com `paused=1` nada avança sozinho — o jogo só anda por `window.__vibe` (mod
 packages/
   shared/   schemas (zod) do projeto, cenas, entidades e componentes + validação
   engine/   engine 2D headless: física, input virtual, gameplay, câmera, estado
-  server/   ProjectStore (disco, escrita atômica, histórico, undo/redo), tools do agente, CLI
+  server/   ProjectStore (disco, escrita atômica, histórico, undo/redo), RuntimeHost (runs headless,
+            screenshots no Chromium), tools do agente, CLI
   runtime/  runtime no browser: renderer Canvas2D, assets, loop, teclado/mouse, window.__vibe
     app/    página Vite (index.html + main.ts)
     vite/   plugin do dev server: serve projects/ e avisa a página quando arquivos mudam
@@ -61,7 +76,7 @@ docs/
   PROMPT_ORIGINAL.md pedido original do projeto (escopo e prioridades)
 ```
 
-Pacotes planejados: `editor` (React). O `server` ganha RuntimeHost, agente e API nas próximas etapas.
+Pacotes planejados: `editor` (React). O `server` ganha o agente (LLM) e a API nas próximas etapas.
 
 ## Uso da engine (headless)
 

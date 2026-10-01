@@ -32,6 +32,51 @@ export type InputStep =
   | { type: 'mouseUp'; button?: MouseButton }
   | { type: 'click'; x?: number; y?: number; button?: MouseButton };
 
+/** Primitive, replayable operation. Every way of driving a Game reduces to a sequence of these. */
+export type GameOp =
+  | { op: 'keyDown'; key: string }
+  | { op: 'keyUp'; key: string }
+  | { op: 'mouseMove'; x: number; y: number }
+  | { op: 'mouseDown'; button?: MouseButton }
+  | { op: 'mouseUp'; button?: MouseButton }
+  | { op: 'step'; frames: number }
+  | { op: 'restart' }
+  | { op: 'loadScene'; scene: string };
+
+/** Expands scripted input steps into primitive ops (tap/hold/click become down, step, up). */
+export function expandInputSteps(steps: InputStep[]): GameOp[] {
+  const ops: GameOp[] = [];
+  for (const s of steps) {
+    switch (s.type) {
+      case 'keyDown':
+      case 'keyUp':
+        ops.push({ op: s.type, key: s.key });
+        break;
+      case 'tap':
+        ops.push({ op: 'keyDown', key: s.key }, { op: 'step', frames: Math.max(1, msToFrames(s.ms ?? 50)) }, { op: 'keyUp', key: s.key });
+        break;
+      case 'hold':
+        ops.push({ op: 'keyDown', key: s.key }, { op: 'step', frames: msToFrames(s.ms) }, { op: 'keyUp', key: s.key });
+        break;
+      case 'wait':
+        ops.push({ op: 'step', frames: msToFrames(s.ms) });
+        break;
+      case 'mouseMove':
+        ops.push({ op: 'mouseMove', x: s.x, y: s.y });
+        break;
+      case 'mouseDown':
+      case 'mouseUp':
+        ops.push({ op: s.type, button: s.button });
+        break;
+      case 'click':
+        if (s.x !== undefined && s.y !== undefined) ops.push({ op: 'mouseMove', x: s.x, y: s.y });
+        ops.push({ op: 'mouseDown', button: s.button }, { op: 'step', frames: 1 }, { op: 'mouseUp', button: s.button });
+        break;
+    }
+  }
+  return ops;
+}
+
 export interface EntitySnapshot {
   id: string;
   name: string;
@@ -178,43 +223,28 @@ export class Game {
 
   /** Runs a scripted input sequence (used by tests and by the agent's input tools). */
   perform(steps: InputStep[]) {
-    for (const s of steps) {
-      switch (s.type) {
-        case 'keyDown':
-          this.input.keyDown(s.key);
-          break;
-        case 'keyUp':
-          this.input.keyUp(s.key);
-          break;
-        case 'tap':
-          this.input.keyDown(s.key);
-          this.step(Math.max(1, msToFrames(s.ms ?? 50)));
-          this.input.keyUp(s.key);
-          break;
-        case 'hold':
-          this.input.keyDown(s.key);
-          this.advance(s.ms);
-          this.input.keyUp(s.key);
-          break;
-        case 'wait':
-          this.advance(s.ms);
-          break;
-        case 'mouseMove':
-          this.input.mouseMove(s.x, s.y);
-          break;
-        case 'mouseDown':
-          this.input.mouseDown(s.button);
-          break;
-        case 'mouseUp':
-          this.input.mouseUp(s.button);
-          break;
-        case 'click':
-          if (s.x !== undefined && s.y !== undefined) this.input.mouseMove(s.x, s.y);
-          this.input.mouseDown(s.button);
-          this.step(1);
-          this.input.mouseUp(s.button);
-          break;
-      }
+    for (const op of expandInputSteps(steps)) this.apply(op);
+  }
+
+  /** Applies one primitive operation. Replaying the same ops on a fresh game reproduces its state exactly. */
+  apply(op: GameOp) {
+    switch (op.op) {
+      case 'keyDown':
+        return this.input.keyDown(op.key);
+      case 'keyUp':
+        return this.input.keyUp(op.key);
+      case 'mouseMove':
+        return this.input.mouseMove(op.x, op.y);
+      case 'mouseDown':
+        return this.input.mouseDown(op.button);
+      case 'mouseUp':
+        return this.input.mouseUp(op.button);
+      case 'step':
+        return this.step(op.frames);
+      case 'restart':
+        return this.restart();
+      case 'loadScene':
+        return this.loadScene(op.scene);
     }
   }
 

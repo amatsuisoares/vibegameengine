@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "vite --config packages/runtime/vite.config.ts",
+    "dev": "vite --config packages/runtime/vite.config.ts --configLoader runner",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
