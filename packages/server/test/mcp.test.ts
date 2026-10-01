@@ -44,8 +44,8 @@ describe('MCP server', () => {
     expect(client.getInstructions()).toContain('VibeGameEngine');
     const { tools } = await client.listTools();
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-    expect(tools.length).toBe(58);
-    for (const name of ['list_projects', 'create_project', 'get_project_summary', 'create_game_object', 'run_game', 'take_screenshot', 'run_test', 'verify_game', 'run_playbooks', 'save_playbook', 'observe', 'undo']) {
+    expect(tools.length).toBe(59);
+    for (const name of ['list_projects', 'create_project', 'get_project_summary', 'create_game_object', 'run_game', 'take_screenshot', 'run_test', 'verify_game', 'run_playbooks', 'save_playbook', 'observe', 'get_mouse_target', 'undo']) {
       expect(byName[name], name).toBeDefined();
     }
     expect(byName.get_scene.annotations).toEqual({ readOnlyHint: true, destructiveHint: false });

@@ -249,6 +249,8 @@ export interface ScriptGame {
     readonly mouseWorld: { x: number; y: number };
     mouseDown(button?: 'left' | 'right' | 'middle'): boolean;
     mousePressed(button?: 'left' | 'right' | 'middle'): boolean;
+    /** What a left click at the mouse would reach now (Interactable click, onClick or "clickable"), or null. For hover effects. */
+    readonly hovered: ScriptEntity | null;
     /** Text typed since the previous frame, in order; "\b" = Backspace, "\n" = Enter (e.g. for a name field). */
     readonly text: string;
   };
@@ -303,6 +305,7 @@ class ScriptApi {
     const w = world;
     const input = w.input;
     const { clock, storage } = host;
+    const wrap = (e: Entity) => this.entity(e);
     const resolve = (ref: string | ScriptEntity | undefined, what: string): Entity => {
       const id = typeof ref === 'string' ? ref : ref?.id;
       const e = id === undefined ? undefined : w.get(id);
@@ -344,6 +347,11 @@ class ScriptApi {
         },
         mouseDown: (b = 'left') => input.isMouseDown(b),
         mousePressed: (b = 'left') => input.wasMousePressed(b),
+        get hovered() {
+          const p = screenToWorld(w, input.mouse.x, input.mouse.y);
+          const e = host.interactions.clickTargetAt(p.x, p.y);
+          return e ? wrap(e) : null;
+        },
         get text() {
           return input.typed();
         },

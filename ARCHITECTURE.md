@@ -320,6 +320,10 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 - **Observação unificada** (V0.4): `observe` junta `GameSession.observe()` (eventos/console incrementais, players),
   `Game.getState({onScreen})` e `RuntimeHost.screenshot()`. `Game.screenBoxOf(e)` dá a caixa de uma entidade no
   viewport (ou null se fora da tela ou não desenhada) — base também para percepção do mouse.
+- **Percepção do mouse** (V0.4, `engine/src/mouse.ts`): `Game.mouseTarget()` calcula sob demanda a pilha sob o mouse
+  (`stackAt`, mesma ordem do clique), o alvo do clique (`InteractionRunner.clickTargetAt`, a regra do clique real) e,
+  sem efeitos, se um `Interactable` aceitaria (`clickInfo`, que reusa o `check` das tentativas). O último clique fica em
+  `Game.lastClick` (sobrevive a trocas de cena). Expressões ganham `mouse`; scripts, `game.input.hovered`.
 - **Diagnóstico** (V0.3, `server/src/runtime/diagnosis.ts`): `diagnose(game, project, scripts, falhas, erros)` extrai
   das checagens que falharam as entidades, variáveis e eventos citados (parse leve das expressões ou campos das
   asserções), junta evidências do `World`, dos eventos, das regras/scripts/`Collectible` que escrevem as variáveis e da
@@ -340,7 +344,7 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 
 ```
 Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
-                                   tools/list  → 3 tools de workspace + 55 do ToolRegistry (com annotations)
+                                   tools/list  → 3 tools de workspace + 56 do ToolRegistry (com annotations)
                                    tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
                                                  → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```

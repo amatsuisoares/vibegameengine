@@ -11,7 +11,8 @@ import { controllerSystem } from './systems/controllers';
 import { moverSystem } from './systems/mover';
 import { healthSystem } from './systems/health';
 import { RuleRunner } from './rules';
-import { hitBox, InteractionRunner, snapshotInteractable, type InteractableSnapshot } from './interact';
+import { hitBox, InteractionRunner, isDrawn, snapshotInteractable, type InteractableSnapshot } from './interact';
+import { mouseTarget, type LastClick, type MouseTarget } from './mouse';
 import { fsmOf, StateMachineRunner, stateMs } from './fsm';
 import { aiOf, UtilityRunner } from './utility';
 import { NavRunner, snapshotNav } from './nav';
@@ -201,6 +202,8 @@ export class Game {
   private soundDirector!: SoundDirector;
   /** Interactions of the current scene (clicks, interaction keys, game.interact). */
   interactions!: InteractionRunner;
+  /** Last left click (any scene), set by the InteractionRunner. */
+  lastClick: LastClick | null = null;
   /** State machines of the current scene. */
   stateMachines!: StateMachineRunner;
   /** Utility AIs of the current scene. */
@@ -360,9 +363,7 @@ export class Game {
   screenBoxOf(e: Entity): ScreenBox | null {
     if (!e.active || e.destroyed) return null;
     // Only what is drawn (a visible sprite or text) or physically there (a collider, e.g. an invisible wall).
-    const { Sprite: sp, Text: tx } = e.components;
-    const drawn = (sp && sp.visible && sp.opacity > 0) || (tx && tx.text !== '' && tx.opacity > 0);
-    if (!drawn && !e.aabb()) return null;
+    if (!isDrawn(e) && !e.aabb()) return null;
     const b = hitBox(e) ?? { x: e.x, y: e.y, w: 0, h: 0 };
     const p = worldToScreen(this.world, b.x, b.y);
     const zoom = this.world.camera.zoom;
@@ -370,6 +371,11 @@ export class Game {
     const { width, height } = this.project.config;
     if (box.x > width || box.y > height || box.x + box.w < 0 || box.y + box.h < 0) return null;
     return box;
+  }
+
+  /** What is under the virtual mouse and what a left click there would reach (no side effects). */
+  mouseTarget(): MouseTarget {
+    return mouseTarget(this);
   }
 
   /** Viewport point at the center of an entity's box (Collider or Sprite); throws if it is not on screen. */

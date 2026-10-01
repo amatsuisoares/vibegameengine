@@ -429,7 +429,8 @@ function onCollision(self, other, game) {
   `input.isDown/pressed/released(ação ou tecla)`, `input.mouse`, `emit(tipo, dados)` (evento visível em
   `read_events`/`events('tipo')`), `random()`, `randomInt(a, b)`, `win()`, `lose()`, `loadScene(id)`.
 - `self` também tem `scaleX, scaleY, rotation` (visuais); `game` tem `entityAt(x, y)`, `input.mouseWorld`,
-  `input.mouseDown/mousePressed(botão)` e `input.text` (texto digitado no frame, em ordem; `\b` = Backspace, `\n` = Enter).
+  `input.mouseDown/mousePressed(botão)`, `input.hovered` (o que um clique no mouse atingiria agora, ou `null` — para
+  efeitos de hover) e `input.text` (texto digitado no frame, em ordem; `\b` = Backspace, `\n` = Enter).
 - **Relógio** `game.clock`: `now` (epoch ms), `hour` (0..24, local), `iso`, `speed` (alterável: 60 = 1 minuto de jogo por
   segundo). É a data/hora do calendário do jogo — no browser começa na data real; nas runs, em `clock.start` (padrão
   2026-01-01 09:00 UTC). Expressões leem `clock.hour`, `clock.now`.
@@ -480,6 +481,7 @@ reproduzir a run no Chromium para o screenshot.
 | `advance_clock` | `hours?, minutes?, ms?` | pula o relógio do calendário (sem simular os frames) e avança 1 frame — como fechar o jogo por um tempo |
 | `perform_inputs` | `steps` | sequência `keyDown/keyUp/tap/hold/wait/mouseMove/mouseDown/mouseUp/click/type` (`type`: texto digitado; `\b` = Backspace, `\n` = Enter; `click` aceita `entity`) |
 | `observe` | `screenshot?, annotate?, entities?, components?` | tudo do momento numa chamada (ver [Observação](#observação-unificada-observe)) |
+| `get_mouse_target` | — | o que está sob o mouse e o que um clique ali atingiria (ver [Percepção do mouse](#percepção-do-mouse-get_mouse_target)) |
 | `inspect_game_state` | `ids?, tags?, components?, storage?, onScreen?` | estado completo (vars, câmera, relógio, entidades com posição, velocidade, vida, `interactable`...); `storage` inclui os dados salvos |
 | `read_events` | `sinceFrame?, type?, limit?` | eventos de gameplay com frame |
 | `read_console` | `since?, level?` | logs, avisos, erros com stack |
@@ -507,7 +509,7 @@ aconteceu?" e o screenshot responde "como isso está aparecendo?"; os dois vêm 
 | `game` | `frame`, `time`, `status`, `scene`, `clock`, `vars` |
 | `players` | entidades com tag `player` (onde estiverem) |
 | `entities` | entidades **na tela** (padrão), cada uma com `screen: {x, y, w, h}` em pixels do viewport; `entities: "all"` lista todas, `"none"` nenhuma; máx. 60 (`entitiesTruncated`); `entityCount` = total na cena |
-| `input` | `keysDown`; `mouse: {x, y, world: {x, y}, buttons}` |
+| `input` | `keysDown`; `mouse: {x, y, world: {x, y}, buttons, hovered, target}` (ids; ver `get_mouse_target`) |
 | `camera` | `x`, `y`, `zoom`, `width`, `height` |
 | `events`, `console` | eventos e avisos/erros novos desde a ação anterior (incremental, como em `wait`) |
 | `screenshot` | `path`, `frame` (+ imagem anexada); `screenshot: false` desliga; uma foto que falha vira `{error}` |
@@ -516,12 +518,38 @@ aconteceu?" e o screenshot responde "como isso está aparecendo?"; os dois vêm 
 (Sprite visível com opacidade > 0, ou Text não vazio) ou tem Collider (paredes e gatilhos invisíveis contam).
 `inspect_game_state {onScreen: true}` usa o mesmo filtro.
 
+### Percepção do mouse (`get_mouse_target`)
+
+Implementado na V0.4 (`engine/src/mouse.ts`, `Game.mouseTarget()`). Diz, sem disparar nada, o que está sob o mouse
+virtual e o que um clique esquerdo ali faria — com a **mesma regra do clique real** (entidade mais alta que aceita
+clique: `Interactable` com `click`, script com `onClick` ou tag `clickable`).
+
+```json
+{ "screen": {"x": 430, "y": 470}, "world": {"x": 430, "y": 470}, "buttons": [], "insideViewport": true,
+  "target":  { "id": "tigela", "distance": 0, "clickable": true, "handlers": ["interactable"], "screen": {...}, "layer": 6,
+               "interactable": { "action": "encher", "enabled": true, "uses": 0, "ready": true } },
+  "hovered": { "id": "tigela", ... },
+  "under":   ["tigela", "pet", "chao"],
+  "lastClick": { "frame": 1, "x": 480, "y": 465, "world": {...}, "entity": "botaoComecar" } }
+```
+
+- `target`: o que o clique atingiria (`null` = nada clicável). Para um `Interactable`: `ready` e, se não, `blocked`
+  (`disabled`, `cooldown` com `cooldownMs`, `condition`...), o mesmo motivo que daria `interact_blocked`.
+- `hovered`: a entidade desenhada no topo sob o mouse (pode não ser clicável — um tapete sobre a cama). `under`: a pilha
+  inteira, do topo para baixo.
+- `nearest`: quando nada clicável está sob o mouse, o alvo clicável mais próximo na tela, com `distance` em px ("errou a
+  cama por 23 px").
+- `lastClick`: o último clique esquerdo (também em espaço vazio: `entity: null`), mesmo depois de trocar de cena.
+- Em expressões/asserções: `mouse` (`x`, `y`, `worldX`, `worldY`, `target`, `hovered`, `buttons`), ex.
+  `mouse.target == 'cama'`. Em scripts: `game.input.hovered`.
+
 ### Expressões
 
 Usadas por `wait_until`, passos `waitUntil`/`assert` e `assertions` do `run_test`. São interpretadas por um
 parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 
-- Nomes: `status`, `frame`, `time`, `scene`, `vars`, `camera`, `clock`; `self` só em expressões de `StateMachine`,
+- Nomes: `status`, `frame`, `time`, `scene`, `vars`, `camera`, `clock`, `mouse` (`x`, `y`, `worldX`, `worldY`, `target`,
+  `hovered`); `self` só em expressões de `StateMachine`,
   `UtilityAI` e `Interactable` (a própria entidade)
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar

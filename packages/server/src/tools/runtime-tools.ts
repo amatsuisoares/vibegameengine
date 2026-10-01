@@ -207,6 +207,7 @@ export const runtimeTools = [
       const MAX = 60;
       const mouse = state.input.mouse;
       const world = screenToWorld(g.world, mouse.x, mouse.y);
+      const aim = g.mouseTarget();
       let shot: Record<string, unknown> | undefined;
       let image: string | undefined;
       if (screenshot) {
@@ -226,7 +227,17 @@ export const runtimeTools = [
           ...(state.entities.length > MAX && { entitiesTruncated: state.entities.length - MAX }),
           entityCount: state.entityCount,
         }),
-        input: { keysDown: state.input.keys, mouse: { x: mouse.x, y: mouse.y, world: { x: Math.round(world.x * 100) / 100, y: Math.round(world.y * 100) / 100 }, buttons: mouse.buttons } },
+        input: {
+          keysDown: state.input.keys,
+          mouse: {
+            x: mouse.x,
+            y: mouse.y,
+            world: { x: Math.round(world.x * 100) / 100, y: Math.round(world.y * 100) / 100 },
+            buttons: mouse.buttons,
+            hovered: aim.hovered?.id ?? null,
+            target: aim.target?.id ?? null,
+          },
+        },
         camera: state.camera,
         events: obs.events,
         ...(obs.eventsTruncated && { eventsTruncated: obs.eventsTruncated }),
@@ -236,6 +247,14 @@ export const runtimeTools = [
       };
       return image ? new WithImages(result, [{ path: image, mediaType: 'image/png' }]) : result;
     },
+  }),
+
+  defineTool({
+    name: 'get_mouse_target',
+    description:
+      'What is under the virtual mouse now (no side effects): its screen and world position; target = what a left click there would reach (with how it handles clicks and, for an Interactable, whether it would accept now or why it is blocked); hovered = topmost drawn entity under the mouse; under = the whole stack; nearest = the closest clickable entity when nothing clickable is under the mouse (with its distance); lastClick. Move the mouse with move_mouse or perform_inputs.',
+    input: z.object({}),
+    run: (ctx) => session(ctx).game.mouseTarget(),
   }),
 
   defineTool({

@@ -82,6 +82,21 @@ export function gap(a: Entity, b: Entity): number {
   return Math.hypot(dx, dy);
 }
 
+/** True when an entity is drawn: a visible sprite with some opacity, or non-empty visible text. */
+export function isDrawn(e: Entity): boolean {
+  const { Sprite: sp, Text: tx } = e.components;
+  return !!((sp && sp.visible && sp.opacity > 0) || (tx && tx.text !== '' && tx.opacity > 0));
+}
+
+/** How an entity would take a left click, and whether its Interactable would accept it now. */
+export interface ClickInfo {
+  /** Would a left click reach it (it is a click target)? */
+  clickable: boolean;
+  /** What handles the click: a click Interactable, a script onClick, the "clickable" tag. */
+  handlers: ('interactable' | 'onClick' | 'tag')[];
+  interactable?: { action: string; label?: string; enabled: boolean; uses: number; ready: boolean; blocked?: BlockReason; cooldownMs?: number };
+}
+
 /** Topmost (highest Sprite layer, then latest in the scene) active entity containing the point. */
 export function topmostAt(world: World, x: number, y: number, accept: (e: Entity) => boolean): Entity | null {
   let best: Entity | null = null;
@@ -139,11 +154,46 @@ export class InteractionRunner {
     const at = w.input.leftPressPosition();
     if (!at) return;
     const pos = screenToWorld(w, at.x, at.y);
-    const target = topmostAt(w, pos.x, pos.y, (e) => e.hasTag('clickable') || usable(e, 'click') || this.hooks.hasClickHandler(e));
+    const target = this.clickTargetAt(pos.x, pos.y);
+    this.game.lastClick = { frame: w.frame, x: at.x, y: at.y, world: { x: round2(pos.x), y: round2(pos.y) }, entity: target?.id ?? null };
     if (!target) return;
     w.emit('click', { entity: target.id, x: Math.round(pos.x), y: Math.round(pos.y) });
     this.hooks.click(target, pos);
     if (usable(target, 'click') && w.status === 'running') this.attempt(target, undefined, 'click');
+  }
+
+  /** Whether an entity takes left clicks (Interactable with click, a script onClick or the "clickable" tag). */
+  takesClicks(e: Entity): boolean {
+    return e.hasTag('clickable') || usable(e, 'click') || this.hooks.hasClickHandler(e);
+  }
+
+  /** The entity a left click at this world point reaches (same rule as a real click). */
+  clickTargetAt(x: number, y: number): Entity | null {
+    return topmostAt(this.world, x, y, (e) => this.takesClicks(e));
+  }
+
+  /** How `e` would take a left click right now, with no side effects (nothing is triggered). */
+  clickInfo(e: Entity): ClickInfo {
+    const c = e.components.Interactable;
+    const handlers: ClickInfo['handlers'] = [];
+    if (usable(e, 'click')) handlers.push('interactable');
+    if (this.hooks.hasClickHandler(e)) handlers.push('onClick');
+    if (e.hasTag('clickable')) handlers.push('tag');
+    const info: ClickInfo = { clickable: handlers.length > 0, handlers };
+    if (c) {
+      const reason = c.via.includes('click') ? this.check(e, c, undefined, 'click') : null;
+      const readyAt = e.interact?.readyAt ?? 0;
+      info.interactable = {
+        action: c.action,
+        ...(c.label && { label: c.label }),
+        enabled: c.enabled,
+        uses: e.interact?.uses ?? 0,
+        ready: c.via.includes('click') && !reason,
+        ...(reason && { blocked: reason }),
+        ...(reason === 'cooldown' && { cooldownMs: Math.round(((readyAt - this.world.frame) * 1000) / 60) }),
+      };
+    }
+    return info;
   }
 
   /** After physics: "enter" interactions for actors that came within range, and the key prompt focus. */

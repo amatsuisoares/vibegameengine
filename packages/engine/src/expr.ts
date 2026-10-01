@@ -1,5 +1,7 @@
 import type { Game } from './game';
 import { findPath, pathOptionsFor } from './nav';
+import { stackAt } from './mouse';
+import { screenToWorld } from './systems/camera';
 
 /**
  * Tiny, side-effect-free expression language for test assertions and wait conditions,
@@ -7,7 +9,7 @@ import { findPath, pathOptionsFor } from './nav';
  * (never `eval`), so agent-written expressions cannot run arbitrary code.
  *
  *   literals     12  1.5  'text'  "text"  true  false  null
- *   names        status  frame  time  scene  vars  camera  clock  self (StateMachine/Interactable conditions)
+ *   names        status  frame  time  scene  vars  camera  clock  mouse  self (StateMachine/Interactable conditions)
  *   functions    entity(id) exists(id) count(tag) events(type) distance(a,b) pathDistance(a,b) abs(x) min(a,b) max(a,b) clamp(x,lo,hi)
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
  * Field access on null yields null (the assertion then fails and shows the null).
@@ -185,11 +187,18 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
           return { ...w.camera };
         case 'clock':
           return game.clock.snapshot();
+        case 'mouse': {
+          const m = game.input.snapshot().mouse;
+          const p = screenToWorld(w, m.x, m.y);
+          const target = game.interactions.clickTargetAt(p.x, p.y);
+          const hovered = stackAt(game, p.x, p.y)[0];
+          return { x: m.x, y: m.y, worldX: p.x, worldY: p.y, target: target?.id ?? null, hovered: hovered?.id ?? null, buttons: m.buttons };
+        }
         case 'self':
           if (scope.self === undefined) throw new ExprError('"self" only exists in StateMachine and Interactable conditions', src);
           return entityValue(game, scope.self);
         default:
-          throw new ExprError(`Unknown name "${n.name}" (use status, frame, time, scene, vars, camera, clock, self or a function)`, src);
+          throw new ExprError(`Unknown name "${n.name}" (use status, frame, time, scene, vars, camera, clock, mouse, self or a function)`, src);
       }
     }
     case 'get': {

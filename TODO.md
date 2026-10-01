@@ -164,7 +164,11 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
   `inspect_game_state {onScreen}`
 - [x] meu-pet: `observe` no quarto lista só o que está desenhado (sem a `noite` transparente nem a ração escondida)
 - [x] 324 testes unitários + 17 e2e
-- [ ] Percepção do mouse (posição na tela e no mundo, entidade sob o mouse, `get_mouse_target`)
+- [x] **Percepção do mouse**: `Game.mouseTarget()` / tool `get_mouse_target` (posição na tela e no mundo, `target` =
+  o que o clique atingiria com `ready`/`blocked`, `hovered`, pilha `under`, `nearest` com distância, `lastClick`);
+  `hovered`/`target` no `observe`; `mouse` nas expressões; `game.input.hovered` nos scripts
+- [x] meu-pet: mouse sobre a tigela (com o pet atrás) → clique vai para a tigela; espaço vazio → alvo mais próximo
+- [x] 328 testes unitários + 17 e2e
 - [ ] Controle do mouse (mover, clicar, pressionar, soltar, arrastar, duplo clique), sempre pelo input virtual
 
 ## ~~Etapa 9 — Teste final~~ — descartada
