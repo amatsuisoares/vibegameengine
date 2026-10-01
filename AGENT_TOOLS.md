@@ -1,13 +1,16 @@
 # Ferramentas do agente
 
-Especificação das tools que o agente usa.
+Especificação das tools que o agente usa. O agente é o **Claude Code**: as tools chegam a ele pelo servidor MCP
+`vibe` (`packages/server/src/mcp`, registrado em `.mcp.json`) com o nome `mcp__vibe__<tool>`. Também dá para
+chamá-las pela CLI (`npm run vibe -- call|script ...`).
 
 | Grupo | Status |
 |---|---|
 | Projeto, cenas, entidades, componentes, arquivos, histórico | **implementado** (Etapa 3, `packages/server/src/tools`) |
 | Runtime no browser (`window.__vibe`) | **implementado** (Etapa 2) |
 | Tools de runtime (`run_game`, `press_key`, `take_screenshot`, `run_test`...) | **implementado** (Etapa 4) |
-| Memória | planejado (Etapa 6) |
+| Workspace: `list_projects`, `open_project`, `create_project` | **implementado** (Etapa 6, só via MCP) |
+| Memória | planejado (Etapa 8) |
 
 Convenções:
 - Todas as tools operam **somente** dentro do projeto aberto (caminhos fora de `projects/<nome>/` são rejeitados;

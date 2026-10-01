@@ -7,7 +7,7 @@ Plataforma de jogos 2D guiada por agente de IA. Leia ARCHITECTURE.md antes de mu
 - `npm run typecheck` — tsc sem emitir
 - `npm run dev` — runtime no browser (Vite, porta 5173)
 - `npm run vibe -- <cmd>` — CLI das tools (`tools`, `call <projeto> <tool> <json|@arquivo>`, `script <projeto> @passos.json`,
-  `history`, `undo`, `agent <projeto> "<pedido>"`). Tools de runtime precisam de `script` (a run vive só durante o processo).
+  `history`, `undo`). Tools de runtime precisam de `script` (a run vive só durante o processo).
 - `npm run test:e2e` — Chromium headless via Playwright (`packages/*/e2e/**/*.e2e.test.ts`); screenshots em
   `projects/demo-platformer/.vibe/runs/`
 
@@ -21,8 +21,9 @@ Plataforma de jogos 2D guiada por agente de IA. Leia ARCHITECTURE.md antes de mu
 - Renderização só lê o `World` (`buildDrawList` é puro; `paint` desenha). Nada no runtime altera a simulação.
 - Toda escrita em projeto passa pelo `ProjectStore` (valida, grava atômico, registra histórico). Nova tool:
   `defineTool` em `packages/server/src/tools/`, registrar em `createEditingTools`, teste, AGENT_TOOLS.md.
-- Agente: `packages/server/src/agent` (`runAgent`, providers). Testes usam `ScriptedProvider` — nunca chamar a API
-  real em testes. Histórico de mensagens é só-acréscimo (não editar turnos anteriores).
+- O agente é o Claude Code, via servidor MCP `vibe` (`packages/server/src/mcp`, `.mcp.json`). Para criar ou
+  testar jogos, use as tools `mcp__vibe__*` (não edite JSON de projeto à mão). Instruções do agente:
+  `packages/server/src/mcp/guide.ts`. Depois de mudar o servidor MCP, é preciso recarregar o Claude Code.
 - Todo controle de jogo vira `GameOp` (`Game.apply`); não mexa no `Game` por fora disso numa run, senão o
   replay do screenshot diverge.
 - Config do Vite importa `@vibe/server` (TS sem build): sempre carregar com `configLoader: 'runner'`.

@@ -38,26 +38,25 @@
 - [x] Leitura de projeto unificada (dev server usa o `ProjectStore`)
 - [x] 137 testes unitários + 7 e2e no Chromium
 
-## ✅ Etapa 5 — Agente (concluída)
-- [x] Interface `LLMProvider` + `ClaudeProvider` (SDK oficial, streaming, cache, thinking adaptativo, fallback) +
-      `ScriptedProvider` (testes sem API)
-- [x] Loop de tool use com limites: iterações, custo estimado, tokens, timeout, Ctrl+C
-- [x] Confirmação para ações destrutivas; log JSONL de cada passo; screenshots enviados como imagem
-- [x] CLI `vibe agent <projeto> "<prompt>"` (também `--scripted`)
-- [x] 151 testes unitários (loop, limites, confirmação, recusa, retry, imagens, formato da requisição) + 7 e2e
-- [ ] **Rodar com a API real** (falta credencial nesta máquina): validar o prompt de sistema num pedido real
+## ~~Etapa 5 — Agente embutido (API)~~ — removida
+O agente via API da Anthropic foi implementado e depois removido: o agente passou a ser o Claude Code (Etapa 6).
 
-## Etapa 6 — Memória + loop autônomo
-- [ ] `.vibe/memory.json`: features, TODOs, erros conhecidos, changelog
-- [ ] Resumo do projeto injetado a cada turno
-- [ ] Ciclo planejar → implementar → executar → testar → corrigir com critério de conclusão
+## ✅ Etapa 6 — Claude Code como agente (MCP) (concluída)
+- [x] Servidor MCP `vibe` (stdio) expondo as 38 tools + `list_projects`/`open_project`/`create_project`
+- [x] `.mcp.json` + `.claude/settings.json` (servidor habilitado, tools liberadas)
+- [x] Instruções do agente no `instructions` do MCP; screenshots como imagem; diffs em texto
+- [x] Run e Chromium persistem durante a sessão; encerrados ao fechar
+- [x] Testes: cliente MCP em memória + servidor lançado com o comando do `.mcp.json` (141 unitários, 8 e2e)
+- [ ] Teste real: recarregar o VS Code com a pasta do repositório aberta e usar as tools pelo chat
 
-## Etapa 7 — Editor React
-- [ ] Layout: hierarquia, viewport, inspector, assets, código (Monaco), console, chat
-- [ ] Sincronização em tempo real com o servidor (WebSocket)
-- [ ] Botões run/stop/test; gerenciamento de cenas
+## Etapa 7 — Jogo dentro do VS Code
+- [ ] Abrir o runtime num painel do VS Code (Simple Browser) com hot reload enquanto o agente edita
+- [ ] Tool/atalho para abrir a visualização no projeto/cena certos
+- [ ] Avaliar uma extensão leve (hierarquia da cena, inspector) se o Simple Browser não bastar
+- [ ] Opcional: espelhar no painel a run do agente (ver ao vivo o que ele está jogando)
 
-## Etapa 8 — Extensões do MVP
+## Etapa 8 — Memória + extensões do MVP
+- [ ] Memória do projeto (`.vibe/memory.json`: features, TODOs, erros conhecidos) + tools
 - [ ] Componente `Script` (hooks onStart/onUpdate/onCollision) com API restrita e erros com arquivo:linha
 - [ ] Importação de imagens/spritesheets/áudio; `AudioSource` + eventos de som
 - [ ] Sistema de eventos/condições data-driven (Trigger → ações)
@@ -65,15 +64,13 @@
 - [ ] Plataformas móveis (kinematic carregando entidades)
 
 ## Etapa 9 — Teste final
-- [ ] Agente cria sozinho o jogo de plataforma do enunciado, testa e corrige
+- [ ] O Claude Code cria, pelo chat, o jogo de plataforma do enunciado, testa e corrige
 
 ## Limitações conhecidas
 - Áudio é declarado mas não carregado (Etapa 8).
 - Hot reload reinicia o jogo do começo (não preserva estado).
 - O servidor de projetos existe só no dev server do Vite; build de produção do runtime ainda não existe.
-- Agente ainda não testado contra a API real; o formato da requisição é validado com um `fetch` falso.
-- Custo é estimativa pela tabela de preços (`pricing.ts`); modelos fora da tabela só respeitam o limite de tokens.
-- O histórico da conversa cresce a cada turno (screenshots incluídos); compactação fica para depois.
+- `.mcp.json` usa o caminho absoluto `C:/Program Files/nodejs/node.exe` (ajustar em outra máquina).
 - Uma run por projeto/host. O screenshot sobe Vite + Chromium na primeira foto (~1-2 s).
 - Sem áudio nas runs (Etapa 8); screenshots mostram um frame (sem vídeo/GIF).
 - Ids de entidade não são renomeáveis (duplicar + apagar). Edições feitas fora do store não entram no histórico.

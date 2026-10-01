@@ -2,9 +2,8 @@
 
 Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa, joga, observa e corrige** o próprio jogo.
 
-> Status: **Etapa 5 concluída** — engine headless determinística, runtime no browser (Canvas2D),
-> ProjectStore com histórico/undo, tools para editar, jogar, testar e fotografar, e o agente (Claude) que usa
-> essas tools sozinho, com limites de custo/tempo e log completo.
+> Status: **Etapa 6 concluída** — a engine roda dentro do VS Code e o **Claude Code é o agente**: pelo chat ele
+> cria e edita o jogo, roda, joga, vê screenshots, testa e corrige, usando as tools do servidor MCP `vibe`.
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos
@@ -23,19 +22,13 @@ npm run test:e2e    # testes no Chromium headless (requer: npx playwright instal
 npm run vibe -- tools   # CLI das tools de edição (ver abaixo)
 ```
 
-### Agente
+### Usando pelo Claude Code (VS Code)
 
-```bash
-# requer credenciais da Anthropic: ANTHROPIC_API_KEY ou `ant auth login`
-npm run vibe -- agent demo-platformer "Adicione dois inimigos que sigam o jogador e teste se eles causam dano"
-```
-
-Opções: `--model` (padrão `claude-opus-5-5`), `--effort low|medium|high|xhigh|max` (padrão `high`),
-`--max-iterations` (60), `--max-cost` (US$ 5), `--timeout` (30 min), `--yes` (não perguntar antes de apagar ou
-sobrescrever), `--no-fallback`, `--scripted turnos.json` (roda o loop sem API, com respostas roteirizadas).
-O terminal mostra cada tool chamada e seu resultado; Ctrl+C para depois do passo atual. O log completo fica em
-`projects/<nome>/.vibe/agent/`, e cada alteração entra no histórico (dá para desfazer com `undo`).
-Com `npm run dev` aberto, as alterações aparecem no jogo enquanto o agente trabalha.
+1. Abra a pasta do repositório no VS Code (**File → Open Folder → `C:\dev\vibegameengine`**).
+2. O Claude Code lê `.mcp.json` e inicia o servidor MCP `vibe` (as tools aparecem como `mcp__vibe__*`).
+3. Peça pelo chat, por exemplo: *"Crie um jogo de plataforma com três moedas, dois inimigos e uma bandeira; teste
+   tudo"*. O agente cria/edita o projeto em `projects/`, joga, tira screenshots e roda testes.
+4. Cada alteração entra no histórico do projeto (`undo`/`redo`). Com `npm run dev` aberto, o jogo atualiza ao vivo.
 
 ### Tools pela CLI
 
@@ -80,7 +73,7 @@ packages/
   shared/   schemas (zod) do projeto, cenas, entidades e componentes + validação
   engine/   engine 2D headless: física, input virtual, gameplay, câmera, estado
   server/   ProjectStore (disco, escrita atômica, histórico, undo/redo), RuntimeHost (runs headless,
-            screenshots no Chromium), tools, agente (loop com Claude), CLI
+            screenshots no Chromium), tools, servidor MCP (Claude Code como agente), CLI
   runtime/  runtime no browser: renderer Canvas2D, assets, loop, teclado/mouse, window.__vibe
     app/    página Vite (index.html + main.ts)
     vite/   plugin do dev server: serve projects/ e avisa a página quando arquivos mudam
@@ -91,7 +84,7 @@ docs/
   PROMPT_ORIGINAL.md pedido original do projeto (escopo e prioridades)
 ```
 
-Pacotes planejados: `editor` (React). O `server` ganha memória do projeto (Etapa 6) e a API do editor (Etapa 7).
+Não há editor separado: o jogo roda dentro do VS Code (Etapa 7) e o chat é o Claude Code.
 
 ## Uso da engine (headless)
 

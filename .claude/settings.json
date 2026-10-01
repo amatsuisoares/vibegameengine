@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": ["vibe"],
+  "permissions": {
+    "allow": ["mcp__vibe"]
+  }
+}

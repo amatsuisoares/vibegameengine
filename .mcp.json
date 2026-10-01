@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "vibe": {
+      "command": "C:/Program Files/nodejs/node.exe",
+      "args": ["--import", "tsx", "packages/server/src/mcp/main.ts"]
+    }
+  }
+}

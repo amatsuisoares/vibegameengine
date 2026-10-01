@@ -2,28 +2,31 @@
 
 ## Visão geral
 
+O VibeGameEngine roda **dentro do VS Code**. O chat e o agente são o próprio **Claude Code**, que usa a engine
+pelas tools de um servidor MCP. Não há editor nem chat separados.
+
 ```
-┌──────────── Editor (React) ──────────────┐
-│ Hierarchy | Viewport | Inspector | Chat  │
-└──────────────┬───────────────────────────┘
-               │ WebSocket + REST
-┌──────────────▼──────────── Server (Node) ┐
-│ ProjectStore ─ histórico/diff             │
-│ ToolRegistry ─ tools do agente            │
-│ AgentLoop ──── LLM + orçamento + logs     │
-│ ProjectMemory ─ features/TODO/erros       │
-│ RuntimeHost ─┬─ headless (Node)           │
-│              └─ visual (Chromium/Playwright) │
-└──────────────┬───────────────────────────┘
-               │ mesma engine nos dois modos
-┌──────────────▼──────────── Engine (TS) ──┐
-│ World · Entities · Systems · Input virtual│
-└───────────────────────────────────────────┘
+┌──────────────── VS Code ───────────────────────────────────────────┐
+│  Claude Code (chat = agente)          painel do jogo (Etapa 7)       │
+└───────────┬──────────────────────────────────▲──────────────────────┘
+            │ MCP (stdio)                      │ hot reload
+┌───────────▼──────── servidor MCP "vibe" (Node) ──────────────────────┐
+│ Workspace ── projeto aberto (list/open/create_project)               │
+│ ToolRegistry ── 38 tools: edição, histórico, runtime                 │
+│ ProjectStore ── validação, escrita atômica, histórico/undo           │
+│ RuntimeHost ─┬─ run headless (Game + log de GameOp)                  │
+│              └─ screenshots: Vite + Chromium (Playwright)            │
+└───────────┬──────────────────────────────────────────────────────────┘
+            │ mesma engine nos dois modos
+┌───────────▼──────── Engine (TS) ─────────────────────────────────────┐
+│ World · Entities · Systems · Input virtual · expressões              │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-Implementado até agora: `shared` e `engine` (Etapa 1), `runtime` no browser (Etapa 2), `server` com
-ProjectStore + tools de edição (Etapa 3), RuntimeHost com runs headless, testes e screenshots (Etapa 4) e o
-loop do agente com Claude (Etapa 5).
+Implementado: `shared` e `engine` (Etapa 1), `runtime` no browser (Etapa 2), `server` com ProjectStore + tools
+de edição (Etapa 3), RuntimeHost com runs headless, testes e screenshots (Etapa 4) e o servidor MCP que faz do
+Claude Code o agente (Etapa 6). A Etapa 5 (agente embutido via API) foi removida quando o projeto passou a usar
+o Claude Code como agente.
 
 ## Princípios
 
@@ -202,39 +205,23 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 - O dev server é carregado com `configLoader: 'runner'` (a config importa `@vibe/server`, que é TypeScript sem
   build).
 
-## Agente (`packages/server/src/agent`)
+## Servidor MCP (`packages/server/src/mcp`)
 
 ```
-vibe agent <projeto> "<pedido>"
-  └─ runAgent(prompt, { provider, store, host, tools, limits, confirm, signal })
-       loop:
-         checa limites (iterações, custo estimado, tokens, tempo, Ctrl+C)
-         provider.complete({ system, messages, tools })      ← histórico só-acréscimo
-         stop_reason == refusal → para (sem rodar tools daquele turno)
-         sem tool_use → concluído (texto final = relatório)
-         para cada tool_use, em ordem:
-           destrutiva? → confirm() → recusada vira tool_result de erro
-           ToolRegistry.call → tool_result (JSON; screenshots viram blocos de imagem)
-         todos os tool_result numa única mensagem do usuário
-       cada evento → .vibe/agent/<runId>.jsonl
+Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
+                                   tools/list  → 3 tools de workspace + 38 do ToolRegistry (com annotations)
+                                   tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
+                                                 → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```
 
-- **`LLMProvider`** é a fronteira com o modelo, no formato da Messages API. `ClaudeProvider` usa o SDK oficial
-  (`@anthropic-ai/sdk`): modelo padrão `claude-opus-5-5`, esforço `high`, streaming (`finalMessage()`),
-  thinking adaptativo com resumo (vai para o log), cache automático do prompt (`cache_control` no topo — o
-  histórico cresce a cada turno), `eager_input_streaming` nas tools (o registro valida cada input com zod) e
-  fallback do servidor em caso de recusa (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`;
-  `--no-fallback` desliga). Credenciais pelo ambiente (`ANTHROPIC_API_KEY` ou perfil do `ant auth login`).
-- **`ScriptedProvider`** devolve turnos predefinidos — testes do loop sem API e `--scripted turns.json`.
-- **Prompt de sistema** estático (`prompt.ts`, sem datas/ids → cacheável): modelo de dados, geometria
-  (centro, y para baixo, altura do pulo), fluxo planejar → implementar → rodar → observar → testar → corrigir,
-  e a regra de só declarar pronto o que foi verificado.
-- **Limites:** `maxIterations` (60), `maxCostUsd` (US$ 5, estimado pela tabela de preços em `pricing.ts`),
-  `maxTotalTokens`, `timeoutMs` (30 min; o timer aborta a requisição em andamento e o tempo decorrido também é
-  checado entre passos). Ctrl+C para depois do passo atual; o segundo Ctrl+C encerra.
-- **Ações destrutivas** (`delete_*`, `write_file` sobrescrevendo) passam por `confirm`. Na CLI: pergunta no
-  terminal; sem terminal, recusa; `--yes` libera tudo.
-- **Erros:** erro de tool volta ao modelo como `is_error` (ele corrige e tenta de novo); input de tool
-  ilegível no streaming → o turno é refeito (até 2 vezes); erro da API → a run termina com `error`.
-- **Resultado:** `status` (`completed`, `max_iterations`, `budget`, `timeout`, `aborted`, `refusal`, `error`),
-  texto final, uso de tokens, custo estimado e caminho do log.
+- **Registro:** `.mcp.json` na raiz do repositório (servidor `vibe`, iniciado com `node --import tsx`; o caminho
+  absoluto do `node.exe` evita depender do PATH do VS Code). `.claude/settings.json` habilita o servidor e libera
+  as tools `mcp__vibe` sem pedir permissão a cada chamada (tudo é restrito a `projects/` e desfazível).
+- **Instruções do agente:** o campo `instructions` do MCP (`mcp/guide.ts`) — o Claude Code o coloca no contexto
+  do modelo: modelo de dados, geometria/física, como rodar/testar/fotografar, fluxo planejar → implementar →
+  rodar → observar → testar → corrigir, e só declarar pronto o que foi verificado.
+- **Workspace:** um projeto aberto por vez (`open_project`; com um único projeto ele abre sozinho;
+  `create_project` cria `projects/<nome>` com uma cena `main` vazia). O processo vive a sessão inteira do Claude
+  Code, então a run e o Chromium persistem entre chamadas; ao fechar, Chromium e Vite são encerrados.
+- **Annotations:** `readOnlyHint` (consulta), `destructiveHint` (`delete_*`, `write_file`).
+- **stdout é o protocolo:** logs vão para stderr. `VIBE_PROJECTS_DIR` troca a pasta de projetos (testes).
