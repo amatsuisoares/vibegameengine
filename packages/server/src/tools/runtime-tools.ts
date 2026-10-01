@@ -9,7 +9,7 @@ const Key = z.string().min(1).describe('Key name: "A".."Z", "0".."9", "Space", "
 const Button = z.enum(['left', 'right', 'middle']);
 const Ms = (max: number) => z.number().min(0).max(max);
 const Expr = z.string().min(1).describe(
-  "Expression over the game state, e.g. \"entity('player').x > 300 && vars.coins >= 1\". Names: status, frame, time, scene, vars, camera, clock (clock.hour, clock.now). Functions: entity(id), exists(id), count(tag), events(type), abs, min, max.",
+  "Expression over the game state, e.g. \"entity('player').x > 300 && vars.coins >= 1\". Names: status, frame, time, scene, vars, camera, clock (clock.hour, clock.now). Functions: entity(id) (x, y, vx, vy, grounded, health, state, stateMs, ai, props, anim, nav, timers, tweens, interactable...), exists(id), count(tag), events(type), distance(a, b), pathDistance(a, b) (null = unreachable), abs, min, max, clamp(x, lo, hi).",
 );
 
 const MAX_WAIT_MS = 60_000;

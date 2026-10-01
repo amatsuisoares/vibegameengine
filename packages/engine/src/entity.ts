@@ -1,5 +1,6 @@
 import type { Components, EntityData } from '@vibe/shared';
 import type { FsmState } from './fsm';
+import type { NavState } from './nav';
 import type { AABB } from './math';
 import type { AiState } from './utility';
 import type { ScriptInstance } from './scripts';
@@ -49,6 +50,8 @@ export class Entity {
   fsm?: FsmState;
   /** Cooldowns started with self.cooldown(): name -> frame it is ready again. */
   cooldowns?: Record<string, number>;
+  /** NavAgent state (see nav.ts). */
+  nav?: NavState;
   /** UtilityAI state (created on first use; see utility.ts). */
   ai?: AiState;
   /** Script instance (created on first use by the ScriptRunner). */

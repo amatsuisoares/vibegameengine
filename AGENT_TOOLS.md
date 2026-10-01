@@ -309,6 +309,32 @@ item que flutua, dano que pisca, entrada/saída de UI, efeito que some. Em frame
 - **Cuidado:** tween de `x`/`y` em corpo dinâmico briga com a física; e um script que escreve a mesma propriedade todo
   frame sobrescreve o tween.
 
+## Pathfinding (`NavAgent`, `findPath`)
+
+Implementado na V0.2 (`packages/engine/src/nav.ts`). Navegação em grade para jogos vistos de cima (NPCs, pets, inimigos
+indo até objetos). Não resolve plataforma com pulo.
+
+- **Grade e A\*:** a cena vira uma grade de `cell` px; células onde o agente (com o tamanho da caixa dele) encostaria em
+  um obstáculo ficam bloqueadas. Obstáculos: colliders sólidos (não-trigger, sem corpo dinâmico) e entidades com uma das
+  `avoidTags`. 8 direções sem cortar quinas (ou 4 com `diagonal: false`); desempate fixo — mesma cena, mesmo caminho.
+  O caminho volta como pontos (só onde ele faz curva) terminando no alvo; se o alvo estiver dentro de um obstáculo, para
+  na célula livre mais próxima.
+- **`NavAgent`** `{target, speed, cell, diagonal, arriveDistance, repathMs, avoidTags}`: `target` é um id de entidade
+  (seguida se ela se mover) ou um ponto `{x, y}`; `null` = parado. Anda pelo caminho e replaneja a cada `repathMs`
+  (inclusive depois de falhar, então anda quando uma porta abre). Com `Body` não estático, dirige pela velocidade (a
+  física continua bloqueando); sem `Body`, move a posição. Eventos `nav_arrived` e `nav_failed` `{entity, target}`.
+- **Sem código:** um estado manda andar com `{"action": "modify", "target": "$self", "component": "NavAgent", "set":
+  {"target": "cama"}}` e sai do estado com a transição `{"event": "nav_arrived", "match": {"entity": "$self"}}`.
+- **Scripts:** `self.nav.goTo(id | entidade | {x, y})`, `self.nav.stop()`, `self.nav.status`
+  (`idle|moving|arrived|failed`), `self.nav.path`, `self.nav.target`; `game.findPath(de, para, {cell, diagonal,
+  avoidTags})` → `{points, length}` ou `null` (de/para: entidade, id ou ponto; se `de` é entidade, a caixa dela é a folga).
+- **Para o agente:** `inspect_game_state` mostra `nav: {target, status, next?, waypoints?}`; expressões têm
+  `pathDistance(a, b)` (comprimento do caminho, `null` se inalcançável — ex. `run_test` com
+  `"pathDistance('player', 'chave') != null"`); o screenshot com `annotate` desenha o caminho restante (laranja
+  tracejado).
+- **Limites:** grade fixa por cena (sem navmesh); a posição do agente é o centro da entidade (offset do collider é
+  ignorado na folga); sem desvio entre agentes (eles se atravessam).
+
 ## Assets e som
 
 Implementado na Etapa 8 (`tools/asset-tools.ts`, `sfx.ts`, `engine/src/sound.ts`, `runtime/src/audio.ts`).
@@ -384,6 +410,7 @@ function onCollision(self, other, game) {
 - `self.fsm` (`state, previous, time, is(...), go(estado)`): ver [Máquinas de estado](#máquinas-de-estado-statemachine).
 - `self.ai` (`choice, scores, decide()`): ver [Utility AI](#utility-ai-utilityai).
 - `self.tween/stopTween/tweens`: ver [Tweens](#tweens).
+- `self.nav` e `game.findPath`: ver [Pathfinding](#pathfinding-navagent-findpath).
 - `self.after/every/cancel/timers/cooldown`: ver [Timers](#timers). Não há `setTimeout` (tempo real quebraria o replay).
 - Também `console.log/warn/error` (vão para o console do jogo) e `Math` com `Math.random` usando a seed da run.
 - **Determinismo:** `Date`, timers, rede, `process`, `window` e `globalThis` não existem para o script. É uma API
@@ -439,7 +466,8 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
   `UtilityAI` e `Interactable` (a própria entidade)
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
-  uma), `abs`, `min`, `max`, `clamp(x, min, max)`
+  uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
+  `abs`, `min`, `max`, `clamp(x, min, max)`
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").

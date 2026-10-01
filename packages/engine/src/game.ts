@@ -14,6 +14,7 @@ import { RuleRunner } from './rules';
 import { hitBox, InteractionRunner, snapshotInteractable, type InteractableSnapshot } from './interact';
 import { fsmOf, StateMachineRunner, stateMs } from './fsm';
 import { aiOf, UtilityRunner } from './utility';
+import { NavRunner, snapshotNav } from './nav';
 import { cooldownsLeft, type TimerInfo } from './timers';
 import type { TweenInfo } from './tweens';
 import { SoundDirector, soundOf } from './sound';
@@ -131,6 +132,8 @@ export interface EntitySnapshot {
   timers?: TimerInfo[];
   /** Cooldowns running (self.cooldown): ms left by name. */
   cooldowns?: Record<string, number>;
+  /** NavAgent: target, status (idle|moving|arrived|failed), next waypoint and how many are left. */
+  nav?: ReturnType<typeof snapshotNav>;
   /** Tweens running on the entity. */
   tweens?: TweenInfo[];
   /** Animator: clip showing and its frame index. */
@@ -188,6 +191,8 @@ export class Game {
   stateMachines!: StateMachineRunner;
   /** Utility AIs of the current scene. */
   utility!: UtilityRunner;
+  /** NavAgents of the current scene. */
+  nav!: NavRunner;
   /** Music asset playing (for the `music` event when a scene without music follows one with music). */
   private music: string | null = null;
 
@@ -233,6 +238,7 @@ export class Game {
     this.ruleRunner = new RuleRunner(this.world, this);
     this.interactions = new InteractionRunner(this.world, this, this.scriptRunner);
     this.stateMachines = new StateMachineRunner(this.world, this, this.scriptRunner);
+    this.nav = new NavRunner(this.world);
     this.utility = new UtilityRunner(this.world, this, this.scriptRunner, this.stateMachines);
     this.soundDirector = new SoundDirector(this.world);
     const music = scene.music ? soundOf(scene.music) : null;
@@ -277,6 +283,7 @@ export class Game {
         }
         controllerSystem(w, dt);
         moverSystem(w, dt);
+        this.nav.run(dt);
         this.interactions.input();
         this.scriptRunner.update(dt);
         physicsSystem(w, dt);
@@ -446,6 +453,8 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
   if (timers.length) s.timers = timers;
   const cds = cooldownsLeft(w, e);
   if (Object.keys(cds).length) s.cooldowns = cds;
+  const nav = snapshotNav(e);
+  if (nav) s.nav = nav;
   const tweens = w.tweens.list(e);
   if (tweens.length) s.tweens = tweens;
   if (e.components.Animator) s.anim = { clip: e.animName, frame: Math.max(0, animFrameIndex(e)) };

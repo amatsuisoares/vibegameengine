@@ -20,3 +20,4 @@ export * from './actions';
 export * from './utility';
 export * from './timers';
 export * from './tweens';
+export * from './nav';

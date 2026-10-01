@@ -96,6 +96,7 @@ Memória do agente em `.vibe/memory.json`.
 | `Interactable` | algo que se usa (porta, NPC, tigela): por clique, tecla em alcance ou entrada; condição, cooldown, once, som |
 | `StateMachine` | estados nomeados com transições por condição, tempo no estado ou evento; ações de entrada/saída |
 | `UtilityAI` | escolhe o que fazer pela nota de cada opção (expressões); entra no estado correspondente |
+| `NavAgent` | anda até um alvo (entidade ou ponto) por um caminho A* em grade, desviando de sólidos (visão de cima) |
 | `Script` | comportamento em JavaScript (`scripts/*.js`): `onStart/onUpdate/onCollision` com API restrita |
 | `Mover` | segue waypoints (vaivém ou loop, pausa); com Body kinematic vira plataforma móvel/elevador |
 
@@ -108,6 +109,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
         1. Input.beginFrame()        latch de teclas pressionadas entre frames
         2. controllerSystem           PlatformerController, Patrol, FollowTarget
            moverSystem                Mover: velocidade dos kinematic rumo ao próximo waypoint
+           NavRunner.run              NavAgent: planeja/replaneja (A*) e anda (posição, ou velocidade do Body)
            InteractionRunner.input    clique esquerdo (click, onClick) e tecla de interação → Interactable
            ScriptRunner.update        onStart (1ª vez) e onUpdate dos scripts
         3. physicsSystem              gravidade; move X e resolve; move Y e resolve (grounded)
@@ -133,7 +135,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Contatos:** pares sobrepostos (tolerância 0,5 px, então “encostar” conta). Goal/Checkpoint usam
   semântica de *enter* (só no primeiro frame de contato).
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -204,6 +206,12 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   jogados (o primeiro passo é no frame em que começa); `yoyo` dobra o ciclo, `repeat` multiplica (`-1` sem fim); no fim
   grava o valor exato (`to`, ou `from` com yoyo). `tweenProp` resolve `x/y/rotation/scale*/opacity` e
   `Componente.campo` numérico. O `Text` ganhou `opacity` (o render aplica `globalAlpha`; texto com 0 não é desenhado).
+- **Pathfinding** (`engine/src/nav.ts`, V0.2): `findPath(world, de, para, opções)` monta a grade na hora (cena ÷
+  `cell`; bloqueia células cujo centro poria a caixa do agente dentro de um sólido ou de uma entidade com `avoidTags`),
+  roda A* (heap binário; desempate por f, h e ordem de inserção) e comprime o caminho nos pontos de curva. O
+  `NavRunner` (por mundo, antes da física) guarda em `Entity.nav` o alvo planejado, status, pontos e o próximo
+  replanejamento; chegar = esgotar o caminho. Sem cache de grade: custo O(entidades + células) por plano, ok para cenas
+  pequenas/médias. `paintDebug` desenha o caminho restante.
 - **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
   conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).

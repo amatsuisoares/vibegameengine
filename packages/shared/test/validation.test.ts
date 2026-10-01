@@ -261,3 +261,14 @@ describe('"tween" actions', () => {
     expect(bad.ok ? [] : bad.errors[0]).toContain('scenes.main.rules(r).do[0].prop: cannot tween "Jetpack.power"');
   });
 });
+
+describe('NavAgent', () => {
+  it('fills defaults and checks the target entity', () => {
+    const r = parseProject(project([{ id: 'npc', components: { NavAgent: {} } }]));
+    if (!r.ok) throw new Error(r.errors.join());
+    expect(r.value.scenes.main.entities[0].components.NavAgent).toEqual({ target: null, speed: 100, cell: 16, diagonal: true, arriveDistance: 4, repathMs: 500, avoidTags: [] });
+    expect(parseProject(project([{ id: 'npc', components: { NavAgent: { target: { x: 1, y: 2 } } } }])).ok).toBe(true);
+    const bad = parseProject(project([{ id: 'npc', components: { NavAgent: { target: 'bed' } } }]));
+    expect(bad.ok ? [] : bad.errors).toEqual(['scenes.main.entities(npc).components.NavAgent.target: entity "bed" does not exist']);
+  });
+});

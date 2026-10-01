@@ -288,6 +288,9 @@ export const DEBUG_COLORS = {
   dynamic: '#ff44ff',
 } as const;
 
+/** NavAgent paths in debug view. */
+export const NAV_PATH_COLOR = '#ff8800';
+
 export function colliderKind(e: Entity): keyof typeof DEBUG_COLORS | null {
   const c = e.components.Collider;
   if (!c) return null;
@@ -323,6 +326,17 @@ export function paintDebug(ctx: CanvasRenderingContext2D, world: World, info: { 
       ctx.fillText(e.id, sx + 3, sy - 3);
     }
     ctx.fillRect(sx - 1, sy - 1, 2, 2);
+    const path = e.nav?.status === 'moving' ? e.nav.path : [];
+    if (path.length) {
+      ctx.save();
+      ctx.strokeStyle = NAV_PATH_COLOR;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      for (const p of path) ctx.lineTo((p.x - cam.x) * cam.zoom, (p.y - cam.y) * cam.zoom);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
   const parts = [`frame ${world.frame}`, world.status, `scene ${world.scene.id}`];
   if (info.fps !== undefined) parts.push(`${Math.round(info.fps)} fps`);

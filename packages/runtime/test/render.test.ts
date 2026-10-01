@@ -4,6 +4,7 @@ import {
   buildDrawList,
   DEBUG_COLORS,
   MISSING_ASSET_COLOR,
+  NAV_PATH_COLOR,
   paint,
   paintDebug,
   paintStatusOverlay,
@@ -191,5 +192,21 @@ describe('text opacity', () => {
     paint(ctx, cmds, { width: 400, height: 300, background: '#000', pixelArt: true });
     const alphas = ops.flatMap((o) => ('prop' in o && o.prop === 'globalAlpha' ? [o.value] : []));
     expect(alphas).toEqual([1, 0.5, 1]);
+  });
+});
+
+describe('debug: navigation paths', () => {
+  it('draws the remaining path of moving NavAgents', () => {
+    const game = new Game(
+      project([
+        { id: 'wall', transform: { x: 200, y: 100 }, components: { Collider: { width: 20, height: 200 } } },
+        { id: 'npc', transform: { x: 50, y: 50 }, components: { Sprite: { width: 10, height: 10 }, NavAgent: { target: { x: 350, y: 50 } } } },
+      ], { camera: { clampToBounds: false } }),
+    );
+    game.step(2);
+    const { ctx, ops, calls } = recordingContext();
+    paintDebug(ctx, game.world);
+    expect(ops.some((o) => 'prop' in o && o.prop === 'strokeStyle' && o.value === NAV_PATH_COLOR)).toBe(true);
+    expect(calls('lineTo').length).toBe(game.entity('npc')!.nav!.path.length);
   });
 });

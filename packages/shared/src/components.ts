@@ -227,6 +227,20 @@ export const UtilityAISchema = z.strictObject({
   noise: z.number().min(0).default(0).describe('Random amount in [0, noise) added to each score (seeded; varied but reproducible).'),
 });
 
+export const NavTargetSchema = z.union([z.string().min(1), z.strictObject({ x: z.number(), y: z.number() })]);
+
+export const NavAgentSchema = z.strictObject({
+  target: NavTargetSchema.nullable()
+    .default(null)
+    .describe('Where to walk: an entity id (followed if it moves) or a world point {x, y}; null = stay. Rules/states set it with "modify".'),
+  speed: z.number().positive().default(100).describe('px/s.'),
+  cell: z.number().int().min(4).default(16).describe('Grid cell size in px for path search.'),
+  diagonal: z.boolean().default(true).describe('Allow diagonal steps (never cutting corners).'),
+  arriveDistance: z.number().min(0).default(4).describe('Close enough to the target, px.'),
+  repathMs: z.number().min(0).default(500).describe('Recompute the path this often while moving (target or obstacles moved). 0 = only when the target changes.'),
+  avoidTags: z.array(z.string()).default(() => []).describe('Entities with these tags are obstacles too (solid colliders always are).'),
+});
+
 /** Script file path: scripts/<name>.js (subfolders allowed). */
 export const SCRIPT_PATH = /^scripts\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*\.js$/;
 
@@ -261,6 +275,7 @@ export const ComponentSchemas = {
   Interactable: InteractableSchema,
   StateMachine: StateMachineSchema,
   UtilityAI: UtilityAISchema,
+  NavAgent: NavAgentSchema,
   Script: ScriptSchema,
 } as const;
 
@@ -286,6 +301,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Interactable: 'Something actors can interact with (open, talk, feed...) by click, key in range or entering; condition, cooldown, once; emits "interact".',
   StateMachine: 'Named states (idle, chase, sleeping...) with transitions by condition, time in state or event, and enter/exit actions.',
   UtilityAI: 'Chooses what to do by scoring options (needs, distance, time, personality...) with expressions; enters the matching StateMachine state.',
+  NavAgent: 'Walks to a target (entity or point) along a grid path (A*) around solid colliders, re-planning as things move (top-down).',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -309,6 +325,7 @@ export const ComponentsSchema = z.strictObject({
   Interactable: InteractableSchema.optional(),
   StateMachine: StateMachineSchema.optional(),
   UtilityAI: UtilityAISchema.optional(),
+  NavAgent: NavAgentSchema.optional(),
   Script: ScriptSchema.optional(),
 });
 

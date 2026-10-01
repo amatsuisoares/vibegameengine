@@ -220,6 +220,8 @@ export function checkScene(scene: Scene, project?: Project): { errors: string[];
     if (c.StateMachine) errors.push(...stateMachineErrors(c.StateMachine, `${ep}.components.StateMachine`, ids, project));
     errors.push(...utilityErrors(c, ep));
     errors.push(...animatorErrors(c, ep, project));
+    const nav = c.NavAgent?.target;
+    if (typeof nav === 'string' && !ids.has(nav)) errors.push(`${ep}.components.NavAgent.target: entity "${nav}" does not exist`);
   }
   return { errors, warnings };
 }

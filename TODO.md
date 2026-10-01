@@ -117,7 +117,11 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
   `Componente.campo`; linear/easeIn/easeOut/easeInOut, yoyo, repeat; `tween_end`; `tweens` no estado; `Text.opacity`
 - [x] meu-pet: o emote (♥, z, ♪...) sobe, balança e some com tweens (sem `onUpdate` nem `rgba` manual)
 - [x] 282 testes unitários + 15 e2e
-- [ ] Pathfinding
+- [x] **Pathfinding**: grade + A* (8 direções sem cortar quinas, folga do tamanho do agente, determinístico),
+  `game.findPath`, componente `NavAgent` (alvo entidade/ponto, replanejamento, `Body` por velocidade), `nav_arrived`/
+  `nav_failed`, `self.nav`, `nav` no estado, `pathDistance()` nas expressões, caminho no screenshot anotado
+- [x] meu-pet não usa (o pet anda em 1D no chão sem obstáculos); validado com um labirinto nos testes e no Chromium
+- [x] 295 testes unitários + 15 e2e
 - [ ] Particles / VFX
 
 ## ~~Etapa 9 — Teste final~~ — descartada

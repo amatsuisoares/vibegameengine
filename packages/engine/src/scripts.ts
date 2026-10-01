@@ -4,6 +4,7 @@ import type { Entity } from './entity';
 import { fsmOf, stateMs, type StateMachineRunner } from './fsm';
 import { animFrameIndex } from './systems/animation';
 import { cooldown, type TimerInfo } from './timers';
+import { findPath, pathOptionsFor, type NavStatus, type PathResult, type Point } from './nav';
 import type { Ease, TweenInfo } from './tweens';
 import { aiOf, type UtilityRunner } from './utility';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
@@ -51,6 +52,21 @@ export interface ScriptHost {
   readonly interactions: InteractionRunner;
   readonly stateMachines: StateMachineRunner;
   readonly utility: UtilityRunner;
+}
+
+type PlaceRef = string | ScriptEntity | Point;
+
+/** self.nav: the entity's NavAgent. */
+export interface ScriptNav {
+  readonly status: NavStatus;
+  /** Remaining waypoints. */
+  readonly path: Point[];
+  /** Current target (entity id or point), null = none. */
+  readonly target: string | Point | null;
+  /** Walks to an entity (id or entity, followed as it moves) or a point {x, y}. */
+  goTo(target: string | ScriptEntity | Point): void;
+  /** Stops (target = null). */
+  stop(): void;
 }
 
 /** self.anim: the entity's Animator. */
@@ -184,6 +200,8 @@ export interface ScriptEntity {
   readonly ai: ScriptAi;
   /** The entity's Animator. */
   readonly anim: ScriptAnim;
+  /** The entity's NavAgent. */
+  readonly nav: ScriptNav;
   /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
   after(ms: number, fn: () => void, id?: string): string;
   /** Runs fn every ms of game time until cancelled. */
@@ -253,6 +271,11 @@ export interface ScriptGame {
    * range are checked). Same checks and events as a player interaction; returns { ok, reason? }.
    */
   interact(target: string | ScriptEntity, actor?: string | ScriptEntity): InteractResult;
+  /**
+   * Path between two places (entity, entity id or {x, y}) around solid colliders, or null. When `from` is an
+   * entity its box is the clearance. Options: cell (16), diagonal (true), avoidTags.
+   */
+  findPath(from: PlaceRef, to: PlaceRef, options?: { cell?: number; diagonal?: boolean; avoidTags?: string[] }): PathResult | null;
   /** Enabled interactables that `actor` may use and is in range of, nearest first. */
   nearbyInteractables(actor: string | ScriptEntity): NearbyInteractable[];
 }
@@ -367,6 +390,17 @@ class ScriptApi {
       spawn: (prefab, x, y, id) => this.entity(w.spawn(prefab, x, y, id)),
       interact: (target, actor) =>
         host.interactions.attempt(resolve(target, 'game.interact target'), actor === undefined ? undefined : resolve(actor, 'game.interact actor'), 'script'),
+      findPath: (from, to, options = {}) => {
+        const place = (ref: PlaceRef, what: string): { point: Point; entity?: Entity } => {
+          if (ref && typeof ref === 'object' && !('id' in ref)) return { point: { x: finite(ref.x, `${what}.x`), y: finite(ref.y, `${what}.y`) } };
+          const e = resolve(ref as string | ScriptEntity, `game.findPath ${what}`);
+          return { point: { x: e.x, y: e.y }, entity: e };
+        };
+        const a = place(from, 'from');
+        const b = place(to, 'to');
+        const base = a.entity ? pathOptionsFor(a.entity) : {};
+        return findPath(w, a.point, b.point, { ...base, ...options, ignore: [...(base.ignore ?? []), ...(b.entity ? [b.entity] : [])] });
+      },
       nearbyInteractables: (actor) => host.interactions.nearby(resolve(actor, 'game.nearbyInteractables')),
     };
   }
@@ -406,6 +440,35 @@ class ScriptApi {
       if (id !== undefined && (typeof id !== 'string' || !id)) throw new Error('timer id must be a non-empty string');
       const timerId: string = w.timers.schedule({ id, ms, every, owner: e, run: fn, onError: (err) => this.report(e, err, `timer "${timerId}"`) });
       return timerId;
+    };
+    const navAgent = () => {
+      const n = e.components.NavAgent;
+      if (!n) throw new Error(`entity "${e.id}" has no NavAgent`);
+      return n;
+    };
+    const nav: ScriptNav = {
+      get status() {
+        return e.nav?.status ?? 'idle';
+      },
+      get path() {
+        return (e.nav?.path ?? []).map((p) => ({ ...p }));
+      },
+      get target() {
+        const t = e.components.NavAgent?.target ?? null;
+        return t && typeof t === 'object' ? { ...t } : t;
+      },
+      goTo: (t) => {
+        const n = navAgent();
+        if (t && typeof t === 'object' && 'x' in t && 'y' in t && !('id' in t)) n.target = { x: finite(t.x, 'x'), y: finite(t.y, 'y') };
+        else {
+          const id = typeof t === 'string' ? t : (t as ScriptEntity | undefined)?.id;
+          if (!id || !w.get(id)) throw new Error(`nav.goTo: entity "${String(id)}" does not exist`);
+          n.target = id;
+        }
+      },
+      stop: () => {
+        navAgent().target = null;
+      },
     };
     const animator = () => {
       const a = e.components.Animator;
@@ -511,6 +574,7 @@ class ScriptApi {
       fsm,
       ai,
       anim,
+      nav,
       after: (ms, fn, id) => schedule(ms, undefined, fn, id),
       every: (ms, fn, id) => schedule(ms, ms, fn, id),
       cancel: (id) => w.timers.cancel(String(id), e),

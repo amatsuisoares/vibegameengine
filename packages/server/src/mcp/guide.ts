@@ -7,7 +7,7 @@ export const VIBE_INSTRUCTIONS = `VibeGameEngine: a 2D game engine you drive wit
 PROJECTS
 - list_projects / open_project / create_project select what you work on. With a single project, it opens automatically.
 - A project is data: project.json (viewport size, gravity, input actions, assets) and scenes/<id>.json (world size, background, camera, killY, vars, entities). Entities have an id, tags, a transform and components.
-- Built-in components: Sprite, Body, Collider, PlatformerController, Patrol, FollowTarget, Health, Damage, Stompable, Collectible, Goal, Checkpoint, Text, Animator, Mover (waypoints; with a kinematic Body = moving platform that carries the player), Interactable, StateMachine, UtilityAI, Script. list_component_types shows them; pass types=[...] for full schemas with defaults.
+- Built-in components: Sprite, Body, Collider, PlatformerController, Patrol, FollowTarget, Health, Damage, Stompable, Collectible, Goal, Checkpoint, Text, Animator, Mover (waypoints; with a kinematic Body = moving platform that carries the player), Interactable, StateMachine, UtilityAI, NavAgent, Script. list_component_types shows them; pass types=[...] for full schemas with defaults.
 - Prefer the scene/entity/component tools over raw file edits. Edits are incremental (JSON merge patches), validated before writing (a rejected edit writes nothing; read the error and retry), recorded in the history with your "reason", and undoable (undo/redo).
 
 RULES (events and conditions without code)
@@ -43,6 +43,10 @@ TWEENS (smooth changes: pulse, float, fade, slide)
 - self.tween(prop, to, ms, {from, ease: linear|easeIn|easeOut|easeInOut, yoyo, repeat (-1 forever), id, onDone}); self.stopTween(idOrProp); props: x, y, rotation, scaleX, scaleY, scale, opacity (Sprite and Text), or "Component.field". Data: the "tween" action in rules/states (e.g. pulse "$entity" on "interact"; float with yoyo + repeat -1 on start).
 - A new tween of the same property replaces the old one; "tween_end" when done; inspect_game_state shows tweens. Do not also write that property every frame in a script.
 
+PATHFINDING (top-down: NPCs walking to things around obstacles)
+- NavAgent {target (entity id, followed, or {x, y}; null = stop), speed, cell (16), diagonal, arriveDistance, repathMs, avoidTags}: plans an A* grid path around solid colliders (and avoidTags), re-plans as things move, emits "nav_arrived"/"nav_failed". With a Body it steers by velocity. Send it from a state with modify {component: "NavAgent", set: {target: "bed"}} and leave the state on event nav_arrived match {entity: "$self"}.
+- Scripts: self.nav.goTo(target) / stop() / status / path; game.findPath(from, to) -> {points, length} | null. Expressions: pathDistance(a, b) (null = unreachable) to verify reachability. inspect_game_state shows nav; annotated screenshots draw the path. Not for platformer jumps.
+
 SCRIPTS (when built-in components and rules are not enough)
 - Write scripts/<name>.js with write_file and attach it with the Script component: {"src":"scripts/<name>.js","props":{...}}. Broken syntax is rejected with file:line.
 - A script defines any of: onStart(self, game), onUpdate(self, game, dt) (every frame, before physics), onCollision(self, other, game) (when a contact begins), onClick(self, game, pos) (left click on the entity: topmost by Sprite layer whose Collider/Sprite box contains it; entities tagged "clickable" also get a "click" event for rules), onEvent(self, event, game) (every game event, end of frame), onInteract(self, by, game, info) (its Interactable was used), onStateChange(self, change, game) (its StateMachine changed state), onDecision(self, decision, game) (its UtilityAI chose something new). Top-level variables are per entity. No imports.
@@ -71,7 +75,7 @@ RUNNING AND TESTING
 - run_game/run_test take clock {start (ISO), utcOffsetMinutes, speed} and storage (a save to start from). advance_clock {hours|minutes} jumps the calendar ahead (like closing the game for a while); run_test has an advanceClock step. perform_inputs has {"type":"type","text":"Mimi\\n"}. inspect_game_state storage=true shows the saved data.
 - take_screenshot shows the current frame as an image (annotate=true draws colliders and ids). Use it to judge layout, reachability and visuals.
 - open_game_view gives a URL of the live game for the user (it opens in VS Code's Simple Browser panel): offer it when the user wants to see or play the game; it hot-reloads on every edit. follow=true mirrors your run in real time, so the user can watch you play.
-- run_test runs a fresh game with input steps, waitUntil/assert steps and final assertions, and reports observed values for failures. Expressions: status, frame, time, scene, vars.x, camera, entity('id').x/.y/.vx/.vy/.grounded/.health/.state/.stateMs, exists('id'), count('tag'), events('type'), distance(a, b), abs/min/max, == != < <= > >= && || !.
+- run_test runs a fresh game with input steps, waitUntil/assert steps and final assertions, and reports observed values for failures. Expressions: status, frame, time, scene, vars.x, camera, entity('id').x/.y/.vx/.vy/.grounded/.health/.state/.stateMs, exists('id'), count('tag'), events('type'), distance(a, b), pathDistance(a, b), abs/min/max, == != < <= > >= && || !.
 
 WORKFLOW
 1. get_project_summary and read_memory. 2. Plan the entities and how you will verify each requirement; record the planned features with update_memory. 3. Implement with editing tools. 4. Run and play; take screenshots. 5. Verify every requirement with run_test. 6. Diagnose failures from observed values, events and console; fix; test again. 7. update_memory: mark features verified (with evidence), record todos, known issues and decisions — the next conversation starts from it.
