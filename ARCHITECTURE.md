@@ -317,6 +317,11 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
   `assert`, validável em arquivos de playbook); `checkAssertion(game, a)` em `engine/src/assertions.ts` lê o `World`
   direto (entidades, componentes, FSM, vars, eventos, cena, status) e devolve `{pass, label, expected, actual,
   evidence}`. Uma checagem de cenário é `{expr}` ou `{check}`.
+- **Diagnóstico** (V0.3, `server/src/runtime/diagnosis.ts`): `diagnose(game, project, scripts, falhas, erros)` extrai
+  das checagens que falharam as entidades, variáveis e eventos citados (parse leve das expressões ou campos das
+  asserções), junta evidências do `World`, dos eventos, das regras/scripts/`Collectible` que escrevem as variáveis e da
+  linha do tempo, e pontua sistemas por sinais (tabelas componente → sistema, evento → sistemas, origem do console →
+  sistema). Nada específico de jogo.
 - **Playbooks** (V0.3): `PlaybookSchema` (`shared/src/playbook.ts`, junto com os schemas de passos) é a entrada do
   `verify_game` e o formato de `playbooks/<id>.json`. O `ProjectStore` valida todo arquivo de playbook em qualquer
   escrita (não entram em `rawProject`, então não deixam a run desatualizada) e os lê com `playbooks()`.

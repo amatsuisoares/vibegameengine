@@ -130,7 +130,7 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
 - [x] **V0.2 concluída**: os 8 sistemas de comportamento (interação, máquina de estados, Utility AI, animação, timers,
   tweens, pathfinding, partículas)
 
-## V0.3 — Camada de QA do agente (em andamento)
+## ✅ V0.3 — Camada de QA do agente (concluída)
 - [x] **`verify_game`**: cenário num jogo novo (passos de input, `waitUntil`/`assert` com nome, `advanceClock`,
   `screenshot` no meio e no fim) → relatório PASS/FAIL por checagem com valores observados, erros de runtime reprovam,
   estado final, contagem de eventos, imagens anexadas; executor compartilhado com `run_test` (`runtime/scenario.ts`);
@@ -150,7 +150,18 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
   `run_playbooks` (ids/tags, placar com as falhas), `delete_playbook`; schemas de passos movidos para `shared`
 - [x] meu-pet: 4 playbooks (`limpar_sujeira`, `encher_tigela`, `carinho`, `bola`), rodados pela regressão
 - [x] 316 testes unitários + 16 e2e
-- [ ] Relatório de diagnóstico
+- [x] **Relatório de diagnóstico**: em toda verificação que falha, `diagnosis` com evidências por checagem
+  (entidades citadas: estado, componentes, últimos eventos, ou se sumiram/nunca existiram; variáveis e quem as escreve;
+  eventos contados), erros de runtime, linha do tempo e `likelySystems` pontuados com motivos; linha `LIKELY` no
+  relatório; `run_playbooks` lista os sistemas prováveis por playbook
+- [x] meu-pet: diagnóstico de uma falha proposital aponta máquina de estados, `pet.js` e Utility AI
+- [x] 321 testes unitários + 16 e2e
+- [x] **V0.3 concluída**: `verify_game`, asserções estruturadas, playbooks, relatório de diagnóstico
+
+## V0.4 — Percepção do agente (próxima)
+- [ ] Observação unificada (`observe`: estado, entidades, player, input, eventos, console, câmera, mouse, screenshot)
+- [ ] Percepção do mouse (posição na tela e no mundo, entidade sob o mouse, `get_mouse_target`)
+- [ ] Controle do mouse (mover, clicar, pressionar, soltar, arrastar, duplo clique), sempre pelo input virtual
 
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.

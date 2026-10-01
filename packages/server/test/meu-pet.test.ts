@@ -129,4 +129,24 @@ describe('meu-pet (regression)', () => {
     expect(board.results.length).toBeGreaterThanOrEqual(4);
     expect(board.results.filter((p) => !p.passed)).toEqual([]);
   });
+
+  it('a failing verification of the real game comes with a diagnosis', async () => {
+    const store = new ProjectStore(MEU_PET);
+    const r = await createAgentTools().call(
+      'verify_game',
+      {
+        scenario: 'the pet falls asleep right after a pat (it does not)',
+        screenshot: false,
+        clock: { speed: 600 },
+        steps: [{ type: 'type', text: 'Bolinha' }, { type: 'click', entity: 'botaoComecar' }, { type: 'wait', ms: 500 }, { type: 'click', entity: 'pet' }, { type: 'wait', ms: 100 }],
+        assertions: [{ assert: 'state', id: 'pet', is: 'sleep' }, { assert: 'variable', var: 'energia', gte: 95 }],
+      },
+      { store, author: 'agent', host: new RuntimeHost(store) },
+    );
+    if (!r.ok) throw new Error(r.error);
+    const v = r.result as { passed: boolean; diagnosis: { likelySystems: { system: string; why: string[] }[]; failures: { variables?: Record<string, { writtenBy: unknown }> }[] } };
+    expect(v.passed).toBe(false);
+    expect(v.diagnosis.likelySystems.slice(0, 3).map((g) => g.system)).toEqual(['state machine', 'script scripts/pet.js', 'utility AI']);
+    expect(v.diagnosis.failures[1].variables!.energia.writtenBy).toEqual(['scripts/pet.js']);
+  });
 });

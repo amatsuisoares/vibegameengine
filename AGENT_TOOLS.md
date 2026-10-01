@@ -605,6 +605,32 @@ valor precisa existir. Linha do relatório:
 FAIL entity "player" at x 2000 (±10) — expected x 2000, y any (±10), got {"x":317.5,"y":402}; evidence {"off":{"dx":-1682.5,"dy":0}} (frame 120)
 ```
 
+#### Relatório de diagnóstico
+
+Implementado na V0.3 (`server/src/runtime/diagnosis.ts`). Quando a verificação falha, o resultado traz `diagnosis` e o
+relatório ganha uma linha `LIKELY` com os 3 sistemas mais prováveis, cada um com o motivo mais forte. É heurístico e
+genérico: usa só componentes, eventos, regras, scripts e o estado da engine, nunca regras de um jogo.
+
+```
+FAIL coin collected — event "collect" {"entity":"coin1"} occurred; expected >= 1, got 0; ... (frame 150)
+LIKELY scene setup (entity "coin1" never existed (...)); collectible (no "collect" event happened); collision (...)
+```
+
+- `diagnosis.failures[]`: para cada checagem que falhou, evidências do que ela cita.
+  - **Entidades** (achadas em `entity('id')`/`exists`/`distance` das expressões ou em `id`/`target`/`match` das
+    asserções): posição, velocidade, `grounded`, componentes, estado, escolha da IA, `nav`, `interactable`, vida e
+    últimos eventos que a citam. Se não existe: `wasInStartScene`, `spawnedAt` ou `neverSeen`.
+  - **Variáveis**: valor e quem escreve (regras com `setVar`/`addVar`, scripts que citam `vars.x`, `Collectible`), ou
+    `"nobody"`.
+  - **Eventos contados**: quantos houve e os últimos.
+- `diagnosis.likelySystems[]`: `{system, score, why[]}` ordenados. Sinais, do mais forte ao mais fraco: entidade que
+  nunca existiu, erro de runtime (pela origem: `script <arquivo>`, `rules`, `state machine`...), interação bloqueada
+  (com o motivo), evento esperado que não aconteceu, quem escreve a variável, o tipo de checagem (posição → movimento
+  e física; estado → máquina de estados e Utility AI; status → goal e regras) e os componentes das entidades citadas.
+- `diagnosis.errors` (erros de runtime) e `diagnosis.timeline` (eventos relevantes dos últimos 3 s, sem
+  `sound`/`tween_end`/`anim_end`/`rule`).
+- `run_playbooks` mostra `likelySystems` (nomes) em cada playbook que falhou.
+
 #### Playbooks (regressão)
 
 Implementados na V0.3. Um playbook é um `verify_game` guardado no projeto, em `playbooks/<id>.json` (mesmos campos,

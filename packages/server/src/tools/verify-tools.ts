@@ -1,6 +1,7 @@
 import { IdSchema, PlaybookSchema, playbookFile, type Playbook } from '@vibe/shared';
 import { z } from 'zod';
 import { ToolError, type ChangeMeta } from '../project-store';
+import { diagnose } from '../runtime/diagnosis';
 import { runScenario, screenshot, type Check, type CheckSpec, type ScenarioShot, type ScenarioStep } from '../runtime/scenario';
 import { defineTool, WithImages, type ToolContext, type ToolImage } from './registry';
 import { host } from './runtime-tools';
@@ -63,6 +64,21 @@ export async function verifyScenario(ctx: ToolContext, p: Playbook) {
   for (const shot of shots) if (shot.error) report.push(`NOTE screenshot${shot.label ? ` "${shot.label}"` : ''} failed: ${shot.error}`);
 
   const passed = failed === 0 && !errorsFail;
+  let diagnosis: ReturnType<typeof diagnose> | undefined;
+  if (!passed) {
+    // Structured checks keep their assertion (step checks by step index, final ones in order).
+    const finals = assertions.map((a) => a.check);
+    let f = 0;
+    const raw = (c: Check) => {
+      const spec = c.step !== undefined ? (p.steps[c.step] as { check?: unknown }).check : finals[f++];
+      return spec as Record<string, unknown> | undefined;
+    };
+    const withRaw = checks.map((c) => ({ check: c, raw: raw(c) })).filter((x) => !x.check.pass);
+    const errorEntries = errorsFail ? game.console.read(0, 'error') : [];
+    diagnosis = diagnose(game, s.project, s.raw.scripts ?? {}, withRaw, errorEntries);
+    const top = diagnosis.likelySystems.slice(0, 3);
+    if (top.length) report.push(`LIKELY ${top.map((g) => `${g.system} (${g.why[0]})`).join('; ')}`);
+  }
   const state = game.getState({ ids: [] });
   const eventCounts: Record<string, number> = {};
   for (const e of game.events()) eventCounts[e.type] = (eventCounts[e.type] ?? 0) + 1;
@@ -77,6 +93,7 @@ export async function verifyScenario(ctx: ToolContext, p: Playbook) {
     eventCounts,
     errors,
     ...(warnings.length && { warnings }),
+    ...(diagnosis && { diagnosis }),
   };
   const images: ToolImage[] = shots.filter((sh) => sh.absolutePath).map((sh) => ({ path: sh.absolutePath!, mediaType: 'image/png' }));
   return { result, images };
@@ -179,7 +196,10 @@ export const verifyTools = [
             scenario: result.scenario,
             passed: result.passed,
             summary: result.summary,
-            ...(!result.passed && { failures: result.report.filter((l) => !l.startsWith('PASS')) }),
+            ...(!result.passed && {
+              failures: result.report.filter((l) => !l.startsWith('PASS') && !l.startsWith('LIKELY')),
+              likelySystems: result.diagnosis?.likelySystems.slice(0, 3).map((g) => g.system),
+            }),
             ...(screenshots && { screenshots: result.screenshots.map((sh) => sh.path).filter(Boolean) }),
           });
         } catch (err) {
