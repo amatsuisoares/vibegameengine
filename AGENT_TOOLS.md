@@ -155,12 +155,23 @@ function onCollision(self, other, game) {
 | `onStart(self, game)` | primeiro frame da entidade |
 | `onUpdate(self, game, dt)` | todo frame, depois dos controllers e antes da física |
 | `onCollision(self, other, game)` | quando um contato começa (dos dois lados) |
+| `onClick(self, game, pos)` | clique esquerdo na entidade (a de cima, por `Sprite.layer`, cuja caixa Collider/Sprite contém o ponto) |
+| `onEvent(self, event, game)` | cada evento do jogo (fim do frame), inclusive os emitidos por scripts e regras |
 
 - `self`: `id, name, tags, hasTag(t), x, y, vx, vy` (velocidade exige `Body`), `grounded, enabled, destroyed, health,
   props, state` (armazenamento livre), `get(tipo)` (dados vivos do componente), `damage(n)`, `destroy()`.
 - `game`: `frame, time, dt, scene, status, vars` (vivas), `entity(id)`, `find(tag)`,
   `input.isDown/pressed/released(ação ou tecla)`, `input.mouse`, `emit(tipo, dados)` (evento visível em
   `read_events`/`events('tipo')`), `random()`, `randomInt(a, b)`, `win()`, `lose()`, `loadScene(id)`.
+- `self` também tem `scaleX, scaleY, rotation` (visuais); `game` tem `entityAt(x, y)`, `input.mouseWorld`,
+  `input.mouseDown/mousePressed(botão)` e `input.text` (texto digitado no frame, em ordem; `\b` = Backspace, `\n` = Enter).
+- **Relógio** `game.clock`: `now` (epoch ms), `hour` (0..24, local), `iso`, `speed` (alterável: 60 = 1 minuto de jogo por
+  segundo). É a data/hora do calendário do jogo — no browser começa na data real; nas runs, em `clock.start` (padrão
+  2026-01-01 09:00 UTC). Expressões leem `clock.hour`, `clock.now`.
+- **Dados salvos** `game.storage`: `get/set/remove/keys`, valores JSON, até 512 KB. No browser ficam no `localStorage`
+  (sobrevivem a fechar o jogo; botão **Apagar save** na barra); nas runs começam de `run_game.storage`. Para tempo
+  offline: salve `clock.now` e, no `onStart`, compare com o relógio atual.
+- Entidades com a tag `clickable` (sem script) também recebem clique: gera o evento `click {entity}` para regras.
 - Também `console.log/warn/error` (vão para o console do jogo) e `Math` com `Math.random` usando a seed da run.
 - **Determinismo:** `Date`, timers, rede, `process`, `window` e `globalThis` não existem para o script. É uma API
   restrita para lógica de jogo, não uma sandbox de segurança.
@@ -185,19 +196,20 @@ reproduzir a run no Chromium para o screenshot.
 
 | Tool | Parâmetros | Retorno / observação |
 |---|---|---|
-| `run_game` | `scene?, seed?` | nova run com o projeto atual (substitui a anterior) |
+| `run_game` | `scene?, seed?, clock?, storage?` | nova run com o projeto atual (substitui a anterior); `clock` = `{start, utcOffsetMinutes, speed}`, `storage` = dados salvos iniciais |
 | `restart_game` | — | recomeça com os **arquivos atuais** (mesma cena/seed) — use depois de editar |
 | `stop_game` | — | encerra a run |
 | `press_key` / `release_key` | `key` | tecla fica pressionada até soltar; não avança o tempo |
 | `move_mouse` / `click_mouse` | `x, y` / `x?, y?, button?` | coordenadas do viewport; o clique avança 1 frame |
 | `wait` | `ms` (máx. 60000) | avança o tempo simulado |
 | `wait_until` | `expr, maxMs?` | avança até a expressão valer (ou timeout / fim de jogo); `ok`, `waitedMs` |
-| `perform_inputs` | `steps` | sequência `keyDown/keyUp/tap/hold/wait/mouseMove/mouseDown/mouseUp/click` |
-| `inspect_game_state` | `ids?, tags?, components?` | estado completo (vars, câmera, entidades com posição, velocidade, vida...) |
+| `advance_clock` | `hours?, minutes?, ms?` | pula o relógio do calendário (sem simular os frames) e avança 1 frame — como fechar o jogo por um tempo |
+| `perform_inputs` | `steps` | sequência `keyDown/keyUp/tap/hold/wait/mouseMove/mouseDown/mouseUp/click/type` (`type`: texto digitado; `\b` = Backspace, `\n` = Enter) |
+| `inspect_game_state` | `ids?, tags?, components?, storage?` | estado completo (vars, câmera, relógio, entidades com posição, velocidade, vida...); `storage` inclui os dados salvos |
 | `read_events` | `sinceFrame?, type?, limit?` | eventos de gameplay com frame |
 | `read_console` | `since?, level?` | logs, avisos, erros com stack |
 | `take_screenshot` | `annotate?` | PNG (imagem anexada ao resultado), `path`, `frame`, `camera`; `renderWarnings` se algum sprite não pôde ser desenhado |
-| `run_test` | `steps, assertions, scene?, seed?` | roda num jogo novo (não mexe na run atual) e relata cada checagem |
+| `run_test` | `steps, assertions, scene?, seed?, clock?, storage?` | roda num jogo novo (não mexe na run atual) e relata cada checagem; passo `advanceClock` |
 | `open_game_view` | `follow?, scene?, debug?` | URL da página do jogo para o usuário abrir no VS Code (ver abaixo) |
 
 **Observação após cada ação.** `run_game`, `restart_game`, `wait`, `wait_until`, `perform_inputs` e `click_mouse`

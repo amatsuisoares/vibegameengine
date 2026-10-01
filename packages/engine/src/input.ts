@@ -57,6 +57,12 @@ export class Input {
   private pressed = new Set<string>();
   private released = new Set<string>();
 
+  private pendingText = '';
+  private text = '';
+  /** Where the left button went down (the mouse may have moved again before the frame runs). */
+  private pendingPressAt: { x: number; y: number } | null = null;
+  private pressAt: { x: number; y: number } | null = null;
+
   private mouseDownSet = new Set<MouseButton>();
   private pendingMousePressed = new Set<MouseButton>();
   private mousePressedSet = new Set<MouseButton>();
@@ -76,12 +82,21 @@ export class Input {
     if (this.down.delete(k)) this.pendingReleased.add(k);
   }
 
+  /**
+   * Characters typed (as produced by the keyboard layout, e.g. "Mimi"), with "\b" for Backspace
+   * and "\n" for Enter so their order is kept. Available for one frame.
+   */
+  typeText(text: string) {
+    this.pendingText += text;
+  }
+
   mouseMove(x: number, y: number) {
     this.mouse = { x, y };
   }
 
   mouseDown(button: MouseButton = 'left') {
     if (!this.mouseDownSet.has(button)) this.pendingMousePressed.add(button);
+    if (button === 'left') this.pendingPressAt ??= { ...this.mouse };
     this.mouseDownSet.add(button);
   }
 
@@ -92,6 +107,7 @@ export class Input {
   releaseAll() {
     for (const k of [...this.down]) this.keyUp(k);
     this.mouseDownSet.clear();
+    this.pendingText = '';
   }
 
   /** Called by the game at the start of every fixed step. */
@@ -102,6 +118,20 @@ export class Input {
     this.pendingReleased = new Set();
     this.mousePressedSet = this.pendingMousePressed;
     this.pendingMousePressed = new Set();
+    this.text = this.pendingText;
+    this.pendingText = '';
+    this.pressAt = this.pendingPressAt;
+    this.pendingPressAt = null;
+  }
+
+  /** Viewport position where the left button was pressed this frame (null if it was not). */
+  leftPressPosition(): { x: number; y: number } | null {
+    return this.pressAt && { ...this.pressAt };
+  }
+
+  /** Text typed since the previous frame. */
+  typed(): string {
+    return this.text;
   }
 
   isDown(key: string) {

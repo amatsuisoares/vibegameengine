@@ -80,6 +80,29 @@ describe('take_screenshot (Chromium)', () => {
     copyFileSync(r.images![0].path, `${RUNS_DIR}/host-scripts-debug.png`);
   });
 
+  it('replays runs with their clock and saved data in the browser', async () => {
+    const t = setup();
+    hosts.push(t.host);
+    const { call, ok } = t;
+    const src = [
+      'function onUpdate(self, game) {',
+      '  const name = game.storage.get("name") || "?";',
+      '  self.x = 100 + game.clock.hour * 20;',
+      '  game.vars.label = name + " " + Math.floor(game.clock.hour);',
+      '}',
+    ].join('\n');
+    await ok('write_file', { path: 'scripts/clocky.js', content: src });
+    await ok('create_component', { scene: 'level1', id: 'coin1', type: 'Script', data: { src: 'scripts/clocky.js' } });
+    await ok('run_game', { clock: { start: '2026-05-01T20:00:00Z', speed: 600 }, storage: { name: 'Kuro' } });
+    await ok('wait', { ms: 1000 });
+    await ok('advance_clock', { hours: 2 });
+    const r = await call('take_screenshot', {});
+    if (!r.ok) throw new Error(r.error);
+    expect((r.result as Shot).warning).toBeUndefined(); // same clock and data in Chromium: same positions
+    const state = await ok<{ vars: { label: string } }>('inspect_game_state', { ids: [] });
+    expect(state.vars.label).toBe('Kuro 22');
+  });
+
   it('reports missing assets when editing and when rendering', async () => {
     const t = setup();
     hosts.push(t.host);

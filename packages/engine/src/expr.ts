@@ -173,8 +173,10 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
           return { ...w.vars };
         case 'camera':
           return { ...w.camera };
+        case 'clock':
+          return game.clock.snapshot();
         default:
-          throw new ExprError(`Unknown name "${n.name}" (use status, frame, time, scene, vars, camera or a function)`, src);
+          throw new ExprError(`Unknown name "${n.name}" (use status, frame, time, scene, vars, camera, clock or a function)`, src);
       }
     }
     case 'get': {

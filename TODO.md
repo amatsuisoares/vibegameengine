@@ -69,6 +69,15 @@ O agente via API da Anthropic foi implementado e depois removido: o agente passo
 - [x] Demo com sons gerados (`create_sound`) mapeados em `config.sounds`
 - [x] 191 testes unitários + 11 e2e no Chromium (scripts e sons no browser, modo seguir)
 
+## Etapa 10 — Jogo de pet virtual (em andamento)
+Jogo da usuária: pet virtual observacional (só os sprites de `mypetgame/assets` são reaproveitados). Desenho aprovado:
+o pet não fala (notificações observacionais com cooldown), necessidades escondidas, personalidade inferida pelo
+comportamento, um quarto, interações com o mouse, evolução bebê → juvenil → adulto, tempo real + velocidade, sem morte.
+- [x] Engine: `onClick`/`onEvent`, texto digitado, mouse no mundo, `entityAt`, escala/rotação em scripts
+- [x] Engine: relógio do calendário (`game.clock`, velocidade, `advance_clock`) e dados salvos (`game.storage`, localStorage)
+- [x] 198 testes unitários + 13 e2e (teclado, clique, save após reload, replay com relógio e dados)
+- [ ] Construir o jogo pelas tools do `vibe` (recarregar o Claude Code antes, para as tools novas)
+
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.
 

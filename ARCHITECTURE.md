@@ -143,6 +143,14 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   mapeados em `config.sounds` em `sound`; `loadScene` emite `music`. No browser, `Runtime.onEvents` entrega os eventos
   novos a cada quadro e o `SoundPlayer` (`runtime/src/audio.ts`, Web Audio) toca — sons com mais de 6 frames de
   atraso são descartados (o modo seguir adianta sem rajada). Páginas de screenshot (`?paused=1`) ficam mudas.
+- **Relógio e dados salvos** (`engine/src/clock.ts`, `storage.ts`): `GameClock` é a data/hora do calendário, separada do
+  tempo de simulação: avança `speed` ms por ms simulado (âncora + frames inteiros, sem erro acumulado) e pula com a op
+  `advanceClock`. `GameStorage` guarda JSON. Ambos voltam ao início no `restart`. Runs headless começam numa data fixa
+  e com os dados passados ao `run_game`; o screenshot e o modo seguir recebem os mesmos valores (determinismo). A
+  página jogada usa a data real, o `localStorage` (`vibe:save:<projeto>`) e, se frames forem pulados (aba em segundo
+  plano), soma o tempo perdido com `advanceClock` (`realtimeClock`).
+- **Mouse e texto:** o clique esquerdo vai para a entidade de cima sob o ponto onde o botão desceu (posição guardada no
+  pressionamento, não a atual) e gera o evento `click`. Texto digitado chega como op `text` (com `\b`/`\n` em ordem).
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).
 - **Troca de cena:** variáveis são mantidas; frame/tempo/eventos continuam acumulando.
 

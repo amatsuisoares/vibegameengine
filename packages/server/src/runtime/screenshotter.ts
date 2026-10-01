@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, isAbsolute, relative, resolve } from 'node:path';
-import type { GameOp, GameState } from '@vibe/engine';
+import type { ClockOptions, GameOp, GameState } from '@vibe/engine';
 import type { Browser, Page, Route } from 'playwright';
 import { ToolError } from '../project-store';
 import { DevServer } from './dev-server';
@@ -27,6 +27,8 @@ export interface ShotRequest {
   projectDir: string;
   seed: number;
   scene?: string;
+  clock?: ClockOptions;
+  storage?: Record<string, unknown>;
   ops: GameOp[];
   annotate: boolean;
 }
@@ -99,6 +101,8 @@ export class Screenshotter {
     this.loaded = undefined;
 
     const name = req.projectName;
+    // The page builds its game with the run's clock and saved data (not the browser's).
+    await page.addInitScript((run) => Object.assign(window, { __vibeRun: run }), { clock: req.clock, storage: req.storage ?? {} });
     await page.route(
       (url) => url.pathname.startsWith('/api/projects') || url.pathname.startsWith(`/projects/${name}/assets/`),
       (route) => this.serve(route, req),

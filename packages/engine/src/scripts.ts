@@ -1,8 +1,11 @@
 import type { ComponentType, VarValue } from '@vibe/shared';
+import { checkSpeed, type GameClock } from './clock';
 import type { Entity } from './entity';
 import { emitSound } from './sound';
+import type { GameStorage } from './storage';
+import { screenToWorld } from './systems/camera';
 import { applyDamage } from './systems/interactions';
-import { FIXED_DT, type World } from './world';
+import { FIXED_DT, type GameEvent, type World } from './world';
 
 /**
  * Scripts: project files `scripts/*.js` attached to entities by the `Script` component.
@@ -11,6 +14,8 @@ import { FIXED_DT, type World } from './world';
  *   function onStart(self, game) {}              // first frame of the entity
  *   function onUpdate(self, game, dt) {}         // every frame, after controllers, before physics
  *   function onCollision(self, other, game) {}   // when a contact with `other` begins
+ *   function onClick(self, game, pos) {}          // the entity was clicked (left button; pos in world px)
+ *   function onEvent(self, event, game) {}        // every game event (end of frame), incl. custom ones
  *
  * Top-level variables are per entity (each entity runs its own copy of the script).
  * Scripts only see `self`, `game`, `console` and a deterministic `Math` (Math.random is
@@ -21,6 +26,16 @@ export interface ScriptHooks {
   onStart?: (self: ScriptEntity, game: ScriptGame) => void;
   onUpdate?: (self: ScriptEntity, game: ScriptGame, dt: number) => void;
   onCollision?: (self: ScriptEntity, other: ScriptEntity, game: ScriptGame) => void;
+  onClick?: (self: ScriptEntity, game: ScriptGame, pos: { x: number; y: number }) => void;
+  onEvent?: (self: ScriptEntity, event: GameEvent, game: ScriptGame) => void;
+}
+
+const HOOKS = ['onStart', 'onUpdate', 'onCollision', 'onClick', 'onEvent'] as const;
+
+/** What scripts reach beyond the world: the calendar clock and the saved data. */
+export interface ScriptHost {
+  clock: GameClock;
+  storage: GameStorage;
 }
 
 type Factory = (math: Math, console: ScriptConsole) => ScriptHooks;
@@ -43,7 +58,8 @@ const HEADER_LINES = 2;
  * line numbers inside the script are unchanged except for the function header.
  */
 export function wrapScript(source: string, file: string): string {
-  return `"use strict";${source}\n;return { onStart: typeof onStart === "function" ? onStart : undefined, onUpdate: typeof onUpdate === "function" ? onUpdate : undefined, onCollision: typeof onCollision === "function" ? onCollision : undefined };\n//# sourceURL=${file}`;
+  const hooks = HOOKS.map((h) => `${h}: typeof ${h} === "function" ? ${h} : undefined`).join(', ');
+  return `"use strict";${source}\n;return { ${hooks} };\n//# sourceURL=${file}`;
 }
 
 export const SCRIPT_PARAMS = ['Math', 'console', ...HIDDEN];
@@ -97,6 +113,10 @@ export interface ScriptEntity {
   hasTag(tag: string): boolean;
   x: number;
   y: number;
+  /** Visual transform (does not change the collider). */
+  scaleX: number;
+  scaleY: number;
+  rotation: number;
   /** Velocity of the Body (0 without one). Setting it needs a Body. */
   vx: number;
   vy: number;
@@ -129,8 +149,20 @@ export interface ScriptGame {
     isDown(action: string): boolean;
     pressed(action: string): boolean;
     released(action: string): boolean;
+    /** Mouse position on screen (viewport px) and in the world. */
     readonly mouse: { x: number; y: number };
+    readonly mouseWorld: { x: number; y: number };
+    mouseDown(button?: 'left' | 'right' | 'middle'): boolean;
+    mousePressed(button?: 'left' | 'right' | 'middle'): boolean;
+    /** Text typed since the previous frame, in order; "\b" = Backspace, "\n" = Enter (e.g. for a name field). */
+    readonly text: string;
   };
+  /** Calendar date/time of the game: now (epoch ms), hour (0..24, local), speed (settable; 60 = 1 game minute per second). */
+  readonly clock: { readonly now: number; readonly hour: number; readonly iso: string; speed: number };
+  /** Saved data that survives closing the game (JSON values). */
+  readonly storage: { get(key: string): unknown; set(key: string, value: unknown): void; remove(key: string): void; keys(): string[] };
+  /** Topmost entity whose box contains the world point (x, y), or null. */
+  entityAt(x: number, y: number): ScriptEntity | null;
   /** Custom gameplay event: shows up in read_events / events('type'). */
   emit(type: string, data?: Record<string, unknown>): void;
   random(): number;
@@ -150,9 +182,13 @@ class ScriptApi {
   private readonly states = new WeakMap<Entity, Record<string, unknown>>();
   readonly game: ScriptGame;
 
-  constructor(private readonly world: World) {
+  constructor(
+    private readonly world: World,
+    host: ScriptHost,
+  ) {
     const w = world;
     const input = w.input;
+    const { clock, storage } = host;
     this.game = {
       get frame() {
         return w.frame;
@@ -183,6 +219,41 @@ class ScriptApi {
           const m = input.snapshot().mouse;
           return { x: m.x, y: m.y };
         },
+        get mouseWorld() {
+          return screenToWorld(w, input.mouse.x, input.mouse.y);
+        },
+        mouseDown: (b = 'left') => input.isMouseDown(b),
+        mousePressed: (b = 'left') => input.wasMousePressed(b),
+        get text() {
+          return input.typed();
+        },
+      },
+      clock: {
+        get now() {
+          return clock.now;
+        },
+        get hour() {
+          return clock.hour;
+        },
+        get iso() {
+          return clock.iso;
+        },
+        get speed() {
+          return clock.speed;
+        },
+        set speed(v) {
+          clock.speed = checkSpeed(v);
+        },
+      },
+      storage: {
+        get: (k) => storage.get(k),
+        set: (k, v) => storage.set(k, v),
+        remove: (k) => storage.remove(k),
+        keys: () => storage.keys(),
+      },
+      entityAt: (x, y) => {
+        const e = topmostAt(w, x, y, () => true);
+        return e ? this.entity(e) : null;
       },
       emit: (type, data = {}) => {
         if (typeof type !== 'string' || !type) throw new Error('game.emit(type): type must be a non-empty string');
@@ -232,6 +303,24 @@ class ScriptApi {
       },
       set y(v) {
         e.y = finite(v, 'y');
+      },
+      get scaleX() {
+        return e.scaleX;
+      },
+      set scaleX(v) {
+        e.scaleX = finite(v, 'scaleX');
+      },
+      get scaleY() {
+        return e.scaleY;
+      },
+      set scaleY(v) {
+        e.scaleY = finite(v, 'scaleY');
+      },
+      get rotation() {
+        return e.rotation;
+      },
+      set rotation(v) {
+        e.rotation = finite(v, 'rotation');
       },
       get vx() {
         return body()?.vx ?? 0;
@@ -300,12 +389,16 @@ export class ScriptRunner {
   private readonly api: ScriptApi;
   private readonly math: Math;
 
+  private processed: number;
+
   constructor(
     private readonly world: World,
     private readonly library: ScriptLibrary,
+    host: ScriptHost,
   ) {
-    this.api = new ScriptApi(world);
+    this.api = new ScriptApi(world, host);
     this.math = seededMath(world);
+    this.processed = world.emitted;
   }
 
   private instance(e: Entity): ScriptInstance | null {
@@ -351,9 +444,10 @@ export class ScriptRunner {
     }
   }
 
-  /** onStart (once) and onUpdate for every active scripted entity. */
+  /** onStart (once) and onUpdate for every active scripted entity; first, clicks. */
   update(dt: number) {
     const w = this.world;
+    this.clicks();
     for (const e of [...w.entities]) {
       if (!e.active || w.status !== 'running') continue;
       const inst = this.instance(e);
@@ -364,6 +458,43 @@ export class ScriptRunner {
         if (inst.hooks.onStart) this.call(e, inst, 'onStart', () => inst.hooks.onStart!(self, this.api.game));
       }
       if (inst.hooks.onUpdate && !inst.failed && e.active) this.call(e, inst, 'onUpdate', () => inst.hooks.onUpdate!(self, this.api.game, dt));
+    }
+  }
+
+  /**
+   * A left click goes to the topmost clickable entity under the mouse: one whose script has
+   * onClick, or that is tagged "clickable" (rules can react to its "click" event).
+   */
+  private clicks() {
+    const w = this.world;
+    const at = w.input.leftPressPosition();
+    if (!at || w.status !== 'running') return;
+    const pos = screenToWorld(w, at.x, at.y);
+    const target = topmostAt(w, pos.x, pos.y, (e) => e.hasTag('clickable') || !!this.instance(e)?.hooks.onClick);
+    if (!target) return;
+    w.emit('click', { entity: target.id, x: Math.round(pos.x), y: Math.round(pos.y) });
+    const inst = this.instance(target);
+    if (inst && !inst.failed && inst.hooks.onClick) {
+      this.call(target, inst, 'onClick', () => inst.hooks.onClick!(this.api.entity(target), this.api.game, pos));
+    }
+  }
+
+  /** onEvent with the events emitted since the previous call (events emitted by onEvent come next frame). */
+  events() {
+    const w = this.world;
+    const count = Math.min(w.emitted - this.processed, w.events.length);
+    this.processed = w.emitted;
+    if (count <= 0) return;
+    const fresh = w.events.slice(-count);
+    for (const e of [...w.entities]) {
+      if (!e.active) continue;
+      const inst = this.instance(e);
+      if (!inst || inst.failed || !inst.hooks.onEvent) continue;
+      const self = this.api.entity(e);
+      for (const ev of fresh) {
+        if (inst.failed || !e.active) break;
+        this.call(e, inst, 'onEvent', () => inst.hooks.onEvent!(self, { ...ev }, this.api.game));
+      }
     }
   }
 
@@ -378,6 +509,34 @@ export class ScriptRunner {
       }
     }
   }
+}
+
+/** Box used for clicks: the Collider, else the (scaled) Sprite. */
+function hitBox(e: Entity) {
+  const box = e.aabb();
+  if (box) return box;
+  const s = e.components.Sprite;
+  if (!s || !s.visible) return null;
+  const w = s.width * Math.abs(e.scaleX);
+  const h = s.height * Math.abs(e.scaleY);
+  return { x: e.x - w / 2, y: e.y - h / 2, w, h };
+}
+
+/** Topmost (highest Sprite layer, then latest in the scene) active entity containing the point. */
+function topmostAt(world: World, x: number, y: number, accept: (e: Entity) => boolean): Entity | null {
+  let best: Entity | null = null;
+  let bestLayer = -Infinity;
+  for (const e of world.entities) {
+    if (!e.active) continue;
+    const b = hitBox(e);
+    if (!b || x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h || !accept(e)) continue;
+    const layer = e.components.Sprite?.layer ?? 0;
+    if (layer >= bestLayer) {
+      best = e;
+      bestLayer = layer;
+    }
+  }
+  return best;
 }
 
 function describe(err: unknown, file: string, e: Entity, where: string): string {

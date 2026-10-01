@@ -1,6 +1,8 @@
 import { assertProject, type Project, type VarValue } from '@vibe/shared';
 import { GameConsole, type LogEntry } from './console';
+import { GameClock, type ClockOptions } from './clock';
 import { Input, type MouseButton } from './input';
+import { GameStorage } from './storage';
 import { round2 } from './math';
 import { Rng } from './rng';
 import { animationSystem } from './systems/animation';
@@ -22,6 +24,12 @@ export interface GameOptions {
   scene?: string;
   /** Receives every console entry as it is written (e.g. to mirror into the browser console). */
   onLog?: (entry: LogEntry) => void;
+  /** Calendar clock: start date, time zone and speed (see GameClock). */
+  clock?: ClockOptions;
+  /** Saved data the game starts with (game.storage). */
+  storage?: Record<string, unknown>;
+  /** Called after every change to game.storage (e.g. to persist it in the browser). */
+  onStorageChange?: (data: Record<string, unknown>) => void;
 }
 
 /** One scripted input action. Time is simulated: `wait` advances fixed frames, not wall-clock time. */
@@ -34,7 +42,8 @@ export type InputStep =
   | { type: 'mouseMove'; x: number; y: number }
   | { type: 'mouseDown'; button?: MouseButton }
   | { type: 'mouseUp'; button?: MouseButton }
-  | { type: 'click'; x?: number; y?: number; button?: MouseButton };
+  | { type: 'click'; x?: number; y?: number; button?: MouseButton }
+  | { type: 'type'; text: string };
 
 /** Primitive, replayable operation. Every way of driving a Game reduces to a sequence of these. */
 export type GameOp =
@@ -45,7 +54,9 @@ export type GameOp =
   | { op: 'mouseUp'; button?: MouseButton }
   | { op: 'step'; frames: number }
   | { op: 'restart' }
-  | { op: 'loadScene'; scene: string };
+  | { op: 'loadScene'; scene: string }
+  | { op: 'text'; text: string }
+  | { op: 'advanceClock'; ms: number };
 
 /** Expands scripted input steps into primitive ops (tap/hold/click become down, step, up). */
 export function expandInputSteps(steps: InputStep[]): GameOp[] {
@@ -75,6 +86,9 @@ export function expandInputSteps(steps: InputStep[]): GameOp[] {
       case 'click':
         if (s.x !== undefined && s.y !== undefined) ops.push({ op: 'mouseMove', x: s.x, y: s.y });
         ops.push({ op: 'mouseDown', button: s.button }, { op: 'step', frames: 1 }, { op: 'mouseUp', button: s.button });
+        break;
+      case 'type':
+        ops.push({ op: 'text', text: s.text }, { op: 'step', frames: 1 });
         break;
     }
   }
@@ -108,6 +122,9 @@ export interface GameState {
   input: ReturnType<Input['snapshot']>;
   entityCount: number;
   entities: EntitySnapshot[];
+  clock: ReturnType<GameClock['snapshot']>;
+  /** Saved data (only when requested with `storage: true`). */
+  storage?: Record<string, unknown>;
 }
 
 export interface StateQuery {
@@ -115,6 +132,8 @@ export interface StateQuery {
   ids?: string[];
   /** Only entities having any of these tags. */
   tags?: string[];
+  /** Include the saved data (game.storage). */
+  storage?: boolean;
   /** Include full component data (verbose). */
   components?: boolean;
 }
@@ -130,6 +149,8 @@ export class Game {
   readonly input: Input;
   readonly console: GameConsole;
   world!: World;
+  readonly clock: GameClock;
+  readonly storage: GameStorage;
   private readonly seed: number;
   private readonly scripts: ScriptLibrary;
   private scriptRunner!: ScriptRunner;
@@ -143,6 +164,8 @@ export class Game {
     this.seed = options.seed ?? 1;
     this.input = new Input(project.config.actions);
     this.console = new GameConsole(1000, options.onLog);
+    this.clock = new GameClock(options.clock);
+    this.storage = new GameStorage(options.storage, options.onStorageChange);
     this.scripts = new ScriptLibrary(project.scripts ?? {});
     this.loadScene(options.scene ?? project.config.startScene, {});
   }
@@ -174,7 +197,7 @@ export class Game {
     this.world.events.push(...prevEvents);
     this.world.emit('scene_loaded', { scene: id });
     this.console.log(`Scene "${id}" loaded (${scene.entities.length} entities)`, 'engine');
-    this.scriptRunner = new ScriptRunner(this.world, this.scripts);
+    this.scriptRunner = new ScriptRunner(this.world, this.scripts, this);
     this.ruleRunner = new RuleRunner(this.world, this);
     this.soundDirector = new SoundDirector(this.world);
     const music = scene.music ? soundOf(scene.music) : null;
@@ -189,6 +212,8 @@ export class Game {
     this.input.releaseAll();
     this.input.beginFrame();
     this.world = undefined as unknown as World;
+    this.clock.reset();
+    this.storage.reset();
     this.console.log('Game restarted', 'engine');
     this.loadScene(this.options.scene ?? this.project.config.startScene, {});
   }
@@ -227,6 +252,7 @@ export class Game {
         animationSystem(w, dt);
         this.ruleRunner.run(entered);
         this.soundDirector.run();
+        this.scriptRunner.events();
         w.flushDestroyed();
       } catch (err) {
         w.status = 'crashed';
@@ -239,6 +265,7 @@ export class Game {
     cameraSystem(w);
     w.frame++;
     w.time += dt;
+    this.clock.tick();
 
     if (w.pendingScene) {
       const next = w.pendingScene;
@@ -271,6 +298,10 @@ export class Game {
         return this.restart();
       case 'loadScene':
         return this.loadScene(op.scene);
+      case 'text':
+        return this.input.typeText(op.text);
+      case 'advanceClock':
+        return this.clock.advance(op.ms);
     }
   }
 
@@ -313,6 +344,8 @@ export class Game {
       input: this.input.snapshot(),
       entityCount: w.entities.length,
       entities: list.map((e) => snapshotEntity(e, !!query.components)),
+      clock: this.clock.snapshot(),
+      ...(query.storage && { storage: this.storage.snapshot() }),
     };
   }
 }

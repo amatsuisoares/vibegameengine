@@ -16,9 +16,11 @@ RULES (events and conditions without code)
 
 SCRIPTS (when built-in components and rules are not enough)
 - Write scripts/<name>.js with write_file and attach it with the Script component: {"src":"scripts/<name>.js","props":{...}}. Broken syntax is rejected with file:line.
-- A script defines any of: onStart(self, game), onUpdate(self, game, dt) (every frame, before physics), onCollision(self, other, game) (when a contact begins). Top-level variables are per entity. No imports.
-- self: id, name, tags, hasTag(t), x, y, vx, vy (needs a Body), grounded, enabled, health, props, state (free storage), get('Sprite'|'Body'|...) (live component data), damage(n), destroy().
-- game: frame, time, dt, scene, status, vars (live), entity(id), find(tag), input.isDown/pressed/released(action or key), input.mouse, emit(type, data) (custom event visible in read_events), random(), randomInt(a,b), win(), lose(), loadScene(id). Also console.log/warn/error and Math (Math.random is seeded).
+- A script defines any of: onStart(self, game), onUpdate(self, game, dt) (every frame, before physics), onCollision(self, other, game) (when a contact begins), onClick(self, game, pos) (left click on the entity: topmost by Sprite layer whose Collider/Sprite box contains it; entities tagged "clickable" also get a "click" event for rules), onEvent(self, event, game) (every game event, end of frame). Top-level variables are per entity. No imports.
+- self: id, name, tags, hasTag(t), x, y, scaleX, scaleY, rotation (visual), vx, vy (needs a Body), grounded, enabled, health, props, state (free storage; other scripts reach it with game.entity(id).state), get('Sprite'|'Text'|...) (live component data, e.g. get('Sprite').asset = 'x' swaps the image), damage(n), destroy().
+- game: frame, time, dt, scene, status, vars (live), entity(id), find(tag), entityAt(x, y), input.isDown/pressed/released(action or key), input.mouse / mouseWorld, input.mouseDown/mousePressed(button), input.text (typed this frame; "\\b" = Backspace, "\\n" = Enter), emit(type, data) (custom event visible in read_events), random(), randomInt(a,b), win(), lose(), loadScene(id), playSound(id), spawn(prefab, x, y).
+- game.clock: now (epoch ms), hour (0..24 local), iso, speed (settable: 60 = a game minute per second). It is the calendar time; use it (not frames) for needs that change over hours. game.storage: get/set/remove/keys — JSON data saved across sessions (browser localStorage). Use it to save and, on onStart, to catch up the time the game was closed (clock.now - saved time).
+- Also console.log/warn/error and Math (Math.random is seeded).
 - Date, timers, network and the host are unavailable (runs must stay deterministic). A script error is logged with scripts/<file>:line, emits script_error and disables that script on that entity until restart: read the console, fix with edit_file, restart_game.
 
 GEOMETRY AND PHYSICS
@@ -37,6 +39,7 @@ ASSETS AND SOUND
 RUNNING AND TESTING
 - run_game starts a headless run; time only advances with wait / wait_until / perform_inputs / click_mouse, so runs are deterministic and fast. Each action returns what happened since the previous one (player state, new events, warnings).
 - After editing the project, call restart_game (results say projectChanged when the run is outdated).
+- run_game/run_test take clock {start (ISO), utcOffsetMinutes, speed} and storage (a save to start from). advance_clock {hours|minutes} jumps the calendar ahead (like closing the game for a while); run_test has an advanceClock step. perform_inputs has {"type":"type","text":"Mimi\\n"}. inspect_game_state storage=true shows the saved data.
 - take_screenshot shows the current frame as an image (annotate=true draws colliders and ids). Use it to judge layout, reachability and visuals.
 - open_game_view gives a URL of the live game for the user (it opens in VS Code's Simple Browser panel): offer it when the user wants to see or play the game; it hot-reloads on every edit. follow=true mirrors your run in real time, so the user can watch you play.
 - run_test runs a fresh game with input steps, waitUntil/assert steps and final assertions, and reports observed values for failures. Expressions: status, frame, time, scene, vars.x, camera, entity('id').x/.y/.vx/.vy/.grounded/.health, exists('id'), count('tag'), events('type'), abs/min/max, == != < <= > >= && || !.

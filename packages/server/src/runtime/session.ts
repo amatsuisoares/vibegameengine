@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { evaluateExpr, ExprError, Game, msToFrames, type EntitySnapshot, type GameEvent, type GameOp, type LogEntry } from '@vibe/engine';
+import { evaluateExpr, ExprError, Game, msToFrames, type ClockOptions, type EntitySnapshot, type GameEvent, type GameOp, type LogEntry } from '@vibe/engine';
 import type { Project } from '@vibe/shared';
 import { ToolError } from '../project-store';
 
@@ -12,6 +12,10 @@ export function fingerprint(raw: RawProject) {
 export interface SessionOptions {
   seed: number;
   scene?: string;
+  /** Calendar clock the run starts with (headless default: 2026-01-01 09:00 UTC, speed 1). */
+  clock?: ClockOptions;
+  /** Saved data (game.storage) the run starts with. */
+  storage?: Record<string, unknown>;
 }
 
 /** What changed since the previous observation; returned after every action so the agent sees effects. */
@@ -20,6 +24,8 @@ export interface Observation {
   time: number;
   status: string;
   scene: string;
+  /** Game calendar time (local), e.g. "2026-01-01T09:30:00". */
+  clock: string;
   keysDown: string[];
   players?: EntitySnapshot[];
   events: GameEvent[];
@@ -49,7 +55,7 @@ export class GameSession {
     readonly options: SessionOptions,
     readonly fingerprint: string,
   ) {
-    this.game = new Game(project, { seed: options.seed, scene: options.scene });
+    this.game = new Game(project, { seed: options.seed, scene: options.scene, clock: options.clock, storage: options.storage });
     this.obsSeq = this.game.console.lastSeq;
   }
 
@@ -96,6 +102,7 @@ export class GameSession {
       time: state.time,
       status: state.status,
       scene: state.scene,
+      clock: state.clock.iso,
       keysDown: state.input.keys,
       ...(state.entities.length && { players: state.entities }),
       events: events.slice(-MAX_EVENTS),

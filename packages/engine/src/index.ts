@@ -12,3 +12,5 @@ export { screenToWorld, worldToScreen } from './systems/camera';
 export { groundAhead } from './systems/controllers';
 export * from './rules';
 export * from './sound';
+export * from './clock';
+export * from './storage';

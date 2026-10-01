@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { Input, type GameOp, type LogEntry } from '@vibe/engine';
+import { Input, type ClockOptions, type GameOp, type LogEntry } from '@vibe/engine';
 import {
   AssetStore,
   attachDomInput,
@@ -20,6 +20,8 @@ declare global {
     __vibe?: VibeApi;
     /** Set when the project could not be loaded, so an external host can report why. */
     __vibeError?: string[];
+    /** Set by a host (screenshots) before the page loads: the run's clock and saved data. */
+    __vibeRun?: { clock?: ClockOptions; storage?: Record<string, unknown> };
     /** Follow mode: which agent run is mirrored and how far the replay got. */
     __vibeLive?: () => { runId: string | null; active: boolean; received: number; backlog: number; runFrame?: number };
   }
@@ -34,6 +36,7 @@ const projectSelect = $<HTMLSelectElement>('project');
 const pauseBtn = $<HTMLButtonElement>('pause');
 const debugBox = $<HTMLInputElement>('debug');
 const followBox = $<HTMLInputElement>('follow');
+const clearSaveBtn = $<HTMLButtonElement>('clearSave');
 const soundBox = $<HTMLInputElement>('sound');
 /** Follow mode: the page mirrors the agent's run (.vibe/live.json) instead of being played. */
 const follow = params.get('live') === '1';
@@ -145,13 +148,53 @@ async function main() {
   };
 
   const seed = params.has('seed') ? Number(params.get('seed')) : undefined;
+  const scene = params.get('scene') ?? undefined;
+
+  // Clock and saved data. A page being played uses the real date and keeps game.storage in
+  // localStorage across sessions; pages driven by a host get the run's own clock and data,
+  // so the replay matches the headless run.
+  const playing = !follow && !host;
+  const saveKey = `vibe:save:${name}`;
+  const readSave = (): Record<string, unknown> => {
+    try {
+      const data = JSON.parse(localStorage.getItem(saveKey) ?? '{}');
+      return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+    } catch {
+      return {};
+    }
+  };
+  const writeSave = (data: Record<string, unknown>) => {
+    try {
+      localStorage.setItem(saveKey, JSON.stringify(data));
+    } catch (err) {
+      appendLog('warn', `Could not save game data: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+  const realClock = (): ClockOptions => ({ start: Date.now(), utcOffsetMinutes: -new Date().getTimezoneOffset() });
+  /** Starts the played game again from the real date and the latest save. */
+  const playStart = () => ({ seed, scene, clock: realClock(), storage: readSave() });
+  clearSaveBtn.hidden = !playing;
+  clearSaveBtn.onclick = () => {
+    if (!confirm('Apagar os dados salvos deste jogo neste navegador?')) return;
+    try {
+      localStorage.removeItem(saveKey);
+    } catch {
+      // Nothing saved.
+    }
+    runtime.setProject(runtime.project, undefined, playStart());
+    appendLog('log', 'Saved data cleared');
+  };
+
   // Follow mode: the runtime stays paused and the agent's ops are played at real-time pace by their own loop.
   let holdLive = false;
   const liveLoop = new FixedLoop((frames) => player.play(frames));
   const runtime = new Runtime(canvas, loaded.project, {
     assets: loaded.assets,
     seed,
-    scene: params.get('scene') ?? undefined,
+    scene,
+    ...(playing ? { clock: realClock(), storage: readSave() } : (window.__vibeRun ?? {})),
+    onStorageChange: playing ? writeSave : undefined,
+    realtimeClock: playing,
     debug: params.get('debug') === '1',
     paused: follow || params.get('paused') === '1',
     onLog: (e) => appendLog(e.level, e.message, e.frame),
@@ -170,14 +213,23 @@ async function main() {
     keyTarget: window,
     canvas,
     viewport: () => runtime.project.config,
-    onShellKey: (code) => !follow && runtime.handleShellKey(code),
+    onShellKey: (code) => {
+      if (follow || code !== 'KeyR' || runtime.game.status === 'running') return false;
+      restartPlay();
+      return true;
+    },
   });
 
   window.__vibe = createVibeApi(runtime, name);
   runtime.start();
   canvas.focus();
 
-  $<HTMLButtonElement>('restart').onclick = () => (follow ? followRun(true) : runtime.restart());
+  // Restarting a played game keeps the saved data and the real date (a host page restarts its run).
+  function restartPlay() {
+    if (playing) runtime.setProject(runtime.project, undefined, playStart());
+    else runtime.restart();
+  }
+  $<HTMLButtonElement>('restart').onclick = () => (follow ? followRun(true) : restartPlay());
   pauseBtn.onclick = () => {
     if (follow) holdLive = !holdLive;
     else if (runtime.paused) runtime.resume();
@@ -237,7 +289,7 @@ async function main() {
         return;
       }
       if (seq !== liveSeq) return;
-      runtime.setProject(next.project, next.assets, { seed: run.seed, scene: run.scene });
+      runtime.setProject(next.project, next.assets, { seed: run.seed, scene: run.scene, clock: run.clock, storage: run.storage });
       setupSound(next.project);
       logAssetErrors(next.assetErrors);
       canvas.classList.toggle('pixelated', next.project.config.pixelArt);
@@ -285,7 +337,7 @@ async function main() {
         const next = await loadProject(name, undefined);
         if (seq !== reloadSeq) return;
         window.__vibeError = undefined;
-        runtime.setProject(next.project, next.assets);
+        runtime.setProject(next.project, next.assets, playing ? playStart() : undefined);
         setupSound(next.project);
         logAssetErrors(next.assetErrors);
         appendLog('log', `Project reloaded (${files} changed)`);

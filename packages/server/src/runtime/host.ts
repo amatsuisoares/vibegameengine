@@ -40,7 +40,12 @@ export class RuntimeHost {
     if (options.scene && !status.project.scenes[options.scene]) {
       throw new ToolError(`Scene "${options.scene}" does not exist. Scenes: ${Object.keys(status.project.scenes).join(', ')}`);
     }
-    this.session = new GameSession(raw, status.project, { seed: options.seed ?? 1, scene: options.scene }, fingerprint(raw));
+    this.session = new GameSession(
+      raw,
+      status.project,
+      { seed: options.seed ?? 1, scene: options.scene, clock: options.clock, storage: options.storage },
+      fingerprint(raw),
+    );
     this.publishLive();
     return this.session;
   }
@@ -65,6 +70,8 @@ export class RuntimeHost {
           runId: s.id,
           seed: s.options.seed,
           ...(s.options.scene && { scene: s.options.scene }),
+          ...(s.options.clock && { clock: s.options.clock }),
+          ...(s.options.storage && { storage: s.options.storage }),
           frame: s.game.frame,
           status: s.game.status,
           raw: s.raw,
@@ -102,6 +109,8 @@ export class RuntimeHost {
       projectDir: this.store.dir,
       seed: s.options.seed,
       scene: s.options.scene,
+      clock: s.options.clock,
+      storage: s.options.storage,
       ops: s.ops,
       annotate,
     });

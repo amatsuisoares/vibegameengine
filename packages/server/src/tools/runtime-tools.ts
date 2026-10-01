@@ -9,7 +9,7 @@ const Key = z.string().min(1).describe('Key name: "A".."Z", "0".."9", "Space", "
 const Button = z.enum(['left', 'right', 'middle']);
 const Ms = (max: number) => z.number().min(0).max(max);
 const Expr = z.string().min(1).describe(
-  "Expression over the game state, e.g. \"entity('player').x > 300 && vars.coins >= 1\". Names: status, frame, time, scene, vars, camera. Functions: entity(id), exists(id), count(tag), events(type), abs, min, max.",
+  "Expression over the game state, e.g. \"entity('player').x > 300 && vars.coins >= 1\". Names: status, frame, time, scene, vars, camera, clock (clock.hour, clock.now). Functions: entity(id), exists(id), count(tag), events(type), abs, min, max.",
 );
 
 const MAX_WAIT_MS = 60_000;
@@ -25,11 +25,27 @@ const InputStepSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('mouseDown'), button: Button.optional() }),
   z.object({ type: z.literal('mouseUp'), button: Button.optional() }),
   z.object({ type: z.literal('click'), x: z.number().optional(), y: z.number().optional(), button: Button.optional() }),
+  z.object({ type: z.literal('type'), text: z.string().min(1).describe('Characters typed (e.g. a name); "\\b" = Backspace, "\\n" = Enter. Advances 1 frame.') }),
 ]);
+
+const ClockInput = z
+  .object({
+    start: z.string().optional().describe('Date and time the game starts at, ISO (e.g. "2026-03-10T21:30:00Z"). Default 2026-01-01T09:00:00Z.'),
+    utcOffsetMinutes: z.number().int().min(-840).max(840).optional().describe('Time zone, minutes east of UTC (default 0).'),
+    speed: z.number().min(0).max(100_000).optional().describe('Game-clock ms per simulated ms (default 1).'),
+  })
+  .describe('Calendar clock of the run (game.clock in scripts, clock in expressions).');
+const StorageInput = z.record(z.string(), z.unknown()).describe('Saved data the game starts with (game.storage), e.g. a save from a previous session.');
 
 const WaitUntilStep = z.object({ type: z.literal('waitUntil'), expr: Expr, maxMs: Ms(MAX_WAIT_MS).optional().describe('Default 5000.') });
 const AssertStep = z.object({ type: z.literal('assert'), expr: Expr });
-const TestStepSchema = z.union([InputStepSchema, WaitUntilStep, AssertStep]);
+const AdvanceClockStep = z.object({
+  type: z.literal('advanceClock'),
+  hours: z.number().min(0).optional(),
+  minutes: z.number().min(0).optional(),
+  ms: z.number().min(0).optional(),
+}).describe('Jumps the calendar clock ahead (no frames simulated).');
+const TestStepSchema = z.union([InputStepSchema, WaitUntilStep, AssertStep, AdvanceClockStep]);
 type TestStep = z.output<typeof TestStepSchema>;
 
 function host(ctx: ToolContext): RuntimeHost {
@@ -75,9 +91,11 @@ export const runtimeTools = [
     input: z.object({
       scene: z.string().optional().describe('Scene to start in (default: startScene).'),
       seed: z.number().int().optional().describe('Random seed (default 1).'),
+      clock: ClockInput.optional(),
+      storage: StorageInput.optional(),
     }),
-    run: (ctx, { scene, seed }) => {
-      const s = host(ctx).run({ scene, seed });
+    run: (ctx, { scene, seed, clock, storage }) => {
+      const s = host(ctx).run({ scene, seed, clock, storage });
       const cfg = s.project.config;
       return observe(ctx, { runId: s.id, viewport: { width: cfg.width, height: cfg.height }, entityCount: s.game.world.entities.length });
     },
@@ -86,7 +104,7 @@ export const runtimeTools = [
   defineTool({
     name: 'restart_game',
     changesRun: true,
-    description: 'Restarts the run from the beginning with the latest project files (same scene and seed). Use after editing the project.',
+    description: 'Restarts the run from the beginning with the latest project files (same scene, seed, clock and starting saved data). Use after editing the project.',
     input: z.object({}),
     run: (ctx) => {
       const h = host(ctx);
@@ -160,6 +178,24 @@ export const runtimeTools = [
   }),
 
   defineTool({
+    name: 'advance_clock',
+    changesRun: true,
+    description:
+      'Jumps the game calendar clock ahead (e.g. 3 hours) without simulating those frames, then advances 1 frame so the game reacts — like closing the game and coming back later. Scripts see the jump in game.clock.now.',
+    input: z.object({
+      hours: z.number().min(0).optional(),
+      minutes: z.number().min(0).optional(),
+      ms: z.number().min(0).optional(),
+    }),
+    run: (ctx, { hours = 0, minutes = 0, ms = 0 }) => {
+      const total = hours * 3_600_000 + minutes * 60_000 + ms;
+      if (total <= 0) throw new ToolError('Give hours, minutes or ms (> 0)');
+      session(ctx).applyAll([{ op: 'advanceClock', ms: total }, { op: 'step', frames: 1 }]);
+      return observe(ctx, { advancedMs: total });
+    },
+  }),
+
+  defineTool({
     name: 'wait_until',
     changesRun: true,
     description: 'Advances time until an expression becomes true (or maxMs passes, or the game ends). Returns ok=false on timeout.',
@@ -185,11 +221,12 @@ export const runtimeTools = [
 
   defineTool({
     name: 'inspect_game_state',
-    description: 'Current state: status, variables, camera, input, and entity snapshots (position, velocity, grounded, health). Filter by ids or tags; components=true adds full component data.',
+    description: 'Current state: status, variables, camera, clock, input, and entity snapshots (position, velocity, grounded, health). Filter by ids or tags; components=true adds full component data; storage=true adds the saved data.',
     input: z.object({
       ids: z.array(z.string()).optional(),
       tags: z.array(z.string()).optional(),
       components: z.boolean().optional(),
+      storage: z.boolean().optional().describe('Include the saved data (game.storage).'),
     }),
     run: (ctx, query) => {
       const state = session(ctx).game.getState(query);
@@ -271,18 +308,22 @@ export const runtimeTools = [
       assertions: z.array(Expr).default([]).describe('Checked after all steps.'),
       scene: z.string().optional(),
       seed: z.number().int().optional(),
+      clock: ClockInput.optional(),
+      storage: StorageInput.optional(),
     }),
-    run: (ctx, { steps, assertions, scene, seed }) => {
+    run: (ctx, { steps, assertions, scene, seed, clock, storage }) => {
       const status = ctx.store.validate();
       if (!status.project) throw new ToolError('Cannot test: the project is invalid', status.errors);
       if (scene && !status.project.scenes[scene]) throw new ToolError(`Scene "${scene}" does not exist`);
-      const game = new Game(status.project, { seed: seed ?? 1, scene });
+      const game = new Game(status.project, { seed: seed ?? 1, scene, clock, storage });
       const checks: { step?: number; expr: string; pass: boolean; observed?: Record<string, unknown>; error?: string; waitedMs?: number }[] = [];
       let simulatedMs = 0;
 
       steps.forEach((step: TestStep, i) => {
         if (step.type === 'assert') {
           checks.push({ step: i, expr: step.expr, ...checkExpr(game, step.expr, 0) });
+        } else if (step.type === 'advanceClock') {
+          game.apply({ op: 'advanceClock', ms: (step.hours ?? 0) * 3_600_000 + (step.minutes ?? 0) * 60_000 + (step.ms ?? 0) });
         } else if (step.type === 'waitUntil') {
           const max = msToFrames(step.maxMs ?? 5000);
           let frames = 0;

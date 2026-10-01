@@ -24,6 +24,8 @@ const CAPTURED_CODES = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', '
 interface KeyEventLike extends Event {
   code: string;
   key: string;
+  ctrlKey?: boolean;
+  metaKey?: boolean;
 }
 interface PointerEventLike extends Event {
   clientX: number;
@@ -61,7 +63,13 @@ export function attachDomInput(getInput: () => Input, o: DomInputOptions): () =>
       e.preventDefault();
       return;
     }
-    getInput().keyDown(keyOf(e));
+    const input = getInput();
+    input.keyDown(keyOf(e));
+    // Printable characters also count as typed text (names, chat boxes...), in order with
+    // Backspace ("\b") and Enter ("\n"), which may all arrive within one frame.
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) input.typeText(e.key);
+    else if (e.key === 'Backspace') input.typeText('\b');
+    else if (e.key === 'Enter') input.typeText('\n');
     if (CAPTURED_CODES.has(e.code)) e.preventDefault();
   };
   const onKeyUp = (ev: Event) => {
