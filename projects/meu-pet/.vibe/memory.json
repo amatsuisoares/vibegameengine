@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "summary": "Meu Pet: pet virtual observacional (tamagotchi). O pet não fala: o estado aparece pelo comportamento (andar até a tigela, bocejar, ir para a cama, empurrar a bola) e por notificações observacionais com o nome dele e cooldown (\"Mimi parece estar com fome.\"). Necessidades escondidas (fome, energia, diversão, higiene, saúde, afeto) medidas em horas do relógio do jogo; 1-2 traços de personalidade escondidos (brincalhão, preguiçoso, carinhoso, curioso, irritável). Um quarto com tigela, cama, bola, janela (dia/noite), lâmpada e sujeira; interações por mouse (encher tigela, petisco, jogar bola, carinho clicando no pet, limpar, remédio, luz). Evolução bebê → juvenil 1/2 (estilo de cuidado) → adulto 1/2/3 a/b (qualidade do cuidado); sem morte. Tempo real com save (game.storage) e progresso offline, mais controle de velocidade (1×, 60×, 600×). Cenas: inicio (nomear) e quarto. Só os sprites da usuária são reaproveitados.",
+  "items": [
+    {
+      "id": "f1",
+      "kind": "feature",
+      "text": "Cena inicio: digitar o nome do pet e começar; com save existente vai direto ao quarto",
+      "status": "verified",
+      "evidence": "type 'Mimi' + Enter carrega o quarto com 'Mimi chegou!'; com storage.pet salvo a cena inicio pula direto para o quarto",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "f2",
+      "kind": "feature",
+      "text": "Quarto: tigela, cama, bola, janela com céu pela hora, lâmpada, chão; noite escurece",
+      "status": "verified",
+      "evidence": "screenshots: céu azul com sol 09:00, escuro com lua 23:00; luz apagada escurece o quarto (overlay 0.6)",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "f3",
+      "kind": "feature",
+      "text": "Cérebro do pet: necessidades por hora de jogo, comportamento autônomo (andar, comer, dormir, brincar, investigar, procurar o jogador)",
+      "status": "verified",
+      "evidence": "pet anda, investiga (curioso), empurra a bola, vai à tigela com fome, dorme na cama à noite (energia < 85), acorda de manhã",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "f4",
+      "kind": "feature",
+      "text": "Personalidade: 1-2 traços sorteados que mudam ritmos, preferências e reações; o diário revela os traços percebidos",
+      "status": "done",
+      "evidence": "traços sorteados (curioso+carinhoso na seed 1) alteram reações ('parece adorar o carinho'); diário revela após 3 sinais — falta jogar mais para ver cada traço revelado",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "f5",
+      "kind": "feature",
+      "text": "Sistema de observação: estado → evento → notificação com nome e cooldown (tempo de jogo + tempo real), sem spam, acompanhada de comportamento/emote",
+      "status": "verified",
+      "evidence": "a 600×, 10 h de jogo em 60 s geraram ~8 observações espaçadas (cooldown de jogo + 25 s reais + 4 s entre avisos)",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "f6",
+      "kind": "feature",
+      "text": "Interações: encher tigela, petisco, jogar bola, carinho, limpar sujeira, remédio, luz; reações dependem do humor e da personalidade",
+      "status": "verified",
+      "evidence": "eventos de carinho, tigela (come 2 porções), bola (persegue, 'ficou animado!'), petisco, remédio (cura), 3 sujeiras limpas sem reaparecer, luz",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "f7",
+      "kind": "feature",
+      "text": "Evolução: bebê → juvenil (12 h) → adulto (36 h), ramo pelo estilo e pela qualidade do cuidado",
+      "status": "verified",
+      "evidence": "bebê→juvenil1 (mais brincadeira) e →juvenil2 (Kuro, mais carinho) a 12 h; adulto3a com abandono a 36 h",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "f8",
+      "kind": "feature",
+      "text": "Tempo: save automático, progresso offline ao reabrir (com resumo observacional), velocidade 1×/60×/600×",
+      "status": "verified",
+      "evidence": "advance_clock e save com lastSeen antigo: resumo 'Você ficou fora por 1 dia. Kuro dormiu, comeu da tigela e parece ter sentido sua falta.'; botão de velocidade 1×→60×→600×",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "n1",
+      "kind": "note",
+      "text": "Sprites 1024×1024 com muita margem transparente: desenhar a ~250-300 px e usar Collider trigger menor para o clique",
+      "status": "open",
+      "updatedAt": "2026-10-01T13:53:57.518Z"
+    },
+    {
+      "id": "n2",
+      "kind": "note",
+      "text": "Adultos a/b são criaturas diferentes (1 quadro cada): linha a vem do juvenil 1, linha b do juvenil 2; bebê e juvenis têm 2 quadros de idle",
+      "status": "open",
+      "updatedAt": "2026-10-01T13:53:57.518Z"
+    },
+    {
+      "id": "t1",
+      "kind": "todo",
+      "text": "Usuária testar no VS Code (tempo real, save no navegador, som) e dar retorno de balanceamento/visual",
+      "status": "open",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "t2",
+      "kind": "todo",
+      "text": "Arte de dormir/comer: sprites só têm idle; sono é só achatamento + 'z' (olhos abertos)",
+      "status": "open",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "n3",
+      "kind": "note",
+      "text": "Decisões: à noite (22h-7h) dorme se energia < 85 e só acorda de manhã; juvenil aos 12 h, adulto aos 36 h; objetos clicáveis ficam numa camada acima do pet (camada 7+)",
+      "status": "open",
+      "updatedAt": "2026-10-01T14:04:16.956Z"
+    },
+    {
+      "id": "f9",
+      "kind": "feature",
+      "text": "Coleção (pokédex): na fase adulta o Diário oferece 'Começar com um novo pet' (2 cliques); o adulto vai para colecao.pets e as formas descobertas ficam em colecao.formas; cena 'colecao' com 9 cartas e lista de pets anteriores",
+      "status": "verified",
+      "evidence": "Mimi adulta → novo pet Kuro; coleção mostra Bebê/Jovem 1/Adulto 3A de Mimi, 6 '?' e 'Mimi — Adulto 3A · 1 dia'; Voltar retorna ao quarto com Kuro",
+      "updatedAt": "2026-10-01T14:33:40.192Z"
+    },
+    {
+      "id": "n4",
+      "kind": "note",
+      "text": "Correções pedidas pela usuária (2026-10-01): pet andava de costas (desenhos olham para a direita → flipX quando vai para a esquerda); save precisa sobreviver a fechar o VS Code (agora em .vibe/save.json pelo dev server)",
+      "status": "open",
+      "updatedAt": "2026-10-01T14:33:40.192Z"
+    }
+  ]
+}

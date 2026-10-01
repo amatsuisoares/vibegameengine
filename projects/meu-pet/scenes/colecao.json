@@ -1,0 +1,49 @@
+{
+  "id": "colecao",
+  "name": "Coleção",
+  "background": "#2b2545",
+  "width": 960,
+  "height": 540,
+  "entities": [
+    {
+      "id": "tituloColecao",
+      "transform": { "x": 30, "y": 18 },
+      "components": {
+        "Text": { "text": "Coleção", "fontSize": 30, "font": "sans-serif", "color": "#ffe28a" },
+        "Script": { "src": "scripts/colecao.js" }
+      }
+    },
+    {
+      "id": "contador",
+      "transform": { "x": 190, "y": 30 },
+      "components": { "Text": { "text": "", "fontSize": 15, "font": "sans-serif", "color": "#9aa3c7" } }
+    },
+    {
+      "id": "painelPets",
+      "transform": { "x": 755, "y": 270 },
+      "components": { "Sprite": { "width": 350, "height": 400, "color": "#3e3763" } }
+    },
+    {
+      "id": "tituloPets",
+      "transform": { "x": 595, "y": 82 },
+      "components": {
+        "Text": { "text": "Pets anteriores", "fontSize": 19, "font": "sans-serif", "color": "#ffe28a" }
+      }
+    },
+    {
+      "id": "listaPets",
+      "transform": { "x": 595, "y": 116 },
+      "components": { "Text": { "text": "", "fontSize": 13, "font": "sans-serif", "color": "#e9e3ff" } }
+    },
+    {
+      "id": "botaoVoltar",
+      "prefab": "botao",
+      "transform": { "x": 860, "y": 505 },
+      "components": {
+        "Sprite": { "width": 130 },
+        "Text": { "text": "Voltar" },
+        "Script": { "props": { "acao": "voltar" } }
+      }
+    }
+  ]
+}

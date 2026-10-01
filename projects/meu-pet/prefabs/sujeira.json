@@ -1,0 +1,22 @@
+{
+  "tags": ["sujeira"],
+  "components": {
+    "Sprite": {
+      "shape": "triangle",
+      "color": "#6b4423",
+      "width": 34,
+      "height": 26,
+      "layer": 7,
+      "opacity": 1
+    },
+    "Script": { "src": "scripts/sujeira.js" },
+    "Text": {
+      "text": "≈",
+      "fontSize": 16,
+      "color": "#7fa35a",
+      "align": "center",
+      "screenSpace": false,
+      "layer": 8
+    }
+  }
+}

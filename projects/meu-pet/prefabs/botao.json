@@ -1,0 +1,15 @@
+{
+  "tags": ["botao"],
+  "components": {
+    "Sprite": { "width": 104, "height": 34, "color": "#3a3355", "layer": 62 },
+    "Text": {
+      "text": "",
+      "fontSize": 15,
+      "font": "sans-serif",
+      "align": "center",
+      "screenSpace": false,
+      "layer": 63
+    },
+    "Script": { "src": "scripts/botao.js" }
+  }
+}

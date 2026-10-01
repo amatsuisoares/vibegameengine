@@ -1,0 +1,14 @@
+{
+  "tags": ["emote"],
+  "components": {
+    "Text": {
+      "text": "",
+      "fontSize": 30,
+      "font": "sans-serif",
+      "align": "center",
+      "screenSpace": false,
+      "layer": 40
+    },
+    "Script": { "src": "scripts/emote.js" }
+  }
+}

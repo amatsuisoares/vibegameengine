@@ -1,0 +1,286 @@
+{
+  "id": "quarto",
+  "name": "Quarto",
+  "background": "#f3d9b1",
+  "width": 960,
+  "height": 540,
+  "camera": { "clampToBounds": true },
+  "entities": [
+    {
+      "id": "parede",
+      "transform": { "x": 480, "y": 180 },
+      "components": { "Sprite": { "width": 960, "height": 360, "color": "#f3d9b1", "layer": -20 } }
+    },
+    {
+      "id": "faixa",
+      "transform": { "x": 480, "y": 250 },
+      "components": { "Sprite": { "width": 960, "height": 6, "color": "#e2c398", "layer": -19 } }
+    },
+    {
+      "id": "chao",
+      "transform": { "x": 480, "y": 450 },
+      "components": { "Sprite": { "width": 960, "height": 180, "color": "#c99a6b", "layer": -19 } }
+    },
+    {
+      "id": "rodape",
+      "transform": { "x": 480, "y": 362 },
+      "components": { "Sprite": { "width": 960, "height": 8, "color": "#a8784c", "layer": -18 } }
+    },
+    {
+      "id": "moldura",
+      "transform": { "x": 250, "y": 140 },
+      "components": { "Sprite": { "width": 200, "height": 160, "color": "#8a5a3b", "layer": -16 } }
+    },
+    {
+      "id": "janela",
+      "transform": { "x": 250, "y": 140 },
+      "components": {
+        "Sprite": { "width": 176, "height": 136, "color": "#8fd3ff", "layer": -15 },
+        "Script": { "src": "scripts/ceu.js" }
+      }
+    },
+    {
+      "id": "astro",
+      "transform": { "x": 250, "y": 120 },
+      "components": {
+        "Sprite": { "shape": "circle", "width": 34, "height": 34, "color": "#ffd23f", "layer": -14 }
+      }
+    },
+    {
+      "id": "cruzV",
+      "transform": { "x": 250, "y": 140 },
+      "components": { "Sprite": { "width": 6, "height": 136, "color": "#8a5a3b", "layer": -13 } }
+    },
+    {
+      "id": "cruzH",
+      "transform": { "x": 250, "y": 140 },
+      "components": { "Sprite": { "width": 176, "height": 6, "color": "#8a5a3b", "layer": -13 } }
+    },
+    {
+      "id": "planta",
+      "transform": { "x": 905, "y": 330 },
+      "components": {
+        "Sprite": { "shape": "circle", "width": 70, "height": 80, "color": "#4f9d5a", "layer": -10 }
+      }
+    },
+    {
+      "id": "vaso",
+      "transform": { "x": 905, "y": 380 },
+      "components": { "Sprite": { "width": 46, "height": 44, "color": "#b5603a", "layer": -9 } }
+    },
+    {
+      "id": "fio",
+      "transform": { "x": 720, "y": 30 },
+      "components": { "Sprite": { "width": 3, "height": 60, "color": "#5b4636", "layer": -8 } }
+    },
+    {
+      "id": "brilho",
+      "transform": { "x": 720, "y": 95 },
+      "components": {
+        "Sprite": {
+          "shape": "circle",
+          "width": 220,
+          "height": 220,
+          "color": "#fff3b0",
+          "opacity": 0.22,
+          "layer": -9
+        }
+      }
+    },
+    {
+      "id": "lampada",
+      "transform": { "x": 720, "y": 72 },
+      "components": {
+        "Sprite": { "shape": "triangle", "width": 70, "height": 40, "color": "#ffe28a", "layer": -7 },
+        "Collider": { "width": 80, "height": 60, "isTrigger": true },
+        "Script": { "src": "scripts/lampada.js" }
+      }
+    },
+    {
+      "id": "cama",
+      "transform": { "x": 150, "y": 452 },
+      "components": { "Sprite": { "width": 190, "height": 46, "color": "#7b9acc", "layer": 1 } }
+    },
+    {
+      "id": "travesseiro",
+      "transform": { "x": 85, "y": 430 },
+      "components": { "Sprite": { "width": 56, "height": 22, "color": "#eef2fb", "layer": 2 } }
+    },
+    {
+      "id": "tigela",
+      "transform": { "x": 430, "y": 468 },
+      "components": {
+        "Sprite": { "width": 74, "height": 24, "color": "#e76f51", "layer": 7 },
+        "Collider": { "width": 90, "height": 50, "isTrigger": true },
+        "Script": { "src": "scripts/tigela.js" }
+      }
+    },
+    {
+      "id": "racao",
+      "transform": { "x": 430, "y": 456 },
+      "components": {
+        "Sprite": { "width": 58, "height": 8, "color": "#8d5524", "layer": 8, "visible": false }
+      }
+    },
+    {
+      "id": "bola",
+      "transform": { "x": 690, "y": 458 },
+      "components": {
+        "Sprite": { "shape": "circle", "width": 34, "height": 34, "color": "#e63946", "layer": 9 },
+        "Collider": { "width": 50, "height": 50, "isTrigger": true },
+        "Script": { "src": "scripts/bola.js" }
+      }
+    },
+    {
+      "id": "pet",
+      "tags": ["pet"],
+      "transform": { "x": 480, "y": 425 },
+      "components": {
+        "Sprite": { "asset": "bebe_1", "width": 250, "height": 250, "layer": 5, "faceVelocity": false },
+        "Collider": { "width": 130, "height": 130, "offsetY": 15, "isTrigger": true },
+        "Script": { "src": "scripts/pet.js" }
+      }
+    },
+    {
+      "id": "noite",
+      "transform": { "x": 480, "y": 270 },
+      "components": {
+        "Sprite": { "width": 960, "height": 540, "color": "#0b1030", "opacity": 0, "layer": 50 }
+      }
+    },
+    {
+      "id": "avisoFundo",
+      "transform": { "x": 480, "y": 34 },
+      "components": {
+        "Sprite": {
+          "width": 780,
+          "height": 44,
+          "color": "#1d1a2e",
+          "opacity": 0.55,
+          "layer": 60,
+          "visible": false
+        }
+      }
+    },
+    {
+      "id": "aviso",
+      "transform": { "x": 480, "y": 22 },
+      "components": {
+        "Text": { "text": "", "fontSize": 20, "font": "sans-serif", "align": "center", "layer": 61 },
+        "Script": { "src": "scripts/aviso.js" }
+      }
+    },
+    {
+      "id": "relogio",
+      "transform": { "x": 262, "y": 506 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 18,
+          "font": "sans-serif",
+          "align": "left",
+          "color": "#ffe28a",
+          "layer": 61
+        }
+      }
+    },
+    {
+      "id": "dica",
+      "transform": { "x": 14, "y": 503 },
+      "components": {
+        "Text": {
+          "text": "Clique no pet para fazer carinho\nClique na tigela, bola, luz e sujeira",
+          "fontSize": 12,
+          "font": "sans-serif",
+          "color": "#e9e3ff",
+          "layer": 61
+        }
+      }
+    },
+    {
+      "id": "botaoPetisco",
+      "prefab": "botao",
+      "transform": { "x": 468, "y": 516 },
+      "components": {
+        "Text": { "text": "Petisco" },
+        "Script": { "props": { "acao": "petisco" } },
+        "Sprite": { "width": 96 }
+      }
+    },
+    {
+      "id": "botaoRemedio",
+      "prefab": "botao",
+      "transform": { "x": 570, "y": 516 },
+      "components": {
+        "Text": { "text": "Remédio" },
+        "Script": { "props": { "acao": "remedio" } },
+        "Sprite": { "width": 96 }
+      }
+    },
+    {
+      "id": "botaoDiario",
+      "prefab": "botao",
+      "transform": { "x": 672, "y": 516 },
+      "components": {
+        "Text": { "text": "Diário" },
+        "Script": { "props": { "acao": "diario" } },
+        "Sprite": { "width": 96 }
+      }
+    },
+    {
+      "id": "botaoVelocidade",
+      "prefab": "botao",
+      "transform": { "x": 897, "y": 516 },
+      "components": {
+        "Sprite": { "width": 116 },
+        "Text": { "text": "Velocidade 1×" },
+        "Script": { "props": { "acao": "velocidade" } }
+      }
+    },
+    {
+      "id": "diario",
+      "enabled": false,
+      "transform": { "x": 480, "y": 262 },
+      "components": {
+        "Sprite": { "width": 640, "height": 360, "color": "#fffaf0", "layer": 70 },
+        "Script": { "src": "scripts/diario.js" }
+      }
+    },
+    {
+      "id": "diarioTexto",
+      "transform": { "x": 185, "y": 100 },
+      "components": {
+        "Text": { "text": "", "fontSize": 17, "font": "sans-serif", "color": "#3b2f2f", "layer": 71 }
+      },
+      "enabled": false
+    },
+    {
+      "id": "barra",
+      "transform": { "x": 480, "y": 516 },
+      "components": {
+        "Sprite": { "width": 960, "height": 48, "color": "#2b2545", "opacity": 0.92, "layer": 60 }
+      }
+    },
+    {
+      "id": "botaoColecao",
+      "prefab": "botao",
+      "transform": { "x": 774, "y": 516 },
+      "components": {
+        "Sprite": { "width": 96 },
+        "Text": { "text": "Coleção" },
+        "Script": { "props": { "acao": "colecao" } }
+      }
+    },
+    {
+      "id": "botaoNovoPet",
+      "prefab": "botao",
+      "enabled": false,
+      "transform": { "x": 640, "y": 412 },
+      "components": {
+        "Sprite": { "width": 250, "height": 38, "color": "#2f7d4f", "layer": 72 },
+        "Text": { "text": "Começar com um novo pet", "layer": 73 },
+        "Script": { "props": { "acao": "novoPet" } }
+      }
+    }
+  ]
+}

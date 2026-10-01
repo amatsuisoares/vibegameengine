@@ -1,0 +1,29 @@
+{
+  "formatVersion": 1,
+  "name": "Meu Pet",
+  "width": 960,
+  "height": 540,
+  "startScene": "inicio",
+  "assets": [
+    { "id": "bebe_1", "type": "image", "path": "pet/bebe_1.png" },
+    { "id": "bebe_2", "type": "image", "path": "pet/bebe_2.png" },
+    { "id": "juvenil1_1", "type": "image", "path": "pet/juvenil1_1.png" },
+    { "id": "juvenil1_2", "type": "image", "path": "pet/juvenil1_2.png" },
+    { "id": "juvenil2_1", "type": "image", "path": "pet/juvenil2_1.png" },
+    { "id": "juvenil2_2", "type": "image", "path": "pet/juvenil2_2.png" },
+    { "id": "adulto1a", "type": "image", "path": "pet/adulto1a.png" },
+    { "id": "adulto2a", "type": "image", "path": "pet/adulto2a.png" },
+    { "id": "adulto3a", "type": "image", "path": "pet/adulto3a.png" },
+    { "id": "adulto1b", "type": "image", "path": "pet/adulto1b.png" },
+    { "id": "adulto2b", "type": "image", "path": "pet/adulto2b.png" },
+    { "id": "adulto3b", "type": "image", "path": "pet/adulto3b.png" },
+    { "id": "sfx_comer", "type": "audio", "path": "sfx/sfx_comer.wav" },
+    { "id": "sfx_tigela", "type": "audio", "path": "sfx/sfx_tigela.wav" },
+    { "id": "sfx_bola", "type": "audio", "path": "sfx/sfx_bola.wav" },
+    { "id": "sfx_limpar", "type": "audio", "path": "sfx/sfx_limpar.wav" },
+    { "id": "sfx_clique", "type": "audio", "path": "sfx/sfx_clique.wav" },
+    { "id": "sfx_evolucao", "type": "audio", "path": "sfx/sfx_evolucao.wav" }
+  ],
+  "gravity": 0,
+  "pixelArt": false
+}

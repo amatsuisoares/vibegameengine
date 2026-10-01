@@ -74,9 +74,13 @@ Jogo da usuária: pet virtual observacional (só os sprites de `mypetgame/assets
 o pet não fala (notificações observacionais com cooldown), necessidades escondidas, personalidade inferida pelo
 comportamento, um quarto, interações com o mouse, evolução bebê → juvenil → adulto, tempo real + velocidade, sem morte.
 - [x] Engine: `onClick`/`onEvent`, texto digitado, mouse no mundo, `entityAt`, escala/rotação em scripts
-- [x] Engine: relógio do calendário (`game.clock`, velocidade, `advance_clock`) e dados salvos (`game.storage`, localStorage)
+- [x] Engine: relógio do calendário (`game.clock`, velocidade, `advance_clock`) e dados salvos (`game.storage`, em disco
+  em `.vibe/save.json` pelo dev server + cópia no localStorage); seed aleatória por sessão no jogo jogado
 - [x] 198 testes unitários + 13 e2e (teclado, clique, save após reload, replay com relógio e dados)
-- [ ] Construir o jogo pelas tools do `vibe` (recarregar o Claude Code antes, para as tools novas)
+- [x] Jogo `projects/meu-pet` construído pelas tools do `vibe`: telas início/quarto/coleção, cérebro do pet
+  (`scripts/pet.js`), observações com cooldown, interações, evolução em 9 formas, tempo real + velocidade, save
+  em disco, coleção de pets anteriores ("pokédex")
+- [ ] Ajustes a partir do teste da usuária (balanceamento, visual, arte de dormir/comer)
 
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.

@@ -1,0 +1,13 @@
+{
+  "components": {
+    "Text": {
+      "text": "",
+      "fontSize": 13,
+      "font": "sans-serif",
+      "align": "center",
+      "screenSpace": false,
+      "color": "#e9e3ff",
+      "layer": 3
+    }
+  }
+}

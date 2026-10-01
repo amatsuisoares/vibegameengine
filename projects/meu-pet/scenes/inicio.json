@@ -1,0 +1,91 @@
+{
+  "id": "inicio",
+  "name": "Início",
+  "background": "#2b2545",
+  "width": 960,
+  "height": 540,
+  "entities": [
+    {
+      "id": "titulo",
+      "transform": { "x": 480, "y": 120 },
+      "components": {
+        "Text": {
+          "text": "Meu Pet",
+          "fontSize": 54,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#ffe28a"
+        },
+        "Script": { "src": "scripts/inicio.js" }
+      }
+    },
+    {
+      "id": "ovo",
+      "transform": { "x": 480, "y": 245 },
+      "components": { "Sprite": { "asset": "bebe_1", "width": 200, "height": 200 } }
+    },
+    {
+      "id": "pergunta",
+      "transform": { "x": 480, "y": 330 },
+      "components": {
+        "Text": {
+          "text": "Um novo pet vai chegar. Como ele vai se chamar?",
+          "fontSize": 19,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#d9d4f0"
+        }
+      }
+    },
+    {
+      "id": "caixaNome",
+      "transform": { "x": 480, "y": 395 },
+      "components": { "Sprite": { "width": 320, "height": 50, "color": "#3e3763" } }
+    },
+    {
+      "id": "campoNome",
+      "transform": { "x": 480, "y": 396 },
+      "components": {
+        "Text": { "text": "", "fontSize": 26, "font": "sans-serif", "align": "center", "screenSpace": false }
+      }
+    },
+    {
+      "id": "botaoComecar",
+      "transform": { "x": 480, "y": 465 },
+      "components": {
+        "Sprite": { "width": 170, "height": 44, "color": "#5b8def" },
+        "Text": {
+          "text": "Começar",
+          "fontSize": 20,
+          "font": "sans-serif",
+          "align": "center",
+          "screenSpace": false
+        },
+        "Script": { "src": "scripts/comecar.js" }
+      }
+    },
+    {
+      "id": "dicaNome",
+      "transform": { "x": 480, "y": 505 },
+      "components": {
+        "Text": {
+          "text": "Digite o nome e aperte Enter",
+          "fontSize": 14,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#9aa3c7"
+        }
+      }
+    },
+    {
+      "id": "botaoColecao",
+      "prefab": "botao",
+      "transform": { "x": 870, "y": 500 },
+      "components": {
+        "Sprite": { "width": 130 },
+        "Text": { "text": "Coleção" },
+        "Script": { "props": { "acao": "colecao" } }
+      }
+    }
+  ]
+}
