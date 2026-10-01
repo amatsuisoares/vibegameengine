@@ -106,7 +106,9 @@ describe('meu-pet (regression)', () => {
         ],
         assertions: [
           { name: 'dirt cleaned', expr: "!exists('sujeira1')" },
-          { name: 'dust puffed', expr: "events('particles') >= 1" },
+          { name: 'dust puffed', assert: 'eventOccurred', event: 'particles', match: { entity: 'sujeira1', count: 14 } },
+          { name: 'the pet has a state', assert: 'entity', id: 'pet', field: 'state', notEquals: null },
+          { assert: 'scene', is: 'quarto' },
         ],
       },
       { store, author: 'agent', host: new RuntimeHost(store) },
@@ -114,7 +116,7 @@ describe('meu-pet (regression)', () => {
     if (!r.ok) throw new Error(r.error);
     expect(r.result).toMatchObject({
       passed: true,
-      report: ['PASS in the room', 'PASS dirt appeared', 'PASS dirt cleaned', 'PASS dust puffed'],
+      report: ['PASS in the room', 'PASS dirt appeared', 'PASS dirt cleaned', 'PASS dust puffed', 'PASS the pet has a state', 'PASS scene is "quarto"'],
       errors: [],
     });
   });

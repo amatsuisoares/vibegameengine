@@ -1,4 +1,5 @@
-import { evaluateExpr, expandInputSteps, ExprError, msToFrames, type Game, type InputStep } from '@vibe/engine';
+import { checkAssertion, evaluateExpr, expandInputSteps, ExprError, msToFrames, type Game, type InputStep } from '@vibe/engine';
+import type { Assertion } from '@vibe/shared';
 import { ToolError } from '../project-store';
 import type { ScreenshotInfo } from './host';
 import type { GameSession } from './session';
@@ -8,27 +9,32 @@ import type { GameSession } from './session';
  * at the end, and (verify_game) screenshots. Shared by run_test and verify_game.
  */
 
+/** A check: an expression or a structured assertion (`check`), with an optional readable name. */
+export type CheckSpec = { name?: string } & ({ expr: string; check?: undefined } | { check: Assertion; expr?: undefined });
+
 export type ScenarioStep =
   | InputStep
-  | { type: 'waitUntil'; expr: string; maxMs?: number; name?: string }
-  | { type: 'assert'; expr: string; name?: string }
+  | ({ type: 'waitUntil'; maxMs?: number } & CheckSpec)
+  | ({ type: 'assert' } & CheckSpec)
   | { type: 'advanceClock'; hours?: number; minutes?: number; ms?: number }
   | { type: 'screenshot'; label?: string; annotate?: boolean };
-
-export interface Assertion {
-  expr: string;
-  name?: string;
-}
 
 export interface Check {
   /** Index of the step (absent for final assertions). */
   step?: number;
   name?: string;
-  expr: string;
-  pass: boolean;
-  frame: number;
+  /** Expression checks: the expression ("waitUntil <expr>" for waits) and the values it saw. */
+  expr?: string;
   observed?: Record<string, unknown>;
   error?: string;
+  /** Structured assertions: kind, description, what was expected and found, and evidence on failure. */
+  assert?: Assertion['assert'];
+  check?: string;
+  expected?: string;
+  actual?: unknown;
+  evidence?: Record<string, unknown>;
+  pass: boolean;
+  frame: number;
   waitedMs?: number;
 }
 
@@ -75,20 +81,26 @@ export function checkExpr(game: Game, expr: string) {
 export async function runScenario(
   session: GameSession,
   steps: ScenarioStep[],
-  assertions: Assertion[],
+  assertions: CheckSpec[],
   shoot?: (label?: string, annotate?: boolean) => Promise<ScreenshotInfo>,
 ): Promise<ScenarioResult> {
   const game = session.game;
   const checks: Check[] = [];
   const shots: ScenarioShot[] = [];
   let simulatedMs = 0;
-  const check = (a: Assertion, step?: number): Check => ({
-    ...(step !== undefined && { step }),
-    ...(a.name && { name: a.name }),
-    expr: a.expr,
-    ...checkExpr(game, a.expr),
-    frame: game.frame,
-  });
+  const check = (a: CheckSpec, step?: number, waiting = false): Check => {
+    const head = { ...(step !== undefined && { step }), ...(a.name && { name: a.name }) };
+    if (a.expr !== undefined) return { ...head, expr: waiting ? `waitUntil ${a.expr}` : a.expr, ...checkExpr(game, a.expr), frame: game.frame };
+    const r = checkAssertion(game, a.check);
+    const { label, ...rest } = r;
+    return { ...head, assert: a.check.assert, check: waiting ? `waitUntil ${label}` : label, ...rest, frame: game.frame };
+  };
+  /** True once the check holds, or can never hold (a bad expression). */
+  const settled = (a: CheckSpec) => {
+    if (a.expr === undefined) return checkAssertion(game, a.check).pass;
+    const r = checkExpr(game, a.expr);
+    return r.pass || 'error' in r;
+  };
 
   for (const [i, step] of steps.entries()) {
     if (step.type === 'assert') {
@@ -96,13 +108,9 @@ export async function runScenario(
     } else if (step.type === 'advanceClock') {
       session.apply({ op: 'advanceClock', ms: (step.hours ?? 0) * 3_600_000 + (step.minutes ?? 0) * 60_000 + (step.ms ?? 0) });
     } else if (step.type === 'waitUntil') {
-      const settled = () => {
-        const r = checkExpr(game, step.expr);
-        return r.pass || 'error' in r;
-      };
-      const frames = session.stepUntil(settled, msToFrames(step.maxMs ?? 5000));
+      const frames = session.stepUntil(() => settled(step), msToFrames(step.maxMs ?? 5000));
       simulatedMs += (frames * 1000) / 60;
-      checks.push({ ...check(step, i), expr: `waitUntil ${step.expr}`, waitedMs: Math.round((frames * 1000) / 60) });
+      checks.push({ ...check(step, i, true), waitedMs: Math.round((frames * 1000) / 60) });
     } else if (step.type === 'screenshot') {
       if (!shoot) throw new ToolError(`step ${i}: screenshots are not available here`);
       shots.push(await screenshot(shoot, game, step.label, step.annotate, i));

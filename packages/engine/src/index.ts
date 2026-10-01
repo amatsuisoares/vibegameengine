@@ -22,3 +22,4 @@ export * from './timers';
 export * from './tweens';
 export * from './nav';
 export * from './particles';
+export * from './assertions';

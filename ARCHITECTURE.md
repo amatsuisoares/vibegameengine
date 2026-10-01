@@ -312,6 +312,10 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
   (`RuntimeHost.newSession`, que não substitui a run atual) e devolve as checagens (`expr`, `pass`, `observed`, `frame`).
   É usado pelo `run_test` e pelo `verify_game`; este ainda fotografa a sessão (`RuntimeHost.screenshotOf`, que serve
   para qualquer sessão) e monta o relatório PASS/FAIL (`tools/verify-tools.ts`). Erros de runtime reprovam por padrão.
+- **Asserções estruturadas** (V0.3): schema `AssertionSchema` em `shared/src/assertions.ts` (união discriminada por
+  `assert`, validável em arquivos de playbook); `checkAssertion(game, a)` em `engine/src/assertions.ts` lê o `World`
+  direto (entidades, componentes, FSM, vars, eventos, cena, status) e devolve `{pass, label, expected, actual,
+  evidence}`. Uma checagem de cenário é `{expr}` ou `{check}`.
 - **Avisos visuais:** problemas de asset só aparecem ao desenhar; o screenshot devolve `renderWarnings`, e o
   `ProjectStore` já avisa na validação quando o arquivo de um asset não existe.
 - **Sandbox:** o agente só alcança o que as tools expõem — arquivos dentro do projeto, a run e a página do

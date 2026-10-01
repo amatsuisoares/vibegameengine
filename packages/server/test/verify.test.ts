@@ -30,7 +30,7 @@ type Report = {
   passed: boolean;
   summary: string;
   report: string[];
-  checks: { name?: string; expr: string; pass: boolean; frame: number; step?: number }[];
+  checks: { name?: string; expr?: string; check?: string; assert?: string; expected?: string; actual?: unknown; evidence?: Record<string, unknown>; pass: boolean; frame: number; step?: number }[];
   screenshots: { label?: string; path?: string; frame: number; step?: number; warning?: string; error?: string }[];
   final: { frame: number; status: string; vars: Record<string, unknown>; simulatedMs: number };
   eventCounts: Record<string, number>;
@@ -115,5 +115,39 @@ describe('verify_game', () => {
     expect(v.report).toEqual(['NOTE no checks: add assertions or assert/waitUntil steps', 'NOTE screenshot "final" failed: no browser']);
     expect(v.screenshots).toEqual([{ label: 'final', frame: 0, error: 'no browser' }]);
     expect((await call('verify_game', { scenario: 'x', steps: Array(6).fill({ type: 'screenshot' }) })).ok).toBe(false);
+  });
+
+  it('takes structured assertions in steps and at the end, with expected/actual and evidence', async () => {
+    const { call } = setup();
+    const r = await call('verify_game', {
+      scenario: 'coin and position',
+      screenshot: false,
+      steps: [
+        { type: 'assert', check: { assert: 'entityExists', id: 'player' } },
+        { type: 'keyDown', key: 'D' },
+        { type: 'waitUntil', name: 'coin collected', check: { assert: 'eventOccurred', event: 'collect', match: { entity: 'coin1' } }, maxMs: 3000 },
+        { type: 'keyUp', key: 'D' },
+      ],
+      assertions: [
+        { assert: 'variable', var: 'coins', equals: 1 },
+        { assert: 'entityExists', id: 'coin1', exists: false, name: 'coin is gone' },
+        { assert: 'entityAt', id: 'player', x: 2000, tolerance: 10 },
+        { assert: 'gameWon' },
+        "entity('player').grounded",
+      ],
+    });
+    if (!r.ok) throw new Error(r.error);
+    const v = r.result as Report;
+    expect(v.summary).toBe('FAIL: 5/7 checks passed');
+    expect(v.report.slice(0, 4)).toEqual(['PASS entity "player" exists', 'PASS coin collected', 'PASS vars.coins == 1', 'PASS coin is gone']);
+    expect(v.report[4]).toMatch(/^FAIL entity "player" at x 2000 \(±10\) — expected x 2000, y any \(±10\), got \{"x":\d+(\.\d+)?,"y":402\}; evidence \{"off":\{"dx":-\d+/);
+    expect(v.report[5]).toMatch(/^FAIL game won — expected "won", got "running" \(frame \d+\)$/);
+    expect(v.report[6]).toBe("PASS entity('player').grounded");
+    expect(v.checks[1]).toMatchObject({ assert: 'eventOccurred', check: 'waitUntil event "collect" {"entity":"coin1"} occurred', actual: 1, pass: true });
+
+    const bad = await call('verify_game', { scenario: 'bad', steps: [{ type: 'assert', expr: 'true', check: { assert: 'gameWon' } }] });
+    expect(bad.ok).toBe(false);
+    const unknown = await call('verify_game', { scenario: 'bad', assertions: [{ assert: 'teleported', id: 'player' }] });
+    expect(unknown.ok).toBe(false);
   });
 });

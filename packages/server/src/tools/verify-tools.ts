@@ -1,13 +1,22 @@
+import { AssertionSchema } from '@vibe/shared';
 import { z } from 'zod';
 import { ToolError } from '../project-store';
-import { runScenario, screenshot, type Check, type ScenarioShot } from '../runtime/scenario';
+import { runScenario, screenshot, type Check, type CheckSpec, type ScenarioShot, type ScenarioStep } from '../runtime/scenario';
 import { defineTool, WithImages } from './registry';
-import { AdvanceClockStep, AssertStep, ClockInput, Expr, host, InputStepSchema, StorageInput, WaitUntilStep } from './runtime-tools';
+import { AdvanceClockStep, ClockInput, Expr, host, InputStepSchema, StorageInput } from './runtime-tools';
 
 const MAX_SHOTS = 6;
 
 const Name = z.string().min(1).max(120).describe('What this checks, in plain words (shown in the report), e.g. "coin collected".');
-const NamedCheck = z.union([Expr, z.object({ name: Name, expr: Expr })]);
+const NamedCheck = z.union([Expr, z.object({ name: Name, expr: Expr }), AssertionSchema]);
+const Structured = AssertionSchema.describe(
+  'Structured assertion, e.g. {"assert":"variable","var":"coins","equals":1}, {"assert":"eventOccurred","event":"collect","match":{"entity":"coin1"}}.',
+);
+/** A step check: "expr" (expression) or "check" (structured assertion), exactly one. */
+const stepCheck = <T extends z.ZodRawShape>(shape: T) =>
+  z
+    .object({ ...shape, expr: Expr.optional(), check: Structured.optional(), name: Name.optional() })
+    .refine((st: { expr?: unknown; check?: unknown }) => (st.expr === undefined) !== (st.check === undefined), 'give either "expr" or "check"');
 const ScreenshotStep = z
   .object({
     type: z.literal('screenshot'),
@@ -17,31 +26,36 @@ const ScreenshotStep = z
   .describe('Takes a screenshot at this point of the scenario.');
 const VerifyStep = z.union([
   InputStepSchema,
-  WaitUntilStep.extend({ name: Name.optional() }),
-  AssertStep.extend({ name: Name.optional() }),
+  stepCheck({ type: z.literal('waitUntil'), maxMs: z.number().min(0).max(60_000).optional().describe('Default 5000.') }),
+  stepCheck({ type: z.literal('assert') }),
   AdvanceClockStep,
   ScreenshotStep,
 ]);
 
+const short = (v: unknown, max = 60) => {
+  const text = v === undefined ? 'undefined' : JSON.stringify(v);
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+};
+
 /** Observed values of a check as "a = 1, b = null" (short). */
 function evidence(observed: Record<string, unknown> | undefined) {
-  const parts = Object.entries(observed ?? {}).map(([k, v]) => {
-    const text = v === undefined ? 'undefined' : JSON.stringify(v);
-    return `${k} = ${text.length > 60 ? `${text.slice(0, 57)}...` : text}`;
-  });
-  return parts.join(', ');
+  return Object.entries(observed ?? {})
+    .map(([k, v]) => `${k} = ${short(v)}`)
+    .join(', ');
 }
 
 /** One report line per check: "PASS coin collected" / "FAIL coin collected: vars.coins == 1 (vars.coins = 0) at frame 180". */
 export function reportLine(c: Check) {
-  const label = c.name ?? c.expr;
+  const what = c.expr ?? c.check;
+  const label = c.name ?? what;
   if (c.pass) return `PASS ${label}`;
   const why = c.error
     ? `error: ${c.error}`
     : [
-        c.name && c.expr,
+        c.name && what,
         c.waitedMs !== undefined && `not true after waiting ${c.waitedMs} ms`,
-        evidence(c.observed) && `observed ${evidence(c.observed)}`,
+        c.assert ? `expected ${c.expected}, got ${short(c.actual)}` : evidence(c.observed) && `observed ${evidence(c.observed)}`,
+        c.evidence && `evidence ${short(c.evidence, 160)}`,
       ]
         .filter(Boolean)
         .join('; ');
@@ -52,14 +66,14 @@ export const verifyTools = [
   defineTool({
     name: 'verify_game',
     description:
-      'Verifies a feature in one call: plays a scenario on a fresh game (does not touch the current run), checks it and reports PASS/FAIL per check with the observed values, runtime errors, final state and screenshots. Steps: input steps (tap, hold, wait, click {entity}...), {"type":"waitUntil","expr"}, {"type":"assert","expr","name"?}, {"type":"advanceClock"}, {"type":"screenshot","label"?}. Use it after implementing or changing a feature.',
+      'Verifies a feature in one call: plays a scenario on a fresh game (does not touch the current run), checks it and reports PASS/FAIL per check with the observed values, runtime errors, final state and screenshots. Steps: input steps (tap, hold, wait, click {entity}...), {"type":"waitUntil","expr"|"check"}, {"type":"assert","expr"|"check","name"?}, {"type":"advanceClock"}, {"type":"screenshot","label"?}. Checks are expressions or structured assertions ({"assert": "entityExists"|"entityAt"|"entityNear"|"entity"|"component"|"state"|"variable"|"count"|"eventOccurred"|"scene"|"gameWon"|"gameLost"|"status", ...}) that report expected/actual and evidence. Use it after implementing or changing a feature.',
     input: z.object({
       scenario: z.string().min(1).max(120).describe('What is being verified, e.g. "player collects the coin".'),
       steps: z.array(VerifyStep).default([]),
       assertions: z
         .array(NamedCheck)
         .default([])
-        .describe('Checked after all steps: expressions, or {name, expr} to give them a readable name in the report.'),
+        .describe('Checked after all steps: expressions, {name, expr}, or structured assertions {"assert": ..., "name"?}.'),
       screenshot: z.boolean().default(true).describe('Screenshot of the final frame (default true).'),
       annotate: z.boolean().default(false).describe('Annotate the final screenshot (colliders and ids).'),
       allowErrors: z.boolean().default(false).describe('By default any runtime error (script crash, broken rule...) fails the verification.'),
@@ -76,8 +90,9 @@ export const verifyTools = [
       const shotSteps = input.steps.filter((st) => st.type === 'screenshot').length + (input.screenshot ? 1 : 0);
       if (shotSteps > MAX_SHOTS) throw new ToolError(`At most ${MAX_SHOTS} screenshots per verification`);
 
-      const assertions = input.assertions.map((a) => (typeof a === 'string' ? { expr: a } : a));
-      const { checks, shots, simulatedMs } = await runScenario(s, input.steps, assertions, shoot);
+      const assertions = input.assertions.map((a): CheckSpec => (typeof a === 'string' ? { expr: a } : 'assert' in a ? { check: a, name: a.name } : a));
+      // The schema guarantees each check step has exactly one of expr / check.
+      const { checks, shots, simulatedMs } = await runScenario(s, input.steps as ScenarioStep[], assertions, shoot);
       if (input.screenshot) shots.push(await screenshot(shoot, game, 'final', input.annotate));
 
       const errors = game.console.read(0, 'error').map((e) => e.message);

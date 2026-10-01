@@ -139,7 +139,12 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
 - [x] Bug achado pelo próprio `verify_game` no meu-pet: um clique no primeiro frame de uma cena chegava antes do
   `onStart` dos scripts. Agora os `onStart` pendentes rodam no começo do frame (`ScriptRunner.start`)
 - [x] 309 testes unitários + 16 e2e
-- [ ] Asserções de gameplay estruturadas
+- [x] **Asserções estruturadas**: `entityExists`, `entityAt`, `entityNear`, `entity` (campo do estado), `component`,
+  `state`, `variable`, `count`, `eventOccurred` (com `match` e contagem), `scene`, `gameWon`, `gameLost`, `status`;
+  comparações `equals/notEquals/gt/gte/lt/lte`; `expected`/`actual`/`evidence` por checagem; no `verify_game` em
+  `assertions` e em passos `assert`/`waitUntil` (`check`)
+- [x] meu-pet: regressão do `verify_game` usando asserções estruturadas
+- [x] 313 testes unitários + 16 e2e
 - [ ] Playbooks reutilizáveis (regressão)
 - [ ] Relatório de diagnóstico
 

@@ -573,6 +573,34 @@ Retorno:
   que falha (sem Chromium, por exemplo) vira `NOTE` no relatório, sem derrubar a verificação.
 - Use `run_test` para checagens rápidas só numéricas; `verify_game` para verificar uma feature com relatório e imagem.
 
+#### Asserções estruturadas
+
+Implementadas na V0.3 (`shared/src/assertions.ts` + `engine/src/assertions.ts`). Checagens sem código nem expressão,
+lidas direto do estado estruturado da engine. Cada uma devolve `expected`, `actual` e, quando falha, `evidence`.
+Entram em `assertions` do `verify_game` (`{"assert": ..., "name"?}`) e nos passos `{"type": "assert" | "waitUntil",
+"check": {...}}`, no lugar de `expr`. Expressões continuam valendo; as duas formas se misturam.
+
+| `assert` | Campos | Evidência quando falha |
+|---|---|---|
+| `entityExists` | `id, exists?` (padrão `true`) | posição se existe; ids parecidos se não |
+| `entityAt` | `id, x?, y?, tolerance?` (4 px) | posição real e quanto está fora (`off: {dx, dy}`) |
+| `entityNear` | `id, target, within` | posições das duas |
+| `entity` | `id, field` (caminho no estado: `health`, `interactable.uses`, `ai.choice`, `props.fome`) + comparação | campos que existem |
+| `component` | `id, component, field?` + comparação | componentes / campos que existem |
+| `state` | `id, is` (estado da `StateMachine`) | `stateMs`, `prevState`, últimas trocas (`idle->alert @120`) |
+| `variable` | `var` + comparação | variáveis que existem |
+| `count` | `tag` + comparação (sem comparação = pelo menos 1) | — |
+| `eventOccurred` | `event, match?` + comparação sobre a quantidade (sem = pelo menos 1; `equals: 0` = nunca) | últimos eventos que casaram, eventos do tipo que não casaram, tipos vistos |
+| `scene` | `is` | — |
+| `gameWon` / `gameLost` / `status` | — / — / `is` | eventos de fim (`win`, `lose`, `death`, `crash`) |
+
+Comparação: `equals`, `notEquals`, `gt`, `gte`, `lt`, `lte` (combináveis: `{"gte": 2, "lt": 5}`); sem nenhuma = o
+valor precisa existir. Linha do relatório:
+
+```
+FAIL entity "player" at x 2000 (±10) — expected x 2000, y any (±10), got {"x":317.5,"y":402}; evidence {"off":{"dx":-1682.5,"dy":0}} (frame 120)
+```
+
 ### Screenshots
 
 `take_screenshot` sobe (uma vez, sob demanda) o dev server do runtime e um Chromium headless. A página abre
