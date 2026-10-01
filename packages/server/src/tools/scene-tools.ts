@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { COMPONENT_DOCS, COMPONENT_TYPES, ComponentSchemas, EntitySchema, IdSchema, type ComponentType } from '@vibe/shared';
+import { COMPONENT_DOCS, COMPONENT_TYPES, ComponentSchemas, EntitySchema, IdSchema, resolveInstance, type ComponentType } from '@vibe/shared';
 import { isPlainObject, mergePatch } from '../merge-patch';
 import { ToolError, type CommitResult, type ProjectStore, type Transaction } from '../project-store';
+import { openMemoryItems } from './memory-tools';
 import { defineTool } from './registry';
 
 type Raw = Record<string, unknown>;
@@ -55,12 +56,13 @@ export function entitySummary(e: Raw) {
     x: t.x ?? 0,
     y: t.y ?? 0,
     components: Object.keys(isPlainObject(e.components) ? e.components : {}),
+    ...(e.prefab !== undefined && { prefab: e.prefab }),
     ...(e.enabled === false && { enabled: false }),
   };
 }
 
 /** Edits one scene's raw JSON inside a transaction. */
-function editScene<T>(ctx: { store: ProjectStore }, meta: Parameters<ProjectStore['edit']>[0], sceneId: string, fn: (scene: Raw, tx: Transaction) => T) {
+export function editScene<T>(ctx: { store: ProjectStore }, meta: Parameters<ProjectStore['edit']>[0], sceneId: string, fn: (scene: Raw, tx: Transaction) => T) {
   let out!: T;
   const r = ctx.store.edit(meta, (tx) => {
     const scene = tx.scene(sceneId);
@@ -79,7 +81,7 @@ export const sceneTools = [
   defineTool({
     name: 'get_project_summary',
     description:
-      'Overview of the project: config, scenes with their entities (id, tags, position, component types), assets, validation status and recent history. Call this first.',
+      'Overview of the project: config, scenes with their entities (id, tags, position, component types), prefabs, scripts, assets, validation status, recent history and open memory items (todos, issues, unfinished features). Call this first.',
     input: z.object({}),
     run: ({ store }) => {
       const snap = store.snapshot();
@@ -97,11 +99,19 @@ export const sceneTools = [
           const list = Array.isArray(scene.entities) ? (scene.entities as Raw[]) : [];
           return { id: s.id, file: s.file, ...(s.error && { error: s.error }), entityCount: list.length, entities: list.map(entitySummary) };
         }),
+        ...(snap.prefabs.length && {
+          prefabs: snap.prefabs.map((p) => ({
+            id: p.id,
+            ...(p.error ? { error: p.error } : { components: Object.keys(isPlainObject((p.data as Raw)?.components) ? ((p.data as Raw).components as Raw) : {}) }),
+          })),
+        }),
+        ...(Object.keys(snap.scripts).length && { scripts: Object.keys(snap.scripts) }),
         history: {
           canUndo: done.length > 0,
           canRedo: undone.length > 0,
           recent: store.history.all().slice(-5).map((e) => ({ seq: e.seq, author: e.author, action: e.action, summary: e.summary })),
         },
+        memory: openMemoryItems(store),
       };
     },
   }),
@@ -119,7 +129,7 @@ export const sceneTools = [
 
   defineTool({
     name: 'modify_project_config',
-    description: 'Changes project.json (name, width, height, gravity, startScene, actions, assets, pixelArt) with a merge patch.',
+    description: 'Changes project.json (name, width, height, gravity, startScene, actions, assets, sounds, pixelArt) with a merge patch. sounds maps event types to audio assets, e.g. {"sounds":{"jump":"sfx_jump","collect":"sfx_coin"}}.',
     mutates: true,
     input: z.object({ patch: Patch }),
     run: ({ store }, { patch }, meta) => {
@@ -191,14 +201,15 @@ export const sceneTools = [
 
   defineTool({
     name: 'get_game_object',
-    description: 'One entity: `raw` is what the scene file stores; `effective` has every default filled in.',
+    description: 'One entity: `raw` is what the scene file stores; `effective` has its prefab (if any) and every default filled in.',
     input: z.object({ scene: SceneId, id: EntityId }),
     run: ({ store }, { scene, id }) => {
       const s = store.snapshot().scenes.find((x) => x.id === scene);
       if (!s) throw new ToolError(`Scene "${scene}" does not exist`);
       if (s.error) throw new ToolError(s.error);
       const raw = entitiesOf(s.data as Raw)[entityIndex(s.data as Raw, scene, id)];
-      const parsed = EntitySchema.safeParse(raw);
+      const prefabs = Object.fromEntries(store.snapshot().prefabs.map((p) => [p.id, p.data]));
+      const parsed = EntitySchema.safeParse(resolveInstance(raw, prefabs).entity);
       return { raw, effective: parsed.success ? parsed.data : null };
     },
   }),

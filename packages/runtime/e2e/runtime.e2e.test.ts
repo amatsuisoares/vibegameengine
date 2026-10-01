@@ -81,6 +81,19 @@ describe('runtime page (Chromium)', () => {
     await page.close();
   });
 
+  it('loads and decodes the demo sounds', async () => {
+    const { page, errors } = await open('project=demo-platformer');
+    await page.waitForFunction(() => /Audio: \d+\/\d+ sounds loaded/.test(document.getElementById('console')!.textContent ?? ''), undefined, {
+      timeout: 10_000,
+    });
+    const line = await page.evaluate(() => document.getElementById('console')!.textContent!.match(/Audio: (\d+)\/(\d+)/)!.slice(1));
+    expect(line[0]).toBe(line[1]);
+    expect(Number(line[0])).toBeGreaterThan(0);
+    expect(await page.locator('#console .error').count()).toBe(0);
+    expect(errors).toEqual([]);
+    await page.close();
+  });
+
   it('is fully controllable through window.__vibe and shows the outcome', async () => {
     const { page } = await open('project=demo-platformer&paused=1&debug=1');
     const before = await vibe(page, (v) => v.getState({ ids: ['player'] }).entities[0].x);

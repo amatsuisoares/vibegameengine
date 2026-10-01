@@ -65,6 +65,16 @@ export const PatrolSchema = z.strictObject({
   startDirection: z.union([z.literal(1), z.literal(-1)]).default(1),
 });
 
+export const MoverSchema = z.strictObject({
+  path: z
+    .array(z.strictObject({ x: z.number(), y: z.number() }))
+    .min(1)
+    .describe('Waypoints relative to the start position, e.g. [{"x":200,"y":0}] = 200 px to the right.'),
+  speed: z.number().positive().default(80).describe('px/s.'),
+  loop: z.boolean().default(false).describe('false: back and forth along the path; true: from the last point straight back to the start.'),
+  waitMs: z.number().min(0).default(0).describe('Pause at each waypoint.'),
+});
+
 export const FollowTargetSchema = z.strictObject({
   targetId: z.string().optional().describe('Entity id to follow. Takes precedence over targetTag.'),
   targetTag: z.string().default('player').describe('Follow the nearest entity with this tag.'),
@@ -137,6 +147,20 @@ export const AnimatorSchema = z.strictObject({
   auto: z.boolean().default(true).describe('Pick idle/run/jump/fall from the body state automatically.'),
 });
 
+/** Script file path: scripts/<name>.js (subfolders allowed). */
+export const SCRIPT_PATH = /^scripts\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*\.js$/;
+
+export const ScriptSchema = z.strictObject({
+  src: z
+    .string()
+    .regex(SCRIPT_PATH, 'must be a .js file in scripts/, e.g. "scripts/spinner.js"')
+    .describe('Script file (project-relative), e.g. "scripts/spinner.js".'),
+  props: z
+    .record(z.string(), z.union([z.number(), z.string(), z.boolean()]))
+    .default(() => ({}))
+    .describe('Per-entity values the script reads as self.props (e.g. speed).'),
+});
+
 /** Registry of all built-in components. Add new component types here. */
 export const ComponentSchemas = {
   Sprite: SpriteSchema,
@@ -144,6 +168,7 @@ export const ComponentSchemas = {
   Collider: ColliderSchema,
   PlatformerController: PlatformerControllerSchema,
   Patrol: PatrolSchema,
+  Mover: MoverSchema,
   FollowTarget: FollowTargetSchema,
   Health: HealthSchema,
   Damage: DamageSchema,
@@ -153,6 +178,7 @@ export const ComponentSchemas = {
   Checkpoint: CheckpointSchema,
   Text: TextSchema,
   Animator: AnimatorSchema,
+  Script: ScriptSchema,
 } as const;
 
 export type ComponentType = keyof typeof ComponentSchemas;
@@ -164,6 +190,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Collider: 'Axis-aligned box; isTrigger detects without blocking; oneWay = jump-through platform.',
   PlatformerController: 'Walk and jump from input actions; acceleration, coyote time, jump buffer, double jump.',
   Patrol: 'Walks back and forth; turns at walls, ledges and a distance limit.',
+  Mover: 'Moves along waypoints (moving platforms, elevators); with a kinematic Body it carries what stands on it.',
   FollowTarget: 'Chases an entity (by id or nearest with a tag) within a range; horizontal or flying.',
   Health: 'Hit points, invulnerability after damage, and what happens on death (destroy/lose/respawn).',
   Damage: 'Hurts entities with target tags on contact, with knockback.',
@@ -173,6 +200,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Checkpoint: 'Sets the respawn point of the entity that touches it.',
   Text: 'Text/HUD with {var} and {entity.health} placeholders; screen or world space.',
   Animator: 'Spritesheet animation clips; picks idle/run/jump/fall automatically.',
+  Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
 
@@ -182,6 +210,7 @@ export const ComponentsSchema = z.strictObject({
   Collider: ColliderSchema.optional(),
   PlatformerController: PlatformerControllerSchema.optional(),
   Patrol: PatrolSchema.optional(),
+  Mover: MoverSchema.optional(),
   FollowTarget: FollowTargetSchema.optional(),
   Health: HealthSchema.optional(),
   Damage: DamageSchema.optional(),
@@ -191,6 +220,7 @@ export const ComponentsSchema = z.strictObject({
   Checkpoint: CheckpointSchema.optional(),
   Text: TextSchema.optional(),
   Animator: AnimatorSchema.optional(),
+  Script: ScriptSchema.optional(),
 });
 
 export type Components = z.output<typeof ComponentsSchema>;

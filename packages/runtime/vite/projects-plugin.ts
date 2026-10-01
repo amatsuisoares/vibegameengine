@@ -1,9 +1,10 @@
 import type { Plugin } from 'vite';
-import { handleProjectRequest, projectOfFile } from './project-files';
+import { handleProjectRequest, liveRunOfFile, projectOfFile } from './project-files';
 
 /**
  * Serves project data to the runtime page and tells it when project files change,
- * so edits (by the user or, later, by the agent) show up without a manual reload.
+ * so edits (by the user or by the agent) show up without a manual reload. Also announces
+ * every update of the agent's published run (follow mode).
  */
 export function vibeProjects(projectsRoot: string): Plugin {
   return {
@@ -23,6 +24,8 @@ export function vibeProjects(projectsRoot: string): Plugin {
         if (event !== 'add' && event !== 'change' && event !== 'unlink') return;
         const hit = projectOfFile(projectsRoot, file);
         if (hit) server.ws.send({ type: 'custom', event: 'vibe:project-changed', data: hit });
+        const live = event !== 'unlink' && liveRunOfFile(projectsRoot, file);
+        if (live) server.ws.send({ type: 'custom', event: 'vibe:live-changed', data: { name: live } });
       });
     },
   };

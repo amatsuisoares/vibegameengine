@@ -1,0 +1,44 @@
+{
+  // Jogo dentro do VS Code: sobe o dev server do runtime e abre a página no Simple Browser.
+  // Command Palette > "Tasks: Run Task" > "Vibe: abrir jogo" (ou "Vibe: seguir agente").
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Vibe: dev server",
+      // Same as `npm run dev`, but with node's absolute path (as in .mcp.json): VS Code may not have
+      // Node.js on its PATH (e.g. when it was opened before Node was installed).
+      "type": "process",
+      "command": "C:/Program Files/nodejs/node.exe",
+      "args": ["node_modules/vite/bin/vite.js", "--config", "packages/runtime/vite.config.ts", "--configLoader", "runner"],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vibe",
+        "pattern": { "regexp": "^\\s*error\\s+(.*)$", "message": 1 },
+        "background": { "activatesOnStart": true, "beginsPattern": "VITE", "endsPattern": "Local" }
+      },
+      "presentation": { "reveal": "silent", "panel": "dedicated" }
+    },
+    {
+      "label": "Vibe: abrir jogo",
+      "detail": "Runtime no Simple Browser, com hot reload a cada edição do projeto",
+      "dependsOn": "Vibe: dev server",
+      "type": "shell",
+      "command": "echo ${input:openGame}",
+      "presentation": { "reveal": "never" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Vibe: seguir agente",
+      "detail": "Mostra ao vivo a run que o Claude Code está jogando",
+      "dependsOn": "Vibe: dev server",
+      "type": "shell",
+      "command": "echo ${input:followAgent}",
+      "presentation": { "reveal": "never" },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    { "id": "openGame", "type": "command", "command": "simpleBrowser.show", "args": "http://localhost:5173/" },
+    { "id": "followAgent", "type": "command", "command": "simpleBrowser.show", "args": "http://localhost:5173/?live=1" }
+  ]
+}

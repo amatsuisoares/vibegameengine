@@ -1,0 +1,6 @@
+{
+  // Links para o runtime (ex.: os que a tool open_game_view devolve) abrem no Simple Browser do VS Code.
+  "workbench.externalUriOpeners": {
+    "localhost:5173": "simpleBrowser.open"
+  }
+}

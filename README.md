@@ -2,8 +2,10 @@
 
 Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa, joga, observa e corrige** o próprio jogo.
 
-> Status: **Etapa 6 concluída** — a engine roda dentro do VS Code e o **Claude Code é o agente**: pelo chat ele
-> cria e edita o jogo, roda, joga, vê screenshots, testa e corrige, usando as tools do servidor MCP `vibe`.
+> Status: **Etapa 8 concluída** — o **Claude Code é o agente**: pelo chat ele cria e edita o jogo, roda, joga,
+> vê screenshots, testa e corrige, usando as tools do servidor MCP `vibe`. O jogo aparece num painel do VS Code,
+> com hot reload e um modo que segue ao vivo o que o agente está jogando. Além dos componentes prontos há scripts,
+> regras de evento/condição, prefabs, som, plataformas móveis e memória do projeto.
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos
@@ -28,7 +30,16 @@ npm run vibe -- tools   # CLI das tools de edição (ver abaixo)
 2. O Claude Code lê `.mcp.json` e inicia o servidor MCP `vibe` (as tools aparecem como `mcp__vibe__*`).
 3. Peça pelo chat, por exemplo: *"Crie um jogo de plataforma com três moedas, dois inimigos e uma bandeira; teste
    tudo"*. O agente cria/edita o projeto em `projects/`, joga, tira screenshots e roda testes.
-4. Cada alteração entra no histórico do projeto (`undo`/`redo`). Com `npm run dev` aberto, o jogo atualiza ao vivo.
+4. Cada alteração entra no histórico do projeto (`undo`/`redo`).
+
+### Jogo dentro do VS Code
+
+- **Command Palette → "Tasks: Run Task" → "Vibe: abrir jogo"**: sobe o dev server e abre o jogo no Simple Browser,
+  num painel do editor. Cada edição do agente recarrega o jogo na hora.
+- **"Vibe: seguir agente"**: o painel mostra ao vivo a run que o Claude Code está jogando (`run_game`,
+  `perform_inputs`...). O mesmo modo liga e desliga pela caixa **Seguir agente** na barra do jogo.
+- Pelo chat: peça *"abra o jogo"*. A tool `open_game_view` devolve um link que o VS Code abre no Simple Browser
+  (`.vscode/settings.json`).
 
 ### Tools pela CLI
 
@@ -60,11 +71,13 @@ Com `npm run dev` aberto, cada alteração aparece no jogo na hora (hot reload).
 ### Runtime no browser
 
 `npm run dev` abre a página do runtime. A/D (ou setas) andam, Espaço pula, **R** reinicia depois do fim de jogo.
-A barra superior tem seletor de projeto, Restart, Pause/Resume, Step (1 frame) e Debug (colliders e ids).
+A barra superior tem seletor de projeto, Restart, Pause/Resume, Step (1 frame), Debug (colliders e ids), Som e
+Seguir agente. O som começa depois do primeiro clique ou tecla na página (regra dos navegadores).
 Editar arquivos em `projects/<nome>/` recarrega o jogo automaticamente; erros de validação aparecem no console.
 
-Parâmetros de URL: `?project=demo-platformer&scene=level1&seed=7&debug=1&paused=1`.
+Parâmetros de URL: `?project=demo-platformer&scene=level1&seed=7&debug=1&paused=1&live=1`.
 Com `paused=1` nada avança sozinho — o jogo só anda por `window.__vibe` (modo usado por hosts externos).
+Com `live=1` a página segue a run do agente (`.vibe/live.json`) em vez de ser jogada.
 
 ## Estrutura
 
@@ -84,7 +97,7 @@ docs/
   PROMPT_ORIGINAL.md pedido original do projeto (escopo e prioridades)
 ```
 
-Não há editor separado: o jogo roda dentro do VS Code (Etapa 7) e o chat é o Claude Code.
+Não há editor separado: o jogo roda dentro do VS Code (Simple Browser, `.vscode/tasks.json`) e o chat é o Claude Code.
 
 ## Uso da engine (headless)
 

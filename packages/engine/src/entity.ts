@@ -1,5 +1,6 @@
 import type { Components, EntityData } from '@vibe/shared';
 import type { AABB } from './math';
+import type { ScriptInstance } from './scripts';
 
 /** Runtime instance of an entity. Component data is a deep copy of the scene data and may be mutated. */
 export class Entity {
@@ -32,6 +33,10 @@ export class Entity {
   patrolDir: number;
   animName: string | null = null;
   animTime = 0;
+  /** Mover progress: waypoint index, direction (ping-pong) and remaining pause in frames. */
+  mover?: { target: number; dir: number; wait: number };
+  /** Script instance (created on first use by the ScriptRunner). */
+  script?: ScriptInstance;
 
   constructor(data: EntityData) {
     this.id = data.id;

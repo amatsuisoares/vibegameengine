@@ -1,13 +1,10 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, isAbsolute, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { GameOp, GameState } from '@vibe/engine';
 import type { Browser, Page, Route } from 'playwright';
-import type { ViteDevServer } from 'vite';
 import { ToolError } from '../project-store';
+import { DevServer } from './dev-server';
 import type { RawProject } from './session';
-
-const RUNTIME_VITE_CONFIG = fileURLToPath(new URL('../../../runtime/vite.config.ts', import.meta.url));
 
 const MIME: Record<string, string> = {
   '.png': 'image/png',
@@ -16,6 +13,9 @@ const MIME: Record<string, string> = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
+  '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
 };
 
 export interface ShotRequest {
@@ -52,10 +52,12 @@ declare global {
  * replayed on the next shot of the same run.
  */
 export class Screenshotter {
-  private server?: ViteDevServer;
   private browser?: Browser;
   private page?: Page;
   private loaded?: { key: string; applied: number };
+
+  /** The dev server is shared with the game view (open_game_view). */
+  constructor(readonly devServer: DevServer = new DevServer()) {}
 
   async shoot(req: ShotRequest): Promise<ShotResult> {
     const page = await this.pageFor(req);
@@ -79,22 +81,13 @@ export class Screenshotter {
 
   async close() {
     await this.browser?.close();
-    await this.server?.close();
-    this.browser = this.server = this.page = this.loaded = undefined;
-  }
-
-  private async baseUrl() {
-    if (!this.server) {
-      const { createServer } = await import('vite');
-      this.server = await createServer({ configFile: RUNTIME_VITE_CONFIG, configLoader: 'runner', server: { port: 0 }, logLevel: 'error' });
-      await this.server.listen();
-    }
-    return this.server.resolvedUrls!.local[0];
+    await this.devServer.close();
+    this.browser = this.page = this.loaded = undefined;
   }
 
   private async pageFor(req: ShotRequest): Promise<Page> {
     if (this.page && this.loaded?.key === req.key && this.loaded.applied <= req.ops.length) return this.page;
-    const base = await this.baseUrl();
+    const base = await this.devServer.url();
     if (!this.browser) {
       const { chromium } = await import('playwright');
       this.browser = await chromium.launch();

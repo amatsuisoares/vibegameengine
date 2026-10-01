@@ -10,3 +10,5 @@ projects/*/.vibe/runs/
 projects/*/.vibe/history.jsonl
 # temporary copy made by the e2e tests
 projects/e2e-tmp/
+# published agent run mirrored by the runtime page (follow mode)
+projects/*/.vibe/live.json

@@ -10,7 +10,7 @@ chamá-las pela CLI (`npm run vibe -- call|script ...`).
 | Runtime no browser (`window.__vibe`) | **implementado** (Etapa 2) |
 | Tools de runtime (`run_game`, `press_key`, `take_screenshot`, `run_test`...) | **implementado** (Etapa 4) |
 | Workspace: `list_projects`, `open_project`, `create_project` | **implementado** (Etapa 6, só via MCP) |
-| Memória | planejado (Etapa 8) |
+| Memória: `read_memory`, `update_memory` | **implementado** (Etapa 8) |
 
 Convenções:
 - Todas as tools operam **somente** dentro do projeto aberto (caminhos fora de `projects/<nome>/` são rejeitados;
@@ -37,7 +37,7 @@ Convenções:
 | `modify_project_config` | `patch` | gravity, actions, assets, startScene... |
 | `get_scene` | `scene` | configurações da cena + resumo das entidades |
 | `create_scene` | `id, settings?, entities?` | cria `scenes/<id>.json` |
-| `modify_scene` | `scene, patch` | configurações (não `id`/`entities`) |
+| `modify_scene` | `scene, patch` | configurações (não `id`/`entities`; para `rules` prefira `set_rule`) |
 | `delete_scene` | `scene` | recusado se ainda referenciada (startScene, Goal.scene) |
 
 ## Entidades e componentes
@@ -55,18 +55,118 @@ Convenções:
 
 Id inexistente sugere ids parecidos (`Did you mean: enemy1, enemy2?`).
 
+## Prefabs
+
+Implementado na Etapa 8 (`shared/src/prefabs.ts`, `tools/prefab-tools.ts`). Um prefab é uma entidade sem `id` em
+`prefabs/<id>.json`. Uma entidade da cena com `"prefab": "<id>"` é o prefab + os campos dela (JSON Merge Patch):
+`{ "id": "enemy3", "prefab": "goomba", "transform": { "x": 900, "y": 406 } }`. Mudar o prefab muda todas as instâncias
+(menos o que a instância sobrescreve; `null` remove um campo herdado).
+
+| Tool | Parâmetros | Observação |
+|---|---|---|
+| `create_prefab` | `id, entity? \| from: {scene, id}, link?` | de dados ou copiando uma entidade (sem a posição); `link` transforma a entidade em instância |
+| `modify_prefab` | `id, patch` | validado contra todas as instâncias |
+| `delete_prefab` | `id` | recusado enquanto houver instâncias ou regras `spawn` usando |
+
+Em execução: ação de regra `spawn {prefab, x?, y?, at?, id?}` (`at`: id ou `"$by"`, e x/y viram deslocamento) e
+`game.spawn(prefab, x, y, id?)` nos scripts. Ids gerados: `<prefab><n>`. Cada criação emite `spawn`. Entidades criadas
+somem no restart (não fazem parte da cena). `get_game_object.effective` já mostra o prefab aplicado;
+`get_project_summary` lista prefabs e scripts.
+
+## Regras da cena (eventos e condições)
+
+Implementado na Etapa 8 (`shared/src/rules.ts`, `engine/src/rules.ts`, `tools/rule-tools.ts`). Lógica comum sem
+script: `quando → se → faça`, guardada em `rules` da cena e avaliada todo frame depois dos sistemas.
+
+| Tool | Parâmetros | Observação |
+|---|---|---|
+| `set_rule` | `scene, rule` | cria ou substitui (pelo `id`); defaults não são gravados |
+| `delete_rule` | `scene, id` | |
+
+```json
+{ "id": "abre-porta", "when": { "expr": "vars.coins >= 3" }, "if": "exists('door')",
+  "do": [{ "action": "setEnabled", "target": "door", "enabled": false }, { "action": "emit", "event": "door_opened" }],
+  "once": true }
+```
+
+| `when` | Dispara |
+|---|---|
+| `{ "start": true }` | uma vez, no início da cena |
+| `{ "event": "collect", "match": { "entity": "coin1" } }` | a cada evento do tipo (de sistemas, scripts ou outras regras) |
+| `{ "enter": "zona", "tag": "player" }` | quando uma entidade com a tag começa a tocar a zona (`tag` padrão: `player`) |
+| `{ "expr": "vars.coins >= 3" }` | quando a expressão passa de falsa para verdadeira |
+| `{ "every": 1000 }` | a cada N ms de tempo de jogo |
+
+Ações: `setVar {var, value}`, `addVar {var, amount}`, `emit {event, data?}`, `win`, `lose`, `loadScene {scene}`,
+`destroy {target}`, `setEnabled {target, enabled}`, `setText {target, text}`, `damage {target, amount}`,
+`heal {target, amount}`, `move {target, x?, y?}`, `modify {target, component, set}`, `log {message}`,
+`playSound {asset, volume?}`, `spawn {prefab, x?, y?, at?, id?}`.
+`target` é um id ou `"$by"` (quem entrou na zona, ou o `by`/`entity` do evento). `if` e `when.expr` usam as mesmas
+expressões do `wait_until`. Cada disparo gera o evento `rule`. Referências (ids, cenas, componentes) e expressões são
+validadas ao gravar; uma regra que falha em execução gera `rule_error`, vai para o console e fica desligada até a
+cena recarregar. Eventos emitidos por uma regra são vistos pelas outras no frame seguinte (sem laços infinitos).
+
+## Assets e som
+
+Implementado na Etapa 8 (`tools/asset-tools.ts`, `sfx.ts`, `engine/src/sound.ts`, `runtime/src/audio.ts`).
+
+| Tool | Parâmetros | Observação |
+|---|---|---|
+| `import_asset` | `source, id, type?, path?, frameWidth?, frameHeight?, replace?` | copia de um caminho absoluto (png/jpg/gif/webp/svg, wav/mp3/ogg; máx. 20 MB) para `assets/` e declara em `project.json` |
+| `create_sound` | `id, preset, pitch?, duration?, volume?, seed?, replace?` | gera um efeito retrô em `assets/sfx/<id>.wav` (presets: coin, jump, hit, powerup, explosion, blip, laser, win, lose) |
+
+- O arquivo binário não entra no histórico; a declaração em `project.json` sim (e é validada: se for recusada, o
+  arquivo copiado é removido).
+- **Som é evento.** `config.sounds` mapeia tipos de evento para assets de áudio
+  (`{"jump": "sfx_jump", "collect": {"asset": "sfx_coin", "volume": 0.5}}`); `scene.music` toca em loop enquanto a cena
+  roda; regras têm a ação `playSound` e scripts `game.playSound(id, volume?)`. A run emite `sound`
+  (`{asset, volume, cause}`) e `music` (`{asset | null}`): o agente verifica pelos eventos, sem ouvir; o browser toca
+  com Web Audio (depois do primeiro clique/tecla, regra dos navegadores) e a barra do jogo tem a caixa **Som**.
+
 ## Código e arquivos
 
 | Tool | Parâmetros | Retorno |
 |---|---|---|
 | `list_files` | `dir?` | arquivos com tamanho (sem `.vibe/`) |
 | `read_file` | `path, startLine?, endLine?` | texto numerado, máx. 2000 linhas por chamada; binário → só o tamanho |
-| `write_file` | `path, content` | cria/sobrescreve; JSON do projeto é validado |
+| `write_file` | `path, content` | cria/sobrescreve; JSON do projeto e scripts são validados |
 | `edit_file` | `path, oldText, newText, replaceAll?` | `oldText` precisa ser único (ou `replaceAll`) |
 | `delete_file` | `path` | `project.json` não pode ser apagado |
 
-`create_script` / `modify_script` / `delete_script` chegam com o componente `Script` (Etapa 8); até lá
-`write_file`/`edit_file` cobrem arquivos de código.
+### Scripts
+
+Implementado na Etapa 8. Comportamento que os componentes prontos não cobrem vai em `scripts/<nome>.js`
+(subpastas valem), ligado a uma entidade pelo componente `Script` (`{ "src": "scripts/x.js", "props": {...} }`).
+Os papéis de `create_script` / `modify_script` / `delete_script` ficam com `write_file` / `edit_file` / `delete_file`:
+script é um arquivo do projeto como os outros (validado, no histórico, desfazível).
+
+```js
+// scripts/bobbing.js — uma cópia por entidade (variáveis de topo não são compartilhadas)
+let base;
+function onStart(self, game) { base = self.y; }
+function onUpdate(self, game, dt) { self.y = base + Math.sin(game.time * self.props.speed) * 6; }
+function onCollision(self, other, game) {
+  if (other.hasTag('player')) { game.vars.bonus = (game.vars.bonus || 0) + 1; game.emit('bonus'); self.destroy(); }
+}
+```
+
+| Hook | Quando |
+|---|---|
+| `onStart(self, game)` | primeiro frame da entidade |
+| `onUpdate(self, game, dt)` | todo frame, depois dos controllers e antes da física |
+| `onCollision(self, other, game)` | quando um contato começa (dos dois lados) |
+
+- `self`: `id, name, tags, hasTag(t), x, y, vx, vy` (velocidade exige `Body`), `grounded, enabled, destroyed, health,
+  props, state` (armazenamento livre), `get(tipo)` (dados vivos do componente), `damage(n)`, `destroy()`.
+- `game`: `frame, time, dt, scene, status, vars` (vivas), `entity(id)`, `find(tag)`,
+  `input.isDown/pressed/released(ação ou tecla)`, `input.mouse`, `emit(tipo, dados)` (evento visível em
+  `read_events`/`events('tipo')`), `random()`, `randomInt(a, b)`, `win()`, `lose()`, `loadScene(id)`.
+- Também `console.log/warn/error` (vão para o console do jogo) e `Math` com `Math.random` usando a seed da run.
+- **Determinismo:** `Date`, timers, rede, `process`, `window` e `globalThis` não existem para o script. É uma API
+  restrita para lógica de jogo, não uma sandbox de segurança.
+- **Erros:** sintaxe quebrada é recusada na gravação com `scripts/x.js:linha` (checada com `node:vm`). Erro em
+  execução vai para o console como `scripts/x.js:linha:coluna in onUpdate of "id": TypeError...`, gera o evento
+  `script_error` e desliga o script daquela entidade até reiniciar — o jogo continua rodando.
 
 ## Histórico
 
@@ -98,6 +198,7 @@ reproduzir a run no Chromium para o screenshot.
 | `read_console` | `since?, level?` | logs, avisos, erros com stack |
 | `take_screenshot` | `annotate?` | PNG (imagem anexada ao resultado), `path`, `frame`, `camera`; `renderWarnings` se algum sprite não pôde ser desenhado |
 | `run_test` | `steps, assertions, scene?, seed?` | roda num jogo novo (não mexe na run atual) e relata cada checagem |
+| `open_game_view` | `follow?, scene?, debug?` | URL da página do jogo para o usuário abrir no VS Code (ver abaixo) |
 
 **Observação após cada ação.** `run_game`, `restart_game`, `wait`, `wait_until`, `perform_inputs` e `click_mouse`
 devolvem o que aconteceu desde a ação anterior: `frame`, `status`, `scene`, `keysDown`, `players` (entidades com
@@ -145,6 +246,22 @@ projeto); as `GameOp` da run são reaplicadas por `window.__vibe.apply()` — s�
 mesma run. O PNG é salvo em `.vibe/runs/<runId>/NNN-f<frame>[-debug].png`. Depois da foto, o estado do browser é
 comparado com o da run headless; divergência viraria `warning` (nunca deve acontecer — testado).
 
+O dev server sobe de preferência na porta 5173 e é compartilhado com `open_game_view`.
+
+### Jogo no VS Code (`open_game_view`)
+
+Devolve `{ url, server, howToOpen }`. Se já há um dev server do VibeGameEngine na porta 5173 (`npm run dev` ou a
+task do VS Code), usa ele; senão sobe um dentro do servidor MCP, que vive enquanto durar a sessão do Claude Code.
+O agente mostra a URL como link: com `.vscode/settings.json` (`workbench.externalUriOpeners`), o VS Code abre
+links para `localhost:5173` no **Simple Browser**.
+
+- `follow: false` (padrão): o usuário joga; a página recarrega a cada edição do projeto (hot reload).
+- `follow: true` (`?live=1`): a página **segue a run do agente**. Depois de cada ação que muda a run
+  (`run_game`, `perform_inputs`, `wait`...), o host grava a run em `.vibe/live.json` (projeto exato, seed, cena
+  e log de `GameOp`); o dev server avisa a página, que reaplica as ops novas em tempo real. Se a página fica mais de
+  3 s atrás (o agente simula mais rápido que o relógio), ela adianta o excesso. O teclado do usuário não chega ao jogo
+  espelhado. `stop_game` marca a run como encerrada; um `restart_game` vira uma run nova.
+
 ## Runtime no browser (`window.__vibe`)
 
 Implementado na Etapa 2. É a superfície que o RuntimeHost (Etapa 4) vai usar via Playwright
@@ -166,12 +283,20 @@ Para execuções determinísticas, abra a página com `?paused=1`.
 `window.__vibeError` (lista de mensagens) é definido quando o projeto não carrega ou uma edição o deixa inválido.
 `take_screenshot` = `apply(ops novas)` + `setDebug(annotate)` + `render()` + screenshot do elemento `canvas`.
 
-## Memória
+## Memória do projeto
 
-| Tool | Parâmetros |
-|---|---|
-| `read_memory` | — |
-| `update_memory` | `features?, todos?, knownIssues?, notes?` |
+Implementado na Etapa 8 (`tools/memory-tools.ts`, schema em `shared/src/memory.ts`). Guarda o que o agente sabe do
+projeto além dos arquivos de dados, para uma conversa nova continuar de onde a anterior parou. Fica em
+`.vibe/memory.json` (versionado no git; fora do histórico de undo).
+
+| Tool | Parâmetros | Retorno |
+|---|---|---|
+| `read_memory` | — | `summary`, `features`, `todos`, `issues`, `notes` + cenas (nº de entidades), assets e as 5 últimas mudanças |
+| `update_memory` | `summary?, upsert?, remove?` | ids criados e contagem `open/done/verified` |
+
+Itens: `{ id, kind: feature|todo|issue|note, text, status: open|done|verified, evidence? }`. Sem `id`, o `upsert`
+cria o item (ids `f1`, `t1`, `i1`, `n1`...); com `id`, altera só os campos passados. `verified` = feito e checado
+por teste ou jogando; `evidence` diz como. `get_project_summary` traz os itens em aberto (`memory`).
 
 ## Nomes de teclas
 

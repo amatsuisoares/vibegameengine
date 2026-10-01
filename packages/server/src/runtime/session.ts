@@ -3,7 +3,7 @@ import { evaluateExpr, ExprError, Game, msToFrames, type EntitySnapshot, type Ga
 import type { Project } from '@vibe/shared';
 import { ToolError } from '../project-store';
 
-export type RawProject = { config: unknown; scenes: Record<string, unknown> };
+export type RawProject = { config: unknown; scenes: Record<string, unknown>; scripts?: Record<string, string>; prefabs?: Record<string, unknown> };
 
 export function fingerprint(raw: RawProject) {
   return createHash('sha1').update(JSON.stringify(raw)).digest('hex');

@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
-import { parseProject, type Project } from '@vibe/shared';
+import { Script } from 'node:vm';
+import { parseExpr, SCRIPT_PARAMS, wrapScript } from '@vibe/engine';
+import { formatIssues, MEMORY_FILE, parseProject, ProjectMemorySchema, SCRIPT_PATH, type Project, type ProjectMemory } from '@vibe/shared';
 import { removeFile, writeFileAtomic } from './fs-atomic';
 import { History, unifiedDiff, type Author, type FileChange, type HistoryEntry } from './history';
 import { formatJson } from './json-format';
@@ -40,7 +42,14 @@ export interface Snapshot {
   config?: unknown;
   configError?: string;
   scenes: SceneFile[];
+  /** Script sources by path (scripts/*.js). */
+  scripts: Record<string, string>;
+  /** prefabs/<id>.json files (id = file name). */
+  prefabs: SceneFile[];
 }
+
+/** The project as stored: config, scenes by id and script sources (not validated). */
+export type RawProjectData = { config: unknown; scenes: Record<string, unknown>; scripts: Record<string, string>; prefabs: Record<string, unknown> };
 
 export interface ValidationStatus {
   ok: boolean;
@@ -59,8 +68,46 @@ export function normalizeRel(rel: string) {
   return rel.replace(/\\/g, '/').replace(/^(\.\/)+/, '').replace(/\/+$/, '');
 }
 
+const SCENE_FILE = /^scenes\/[^/]+\.json$/;
+const PREFAB_FILE = /^prefabs\/[A-Za-z][A-Za-z0-9_-]*\.json$/;
+
+/** Files that make up the game itself (validated before every write): config, scenes, scripts and prefabs. */
 export function isProjectDataFile(rel: string) {
-  return rel === PROJECT_FILE || /^scenes\/[^/]+\.json$/.test(rel);
+  return rel === PROJECT_FILE || SCENE_FILE.test(rel) || SCRIPT_PATH.test(rel) || PREFAB_FILE.test(rel);
+}
+
+/**
+ * Syntax check of a script, with the line of the error (V8's `new Function` does not report it).
+ * Compiles the same wrapper the engine uses, without running it.
+ */
+export function checkScriptSyntax(file: string, source: string): string | null {
+  try {
+    new Script(`(function (${SCRIPT_PARAMS.join(', ')}) {${wrapScript(source, file)}\n})`, { filename: file });
+    return null;
+  } catch (err) {
+    const where = /^(.*?:\d+)\n/.exec((err as Error).stack ?? '')?.[1] ?? file;
+    return `${where}: ${(err as Error).name}: ${(err as Error).message}`;
+  }
+}
+
+/** Syntax errors in scene rule expressions (`when.expr` and `if`). */
+function ruleExpressionErrors(project: Project): string[] {
+  const errors: string[] = [];
+  for (const scene of Object.values(project.scenes)) {
+    for (const rule of scene.rules) {
+      const at = `scenes.${scene.id}.rules(${rule.id})`;
+      const exprs: [string, string | undefined][] = [['when.expr', 'expr' in rule.when ? rule.when.expr : undefined], ['if', rule.if]];
+      for (const [field, src] of exprs) {
+        if (src === undefined) continue;
+        try {
+          parseExpr(src);
+        } catch (err) {
+          errors.push(`${at}.${field}: ${(err as Error).message}`);
+        }
+      }
+    }
+  }
+  return errors;
 }
 
 function parseJsonText(file: string, text: string): { data?: unknown; error?: string } {
@@ -110,7 +157,36 @@ export class ProjectStore {
     const dir = join(this.dir, 'scenes');
     const files = new Set(existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => `scenes/${f}`) : []);
     for (const [file, content] of changes) {
-      if (!isProjectDataFile(file) || file === PROJECT_FILE) continue;
+      if (!SCENE_FILE.test(file)) continue;
+      if (content === null) files.delete(file);
+      else files.add(file);
+    }
+    return [...files].sort();
+  }
+
+  /** Script files (.js under scripts/) on disk, with pending changes applied on top. */
+  scriptFiles(changes: Changes = new Map()): string[] {
+    return this.filesMatching('scripts', SCRIPT_PATH, changes);
+  }
+
+  /** Prefab files (prefabs/<id>.json) on disk, with pending changes applied on top. */
+  prefabFiles(changes: Changes = new Map()): string[] {
+    return this.filesMatching('prefabs', PREFAB_FILE, changes);
+  }
+
+  private filesMatching(dir: string, pattern: RegExp, changes: Changes): string[] {
+    const files = new Set<string>();
+    const walk = (abs: string, rel: string) => {
+      if (!existsSync(abs)) return;
+      for (const d of readdirSync(abs, { withFileTypes: true })) {
+        const r = `${rel}/${d.name}`;
+        if (d.isDirectory()) walk(join(abs, d.name), r);
+        else if (pattern.test(r)) files.add(r);
+      }
+    };
+    walk(join(this.dir, dir), dir);
+    for (const [file, content] of changes) {
+      if (!pattern.test(file)) continue;
       if (content === null) files.delete(file);
       else files.add(file);
     }
@@ -119,7 +195,7 @@ export class ProjectStore {
 
   snapshot(changes: Changes = new Map()): Snapshot {
     const read = (f: string) => (changes.has(f) ? changes.get(f)! : this.readText(f));
-    const snap: Snapshot = { scenes: [] };
+    const snap: Snapshot = { scenes: [], scripts: {}, prefabs: [] };
     const configText = read(PROJECT_FILE);
     if (configText === null) snap.configError = `${PROJECT_FILE} is missing`;
     else {
@@ -132,6 +208,8 @@ export class ProjectStore {
       const id = (r.data as { id?: unknown } | undefined)?.id;
       snap.scenes.push({ file, id: typeof id === 'string' ? id : basename(file, '.json'), ...r });
     }
+    for (const file of this.scriptFiles(changes)) snap.scripts[file] = read(file) ?? '';
+    for (const file of this.prefabFiles(changes)) snap.prefabs.push({ file, id: basename(file, '.json'), ...parseJsonText(file, read(file) ?? '') });
     return snap;
   }
 
@@ -148,9 +226,17 @@ export class ProjectStore {
         scenes[s.id] = s.data;
       }
     }
+    for (const [file, source] of Object.entries(snap.scripts)) {
+      const err = checkScriptSyntax(file, source);
+      if (err) errors.push(err);
+    }
+    for (const p of snap.prefabs) if (p.error) errors.push(p.error);
     if (errors.length) return { ok: false, errors, warnings: [] };
-    const r = parseProject({ config: snap.config, scenes });
+    const prefabs = Object.fromEntries(snap.prefabs.map((p) => [p.id, p.data]));
+    const r = parseProject({ config: snap.config, scenes, scripts: snap.scripts, prefabs });
     if (!r.ok) return { ok: false, errors: r.errors, warnings: r.warnings };
+    const exprErrors = ruleExpressionErrors(r.value);
+    if (exprErrors.length) return { ok: false, errors: exprErrors, warnings: r.warnings };
     const warnings = [...r.warnings];
     for (const a of r.value.config.assets) {
       if (!existsSync(join(this.dir, 'assets', a.path))) warnings.push(`config.assets(${a.id}): file assets/${a.path} not found`);
@@ -158,12 +244,35 @@ export class ProjectStore {
     return { ok: true, project: r.value, errors: [], warnings };
   }
 
-  /** Raw `{ config, scenes }` as stored on disk (not validated); throws if a file is not valid JSON. */
-  rawProject(): { config: unknown; scenes: Record<string, unknown> } {
+  /** Raw `{ config, scenes, scripts, prefabs }` as stored on disk (not validated); throws if a file is not valid JSON. */
+  rawProject(): RawProjectData {
     const snap = this.snapshot();
-    const errors = [snap.configError, ...snap.scenes.map((s) => s.error)].filter((e): e is string => !!e);
+    const errors = [snap.configError, ...snap.scenes.map((s) => s.error), ...snap.prefabs.map((p) => p.error)].filter((e): e is string => !!e);
     if (errors.length) throw new ToolError('Project files contain invalid JSON', errors);
-    return { config: snap.config, scenes: Object.fromEntries(snap.scenes.map((s) => [s.id, s.data])) };
+    return {
+      config: snap.config,
+      scenes: Object.fromEntries(snap.scenes.map((s) => [s.id, s.data])),
+      scripts: snap.scripts,
+      prefabs: Object.fromEntries(snap.prefabs.map((p) => [p.id, p.data])),
+    };
+  }
+
+  /** The project memory (.vibe/memory.json), empty when there is none yet. Not part of the undo history. */
+  readMemory(): ProjectMemory {
+    const text = this.readText(MEMORY_FILE);
+    if (text === null) return ProjectMemorySchema.parse({});
+    const json = parseJsonText(MEMORY_FILE, text);
+    const r = json.error ? null : ProjectMemorySchema.safeParse(json.data);
+    if (!r?.success) throw new ToolError(`${MEMORY_FILE} is invalid`, r ? formatIssues(r.error, json.data) : [json.error!]);
+    return r.data;
+  }
+
+  writeMemory(memory: ProjectMemory) {
+    writeFileAtomic(this.path(MEMORY_FILE), formatJson(ProjectMemorySchema.parse(memory)));
+  }
+
+  now(): string {
+    return this.clock().toISOString();
   }
 
   /** The validated, normalized project; throws a ToolError listing problems if it is invalid. */

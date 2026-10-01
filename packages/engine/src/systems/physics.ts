@@ -6,6 +6,8 @@ import type { World } from '../world';
  * Arcade physics: dynamic bodies get gravity and are moved one axis at a time,
  * resolving penetration against solids (static/kinematic/no-body colliders).
  * Dynamic bodies do not block each other; their overlaps become contacts.
+ * Kinematic bodies move first; a dynamic body that was standing on one is carried
+ * along (moving platforms, elevators), including on one-way platforms.
  *
  * Limitation: no swept collision. A body moving more than half the thickness of a
  * solid per frame can tunnel (maxFallSpeed 900 = 15px/frame, so keep solids >= 16px).
@@ -14,17 +16,22 @@ export function physicsSystem(world: World, dt: number) {
   const gravity = world.config.gravity;
   const solids = world.entities.filter((s) => s.active && s.isSolid);
 
+  const moved = new Map<string, { dx: number; dy: number }>();
   for (const e of world.entities) {
     const b = e.components.Body;
-    if (!e.active || !b) continue;
+    if (!e.active || b?.type !== 'kinematic') continue;
+    const dx = b.vx * dt;
+    const dy = b.vy * dt;
+    e.x += dx;
+    e.y += dy;
+    if (dx || dy) moved.set(e.id, { dx, dy });
+  }
 
-    if (b.type === 'kinematic') {
-      e.x += b.vx * dt;
-      e.y += b.vy * dt;
-      continue;
-    }
-    if (b.type !== 'dynamic') continue;
+  for (const e of world.entities) {
+    const b = e.components.Body;
+    if (!e.active || b?.type !== 'dynamic') continue;
 
+    const carrier = e.grounded && e.groundId ? moved.get(e.groundId) : undefined;
     b.vy = Math.min(b.vy + gravity * b.gravityScale * dt, b.maxFallSpeed);
     e.grounded = false;
     e.groundId = null;
@@ -37,8 +44,25 @@ export function physicsSystem(world: World, dt: number) {
       continue;
     }
 
+    if (carrier) carry(world, e, carrier, solids);
     moveX(e, b.vx * dt, solids);
     moveY(e, b.vy * dt, solids);
+  }
+}
+
+/** Moves a body with the platform it stood on: stays on its top, then follows it sideways. */
+function carry(world: World, e: Entity, by: { dx: number; dy: number }, solids: Entity[]) {
+  const platform = world.get(e.groundId!);
+  const top = platform?.aabb()?.y;
+  const col = e.components.Collider!;
+  const before = e.y;
+  e.y = top !== undefined ? top - col.height / 2 - col.offsetY : e.y + by.dy;
+  e.prevY += e.y - before; // one-way checks compare with the previous bottom
+  if (by.dx) {
+    const vx = e.components.Body!.vx;
+    moveX(e, by.dx, solids);
+    e.components.Body!.vx = vx; // being pushed against a wall by the platform does not stop the body's own motion
+    e.prevX += by.dx;
   }
 }
 
@@ -76,7 +100,8 @@ function moveY(e: Entity, dy: number, solids: Entity[]) {
     const sb = s.aabb()!;
     if (!overlaps(box, sb)) continue;
     if (dy > 0) {
-      if (oneWay && prevBottom > sb.y + 0.01) continue;
+      // Compare with where the platform was: a rising one-way platform must still catch the body.
+      if (oneWay && prevBottom > s.prevAabb()!.y + 0.01) continue;
       e.y = sb.y - col.height / 2 - col.offsetY;
       e.grounded = true;
       e.groundId = s.id;

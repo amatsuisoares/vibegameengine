@@ -57,12 +57,35 @@ describe('take_screenshot (Chromium)', () => {
     copyFileSync(after.images![0].path, `${RUNS_DIR}/host-restarted-debug.png`);
   });
 
+  it('runs scripts in the browser exactly as in the headless run', async () => {
+    const t = setup();
+    hosts.push(t.host);
+    const { call, ok } = t;
+    const src = [
+      'function onUpdate(self, game, dt) {',
+      '  self.x += Math.sin(game.time * 3) * self.props.amp * dt + (Math.random() - 0.5);',
+      '  self.get("Sprite").rotation += 4;',
+      '}',
+    ].join('\n');
+    await ok('write_file', { path: 'scripts/wobble.js', content: src });
+    for (const id of ['coin1', 'coin2']) {
+      await ok('create_component', { scene: 'level1', id, type: 'Script', data: { src: 'scripts/wobble.js', props: { amp: 120 } } });
+    }
+    await ok('run_game', { seed: 3 });
+    await ok('perform_inputs', { steps: [{ type: 'hold', key: 'D', ms: 1500 }] });
+    const r = await call('take_screenshot', { annotate: true });
+    if (!r.ok) throw new Error(r.error);
+    expect((r.result as Shot).warning).toBeUndefined(); // seeded Math.random: same positions in Chromium
+    mkdirSync(RUNS_DIR, { recursive: true });
+    copyFileSync(r.images![0].path, `${RUNS_DIR}/host-scripts-debug.png`);
+  });
+
   it('reports missing assets when editing and when rendering', async () => {
     const t = setup();
     hosts.push(t.host);
     await t.ok('run_game');
     const edit = await t.ok<{ warnings?: string[] }>('modify_project_config', {
-      patch: { assets: [{ id: 'hero', type: 'spritesheet', path: 'missing.svg', frameWidth: 24, frameHeight: 32 }, { id: 'coin', type: 'spritesheet', path: 'coin.svg', frameWidth: 16, frameHeight: 16 }] },
+      patch: { sounds: null, assets: [{ id: 'hero', type: 'spritesheet', path: 'missing.svg', frameWidth: 24, frameHeight: 32 }, { id: 'coin', type: 'spritesheet', path: 'coin.svg', frameWidth: 16, frameHeight: 16 }] },
     });
     expect(edit.warnings).toEqual(['config.assets(hero): file assets/missing.svg not found']);
     await t.ok('restart_game');

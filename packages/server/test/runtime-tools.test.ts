@@ -29,11 +29,11 @@ describe('runtime tools', () => {
     const moved = await ok<Obs>('wait', { ms: 2000 });
     expect(moved.frame).toBe(120);
     expect(moved.players![0].x).toBeGreaterThan(200);
-    expect(moved.events.map((e) => e.type)).toEqual(['collect']); // coin1 sits on the way; scene_loaded was already reported
+    expect(moved.events.map((e) => e.type)).toEqual(['collect', 'sound']); // coin1 sits on the way (+ its sound); scene_loaded was already reported
     await ok('release_key', { key: 'D' });
 
     const jump = await ok<Obs>('perform_inputs', { steps: [{ type: 'tap', key: 'Space' }, { type: 'wait', ms: 100 }] });
-    expect(jump.events.map((e) => e.type)).toEqual(['jump']); // only events since the last observation
+    expect(jump.events.map((e) => e.type)).toEqual(['jump', 'sound']); // only events since the last observation (the jump and its sound)
     expect(jump.players![0].grounded).toBe(false);
   });
 

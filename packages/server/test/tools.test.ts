@@ -76,14 +76,14 @@ describe('entity and component tools', () => {
     const { ok, fail } = setup();
     const r = (await ok<{ changed: boolean; diff: string; historySeq: number }>('create_game_object', {
       scene: 'level1',
-      entity: { id: 'coin4', tags: ['coin'], transform: { x: 500, y: 380 }, components: { Collider: { isTrigger: true }, Collectible: {} } },
-      reason: 'fourth coin',
+      entity: { id: 'coin9', tags: ['coin'], transform: { x: 500, y: 380 }, components: { Collider: { isTrigger: true }, Collectible: {} } },
+      reason: 'extra coin',
     }));
     expect(r.changed).toBe(true);
     expect(r.diff).toContain('+');
-    const got = await ok<{ raw: unknown; effective: { components: { Collectible: { variable: string } } } }>('get_game_object', { scene: 'level1', id: 'coin4' });
+    const got = await ok<{ raw: unknown; effective: { components: { Collectible: { variable: string } } } }>('get_game_object', { scene: 'level1', id: 'coin9' });
     expect(got.effective.components.Collectible.variable).toBe('coins');
-    expect((await fail('create_game_object', { scene: 'level1', entity: { id: 'coin4' } })).error).toContain('already exists');
+    expect((await fail('create_game_object', { scene: 'level1', entity: { id: 'coin9' } })).error).toContain('already exists');
   });
 
   it('rejects entities with invalid components and names the problem', async () => {
@@ -136,7 +136,8 @@ describe('file tools', () => {
   it('lists, reads with line numbers, writes, edits and deletes files', async () => {
     const { ok, fail } = setup();
     const files = (await ok<{ path: string }[]>('list_files')).map((f) => f.path);
-    expect(files).toEqual(['assets/coin.svg', 'assets/hero.svg', 'project.json', 'scenes/level1.json']);
+    expect(files.filter((f) => !f.startsWith('assets/sfx/'))).toEqual(['assets/coin.svg', 'assets/hero.svg', 'project.json', 'scenes/level1.json']);
+    expect(files.filter((f) => f.startsWith('assets/sfx/'))).toContain('assets/sfx/sfx_coin.wav');
 
     await ok('write_file', { path: 'scripts/notes.md', content: 'line one\nline two\nline two\n' });
     const read = await ok<{ text: string; totalLines: number }>('read_file', { path: 'scripts/notes.md', startLine: 2 });

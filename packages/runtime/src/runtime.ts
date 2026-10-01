@@ -1,4 +1,4 @@
-import { Game, type LogEntry } from '@vibe/engine';
+import { Game, type GameEvent, type LogEntry, type World } from '@vibe/engine';
 import type { Project } from '@vibe/shared';
 import { FixedLoop } from './loop';
 import { buildDrawList, paint, paintDebug, paintStatusOverlay, type AssetResolver } from './render';
@@ -29,6 +29,10 @@ export interface RuntimeOptions {
   /** Draw the win/lose/crash banner. */
   statusOverlay?: boolean;
   onLog?: (entry: LogEntry) => void;
+  /** Called on every animation frame before drawing (e.g. to feed a replayed run). */
+  onTick?: (now: number) => void;
+  /** Receives the events emitted since the previous animation frame (e.g. to play sounds). */
+  onEvents?: (events: GameEvent[], game: Game) => void;
   scheduler?: Scheduler;
 }
 
@@ -50,6 +54,8 @@ export class Runtime {
   private lastFrameAt: number | null = null;
   private _paused: boolean;
   private reportedAssetErrors = new Set<string>();
+  private startAt: { seed?: number; scene?: string };
+  private seen: { world: World | null; emitted: number } = { world: null, emitted: 0 };
 
   constructor(
     private readonly canvas: CanvasLike,
@@ -62,18 +68,23 @@ export class Runtime {
     this.debug = options.debug ?? false;
     this._paused = options.paused ?? false;
     this.scheduler = options.scheduler ?? animationFrames;
+    this.startAt = { seed: options.seed, scene: options.scene };
     this.loop = new FixedLoop((frames) => this.game.step(frames));
     this.setProject(project, options.assets);
   }
 
-  /** Replaces the project (hot reload) and starts it from its start scene. */
-  setProject(project: Project, assets = this.assets) {
+  /**
+   * Replaces the project (hot reload) and starts it from its start scene, or from
+   * `start` (seed/scene of a run to mirror), which is kept for later restarts.
+   */
+  setProject(project: Project, assets = this.assets, start?: { seed?: number; scene?: string }) {
+    if (start) this.startAt = start;
     this.project = project;
     this.assets = assets;
     this.canvas.width = project.config.width;
     this.canvas.height = project.config.height;
     this.reportedAssetErrors.clear();
-    this.game = new Game(project, { seed: this.options.seed, scene: this.options.scene, onLog: this.options.onLog });
+    this.game = new Game(project, { ...this.startAt, onLog: this.options.onLog });
     this.loop.reset();
     this.render();
   }
@@ -107,6 +118,8 @@ export class Runtime {
       this.measureFps(now);
       if (this._paused) this.loop.reset();
       else this.loop.tick(now);
+      this.options.onTick?.(now);
+      this.dispatchEvents();
       this.render();
     };
     this.rafId = this.scheduler.request(frame);
@@ -147,6 +160,16 @@ export class Runtime {
       const crash = world.status === 'crashed' ? world.events.findLast((e) => e.type === 'crash') : undefined;
       paintStatusOverlay(this.ctx, world.status, config.width, config.height, crash?.message as string | undefined);
     }
+  }
+
+  /** Hands new events to onEvents. A new world (restart, scene change, hot reload) counts from its own start. */
+  private dispatchEvents() {
+    if (!this.options.onEvents) return;
+    const w = this.game.world;
+    if (this.seen.world !== w) this.seen = { world: w, emitted: 0 };
+    const count = Math.min(w.emitted - this.seen.emitted, w.events.length);
+    this.seen.emitted = w.emitted;
+    if (count > 0) this.options.onEvents(w.events.slice(-count), this.game);
   }
 
   private reportAssetError(message: string) {

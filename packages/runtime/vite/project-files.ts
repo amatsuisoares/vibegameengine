@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { ProjectStore, ToolError } from '@vibe/server';
+import { ProjectStore, ToolError, type RawProjectData } from '@vibe/server';
+import { LIVE_RUN_FILE } from '@vibe/shared';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 
 /** Node-side access to project folders (projects/<name>/project.json + scenes/*.json + assets/). */
@@ -34,7 +35,7 @@ export function listProjects(projectsRoot: string): { name: string; title: strin
  * Reads a project folder into the raw `{ config, scenes }` shape through the ProjectStore
  * (not validated; the page validates so it can show the errors).
  */
-export function readProjectDir(dir: string): { config: unknown; scenes: Record<string, unknown> } {
+export function readProjectDir(dir: string): RawProjectData {
   try {
     return new ProjectStore(dir).rawProject();
   } catch (err) {
@@ -72,6 +73,7 @@ const jsonResult = (status: number, value: unknown): HttpResult => ({
  * Routes:
  *   GET /api/projects                  -> [{ name, title }]
  *   GET /api/projects/<name>           -> { config, scenes } (raw) | 500 { error }
+ *   GET /api/projects/<name>/live      -> the agent's published run (LiveRun) | { active: false }
  *   GET /projects/<name>/assets/<path> -> asset file
  * Returns null for any other URL.
  */
@@ -89,6 +91,18 @@ export function handleProjectRequest(projectsRoot: string, url: string): HttpRes
       return jsonResult(200, readProjectDir(join(projectsRoot, name)));
     } catch (err) {
       return jsonResult(500, { error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  m = /^\/api\/projects\/([^/]+)\/live$/.exec(path);
+  if (m) {
+    const name = m[1];
+    if (!PROJECT_NAME.test(name)) return jsonResult(404, { error: 'Not found' });
+    const file = join(projectsRoot, name, LIVE_RUN_FILE);
+    try {
+      return { status: 200, type: 'application/json; charset=utf-8', body: readFileSync(file, 'utf8') };
+    } catch {
+      return jsonResult(200, { version: 1, active: false, runId: null });
     }
   }
 
@@ -113,4 +127,10 @@ export function projectOfFile(projectsRoot: string, file: string): { name: strin
   const r = relative(resolve(projectsRoot), resolve(file)).split(/[\\/]/);
   if (r.length < 2 || r[0] === '..' || !PROJECT_NAME.test(r[0]) || r[1] === '.vibe') return null;
   return { name: r[0], file: r.slice(1).join('/') };
+}
+
+/** Project name when `file` is the agent's published run (projects/<name>/.vibe/live.json). */
+export function liveRunOfFile(projectsRoot: string, file: string): string | null {
+  const r = relative(resolve(projectsRoot), resolve(file)).split(/[\\/]/);
+  return r.length === 3 && PROJECT_NAME.test(r[0]) && `${r[1]}/${r[2]}` === LIVE_RUN_FILE ? r[0] : null;
 }

@@ -1,5 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { LIVE_RUN_FILE, type LiveRun } from '@vibe/shared';
+import { writeFileAtomic } from '../fs-atomic';
 import type { ProjectStore } from '../project-store';
 import { ToolError } from '../project-store';
 import { Screenshotter } from './screenshotter';
@@ -39,13 +41,41 @@ export class RuntimeHost {
       throw new ToolError(`Scene "${options.scene}" does not exist. Scenes: ${Object.keys(status.project.scenes).join(', ')}`);
     }
     this.session = new GameSession(raw, status.project, { seed: options.seed ?? 1, scene: options.scene }, fingerprint(raw));
+    this.publishLive();
     return this.session;
   }
 
   stop() {
     const had = this.session !== null;
     this.session = null;
+    if (had) this.publishLive();
     return had;
+  }
+
+  /**
+   * Writes the current run to .vibe/live.json so the runtime page can mirror it (follow mode).
+   * Called after every action that changes the run. Never fails the action.
+   */
+  publishLive() {
+    const s = this.session;
+    const live: LiveRun = s
+      ? {
+          version: 1,
+          active: true,
+          runId: s.id,
+          seed: s.options.seed,
+          ...(s.options.scene && { scene: s.options.scene }),
+          frame: s.game.frame,
+          status: s.game.status,
+          raw: s.raw,
+          ops: s.ops,
+        }
+      : { version: 1, active: false, runId: null };
+    try {
+      writeFileAtomic(this.store.path(LIVE_RUN_FILE), JSON.stringify(live));
+    } catch (err) {
+      console.error(`[vibe] could not publish the live run: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   requireSession(): GameSession {
@@ -90,6 +120,19 @@ export class RuntimeHost {
       renderWarnings: warnings,
       ...(!same && { divergence: `browser replay is at frame ${state.frame} with different entity state than the headless run` }),
     };
+  }
+
+  /**
+   * URL of the runtime page for this project on the dev server the user can open in VS Code
+   * (started if needed). `follow` opens it in follow mode: the page mirrors the agent's run.
+   */
+  async viewUrl(options: { scene?: string; follow?: boolean; debug?: boolean } = {}) {
+    const { base, owned } = await this.screenshotter.devServer.viewUrl();
+    const q = new URLSearchParams({ project: this.store.name });
+    if (options.scene) q.set('scene', options.scene);
+    if (options.follow) q.set('live', '1');
+    if (options.debug) q.set('debug', '1');
+    return { url: `${base}?${q}`, owned };
   }
 
   async close() {

@@ -242,6 +242,27 @@ export const runtimeTools = [
   }),
 
   defineTool({
+    name: 'open_game_view',
+    description:
+      'Gives the URL of the live game page for the user to open in VS Code (Simple Browser), starting the dev server if needed. The page hot-reloads on every project edit. follow=true mirrors your current run instead (the user watches what you play, in real time).',
+    input: z.object({
+      follow: z.boolean().default(false).describe('Mirror the agent run (run_game, perform_inputs, wait...) instead of letting the user play.'),
+      scene: z.string().optional().describe('Scene to start in when playing (default: startScene).'),
+      debug: z.boolean().default(false).describe('Show colliders and entity ids.'),
+    }),
+    run: async (ctx, { follow, scene, debug }) => {
+      if (scene && !ctx.store.validate().project?.scenes[scene]) throw new ToolError(`Scene "${scene}" does not exist`);
+      const { url, owned } = await host(ctx).viewUrl({ follow, scene, debug });
+      return {
+        url,
+        server: owned ? 'started by the vibe MCP server (stays up while this Claude Code session lives)' : 'already running (npm run dev or the VS Code task)',
+        howToOpen:
+          'Show the user this URL as a link: in VS Code it opens in the Simple Browser panel. Or: Command Palette > "Tasks: Run Task" > "Vibe: abrir jogo".',
+      };
+    },
+  }),
+
+  defineTool({
     name: 'run_test',
     description:
       'Runs a scripted test on a fresh game (does not touch the current run): input steps plus {"type":"waitUntil","expr",...} and {"type":"assert","expr"} steps, then final assertions. Reports each check with the observed values.',

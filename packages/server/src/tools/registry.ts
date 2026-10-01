@@ -33,6 +33,8 @@ export interface ToolDef<S extends z.ZodObject = z.ZodObject> {
   mutates?: boolean;
   /** Changes the state of the current game run (not the project files). */
   changesRun?: boolean;
+  /** Writes platform data that is not in the undo history (e.g. the project memory). */
+  writesMeta?: boolean;
   /** Deletes or may overwrite data (reported to MCP clients as destructiveHint). */
   destructive?: boolean;
   run(ctx: ToolContext, input: z.output<S>, meta: (summary: string) => ChangeMeta): unknown | Promise<unknown>;
@@ -75,7 +77,7 @@ export class ToolRegistry {
   annotations(name: string) {
     const tool = this.tools.get(name);
     if (!tool) return undefined;
-    return { readOnlyHint: !tool.mutates && !tool.changesRun, destructiveHint: !!tool.destructive };
+    return { readOnlyHint: !tool.mutates && !tool.changesRun && !tool.writesMeta, destructiveHint: !!tool.destructive };
   }
 
   definitions(): ToolDefinition[] {
@@ -99,6 +101,9 @@ export class ToolRegistry {
     } catch (err) {
       if (err instanceof ToolError) return { ok: false, error: err.message, ...(err.details.length && { details: err.details }) };
       return { ok: false, error: `Internal error in ${name}: ${err instanceof Error ? err.message : String(err)}` };
+    } finally {
+      // Even a failed action (e.g. a wait_until timeout) may have advanced the run.
+      if (tool.changesRun) ctx.host?.publishLive();
     }
   }
 }

@@ -7,5 +7,8 @@ export * from './math';
 export * from './rng';
 export * from './text';
 export * from './expr';
+export * from './scripts';
 export { screenToWorld, worldToScreen } from './systems/camera';
 export { groundAhead } from './systems/controllers';
+export * from './rules';
+export * from './sound';

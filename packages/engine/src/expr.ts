@@ -296,3 +296,9 @@ export function evaluateExpr(src: string, scope: ExprScope): ExprResult {
   collect(tree);
   return { value, observed };
 }
+
+/** Parses once and returns an evaluator (for expressions checked every frame, e.g. scene rules). */
+export function compileExpr(src: string): (scope: ExprScope) => unknown {
+  const tree = parseExpr(src);
+  return (scope) => evaluate(tree, scope, src);
+}

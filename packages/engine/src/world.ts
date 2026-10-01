@@ -1,4 +1,4 @@
-import type { ProjectConfig, Scene, VarValue } from '@vibe/shared';
+import type { EntityData, PrefabData, ProjectConfig, Scene, VarValue } from '@vibe/shared';
 import type { GameConsole } from './console';
 import { Entity } from './entity';
 import type { Input } from './input';
@@ -51,6 +51,32 @@ export class World {
     for (const data of scene.entities) this.add(new Entity(data));
   }
 
+  /** Entity templates that rules and scripts can spawn (set by the Game). */
+  prefabs: Record<string, PrefabData> = {};
+  private spawned = 0;
+
+  /** Creates an entity from a prefab at (x, y). Ids default to <prefab><n>. */
+  spawn(prefabId: string, x: number, y: number, id?: string): Entity {
+    const prefab = this.prefabs[prefabId];
+    if (!prefab) throw new Error(`prefab "${prefabId}" does not exist (prefabs: ${Object.keys(this.prefabs).join(', ') || 'none'})`);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`spawn position must be finite numbers (got ${x}, ${y})`);
+    let newId = id;
+    if (newId !== undefined) {
+      if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(newId)) throw new Error(`invalid entity id "${newId}"`);
+      if (this.byId.has(newId)) throw new Error(`entity "${newId}" already exists`);
+    } else {
+      do newId = `${prefabId}${++this.spawned}`;
+      while (this.byId.has(newId));
+    }
+    const data = structuredClone(prefab) as EntityData;
+    data.id = newId;
+    data.prefab = prefabId;
+    data.transform = { ...data.transform, x, y };
+    const e = this.add(new Entity(data));
+    this.emit('spawn', { entity: newId, prefab: prefabId, x, y });
+    return e;
+  }
+
   add(e: Entity) {
     if (this.byId.has(e.id)) throw new Error(`Duplicate entity id "${e.id}"`);
     this.entities.push(e);
@@ -86,7 +112,11 @@ export class World {
     }
   }
 
+  /** Events emitted in this world so far (the array keeps only the most recent ones). */
+  emitted = 0;
+
   emit(type: string, data: Record<string, unknown> = {}) {
+    this.emitted++;
     this.events.push({ frame: this.frame, type, ...data });
     if (this.events.length > this.eventCapacity) this.events.splice(0, this.events.length - this.eventCapacity);
   }

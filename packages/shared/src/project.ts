@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ComponentsSchema } from './components';
+import { RuleSchema } from './rules';
 
 export const IdSchema = z
   .string()
@@ -20,7 +21,11 @@ export const EntitySchema = z.strictObject({
   enabled: z.boolean().default(true),
   transform: TransformSchema.default(() => ({ x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 })),
   components: ComponentsSchema.default(() => ({})),
+  prefab: IdSchema.optional().describe('Prefab this entity is an instance of: the entity only stores what differs from it.'),
 });
+
+/** A reusable entity template (prefabs/<id>.json): an entity without id. */
+export const PrefabSchema = EntitySchema.omit({ id: true, prefab: true });
 
 export const CameraSchema = z.strictObject({
   follow: z.string().optional().describe('Entity id the camera follows.'),
@@ -44,7 +49,15 @@ export const SceneSchema = z.strictObject({
   camera: CameraSchema.default(() => ({ x: 0, y: 0, zoom: 1, lerp: 0.15, clampToBounds: true })),
   vars: z.record(z.string(), VarValueSchema).default(() => ({})).describe('Initial game variables.'),
   entities: z.array(EntitySchema).default(() => []),
+  rules: z.array(RuleSchema).default(() => []).describe('Data-driven events and conditions: when -> if -> do.'),
+  music: z.lazy(() => SoundRefSchema).optional().describe('Audio asset looped while this scene runs.'),
 });
+
+/** An audio asset id, or { asset, volume }. */
+export const SoundRefSchema = z.union([
+  z.string().min(1),
+  z.strictObject({ asset: z.string().min(1), volume: z.number().min(0).max(1).default(1) }),
+]);
 
 export const AssetSchema = z.strictObject({
   id: IdSchema,
@@ -73,16 +86,23 @@ export const ProjectConfigSchema = z.strictObject({
   actions: z.record(z.string(), z.array(z.string())).default(() => structuredClone(DEFAULT_ACTIONS))
     .describe('Input action name -> keys. Controllers reference actions, not keys.'),
   assets: z.array(AssetSchema).default(() => []),
+  sounds: z
+    .record(z.string(), SoundRefSchema)
+    .default(() => ({}))
+    .describe('Event type -> audio asset played when that event happens, e.g. {"jump": "sfx_jump", "collect": "sfx_coin"}.'),
 });
 
 export const ProjectSchema = z.strictObject({
   config: ProjectConfigSchema,
   scenes: z.record(z.string(), SceneSchema),
+  scripts: z.record(z.string(), z.string()).default(() => ({})).describe('Script sources by project-relative path (scripts/*.js).'),
+  prefabs: z.record(z.string(), PrefabSchema).default(() => ({})).describe('Entity templates by id (prefabs/<id>.json).'),
 });
 
 export type Transform = z.output<typeof TransformSchema>;
 export type EntityData = z.output<typeof EntitySchema>;
 export type EntityInput = z.input<typeof EntitySchema>;
+export type PrefabData = z.output<typeof PrefabSchema>;
 export type CameraData = z.output<typeof CameraSchema>;
 export type Scene = z.output<typeof SceneSchema>;
 export type SceneInput = z.input<typeof SceneSchema>;
@@ -91,3 +111,4 @@ export type ProjectConfig = z.output<typeof ProjectConfigSchema>;
 export type Project = z.output<typeof ProjectSchema>;
 export type ProjectInput = z.input<typeof ProjectSchema>;
 export type VarValue = z.output<typeof VarValueSchema>;
+export type SoundRef = z.output<typeof SoundRefSchema>;

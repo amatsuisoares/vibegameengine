@@ -84,6 +84,17 @@
       }
     },
     {
+      "id": "coin4",
+      "tags": ["coin"],
+      "transform": { "x": 250, "y": 340 },
+      "components": {
+        "Sprite": { "asset": "coin", "width": 16, "height": 16 },
+        "Animator": { "animations": { "spin": { "frames": [0, 1, 2, 3], "fps": 8 } }, "initial": "spin" },
+        "Collider": { "width": 16, "height": 16, "isTrigger": true },
+        "Collectible": { "score": 100 }
+      }
+    },
+    {
       "id": "coin2",
       "tags": ["coin"],
       "transform": { "x": 1100, "y": 318 },
@@ -156,7 +167,7 @@
       "tags": ["ui"],
       "transform": { "x": 12, "y": 12 },
       "components": {
-        "Text": { "text": "Coins: {coins}/3   HP: {player.health}   Score: {score}", "fontSize": 16 }
+        "Text": { "text": "Coins: {coins}/4   HP: {player.health}   Score: {score}", "fontSize": 16 }
       }
     }
   ]

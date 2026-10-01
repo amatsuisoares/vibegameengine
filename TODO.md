@@ -47,35 +47,42 @@ O agente via API da Anthropic foi implementado e depois removido: o agente passo
 - [x] Instruções do agente no `instructions` do MCP; screenshots como imagem; diffs em texto
 - [x] Run e Chromium persistem durante a sessão; encerrados ao fechar
 - [x] Testes: cliente MCP em memória + servidor lançado com o comando do `.mcp.json` (141 unitários, 8 e2e)
-- [ ] Teste real: recarregar o VS Code com a pasta do repositório aberta e usar as tools pelo chat
+- [x] Teste real: tools usadas pelo chat (quarta moeda no demo, coletada pulando, HUD ajustado)
 
-## Etapa 7 — Jogo dentro do VS Code
-- [ ] Abrir o runtime num painel do VS Code (Simple Browser) com hot reload enquanto o agente edita
-- [ ] Tool/atalho para abrir a visualização no projeto/cena certos
-- [ ] Avaliar uma extensão leve (hierarquia da cena, inspector) se o Simple Browser não bastar
-- [ ] Opcional: espelhar no painel a run do agente (ver ao vivo o que ele está jogando)
+## ✅ Etapa 7 — Jogo dentro do VS Code (concluída)
+- [x] Runtime num painel do VS Code (Simple Browser) com hot reload: tasks "Vibe: abrir jogo" / "Vibe: seguir agente"
+- [x] Tool `open_game_view` (URL do projeto/cena; sobe o dev server se preciso) + links `localhost:5173` no Simple Browser
+- [x] Espelhar no painel a run do agente em tempo real (`.vibe/live.json` + `LivePlayer`, modo `?live=1`)
+- [x] Testes: `LivePlayer`, publicação da run, rota `/live`, `open_game_view`, e2e do modo seguir no Chromium
+- [x] Teste real no VS Code: task "Vibe: abrir jogo" (com o caminho absoluto do node, como no `.mcp.json`)
+- [x] Extensão leve (hierarquia/inspector): adiada — o Simple Browser bastou; reavaliar se fizer falta
 
-## Etapa 8 — Memória + extensões do MVP
-- [ ] Memória do projeto (`.vibe/memory.json`: features, TODOs, erros conhecidos) + tools
-- [ ] Componente `Script` (hooks onStart/onUpdate/onCollision) com API restrita e erros com arquivo:linha
-- [ ] Importação de imagens/spritesheets/áudio; `AudioSource` + eventos de som
-- [ ] Sistema de eventos/condições data-driven (Trigger → ações)
-- [ ] Prefabs
-- [ ] Plataformas móveis (kinematic carregando entidades)
+## ✅ Etapa 8 — Memória + extensões do MVP (concluída)
+- [x] Memória do projeto (`.vibe/memory.json`: resumo, features, todos, issues, notas) + `read_memory`/`update_memory`
+- [x] Componente `Script` (hooks onStart/onUpdate/onCollision) com API restrita, determinístico, erros com arquivo:linha
+- [x] Áudio e assets: `import_asset` (imagens/spritesheets/áudio do disco), `create_sound` (efeitos gerados em WAV),
+  `config.sounds` (evento → som), `scene.music`, `playSound` em regras e scripts; o browser toca (Web Audio)
+- [x] Eventos/condições data-driven: regras da cena (`start/event/enter/expr/every` → `if` → ações) + `set_rule`/`delete_rule`
+- [x] Prefabs (`prefabs/<id>.json`): instâncias por merge patch, `spawn` em regras e scripts, `create/modify/delete_prefab`
+- [x] Plataformas móveis: componente `Mover` (waypoints, vaivém/loop, pausa); física carrega quem está em cima
+  (inclusive one-way subindo)
+- [x] Demo com sons gerados (`create_sound`) mapeados em `config.sounds`
+- [x] 191 testes unitários + 11 e2e no Chromium (scripts e sons no browser, modo seguir)
 
-## Etapa 9 — Teste final
-- [ ] O Claude Code cria, pelo chat, o jogo de plataforma do enunciado, testa e corrige
+## ~~Etapa 9 — Teste final~~ — descartada
+O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.
 
 ## Limitações conhecidas
-- Áudio é declarado mas não carregado (Etapa 8).
+- Sem `AudioSource` por entidade: sons saem de eventos (`config.sounds`), regras e scripts; sem áudio posicional.
 - Hot reload reinicia o jogo do começo (não preserva estado).
 - O servidor de projetos existe só no dev server do Vite; build de produção do runtime ainda não existe.
 - `.mcp.json` usa o caminho absoluto `C:/Program Files/nodejs/node.exe` (ajustar em outra máquina).
 - Uma run por projeto/host. O screenshot sobe Vite + Chromium na primeira foto (~1-2 s).
-- Sem áudio nas runs (Etapa 8); screenshots mostram um frame (sem vídeo/GIF).
+- Runs headless não tocam som (o agente vê os eventos `sound`/`music`); screenshots mostram um frame (sem vídeo/GIF).
+- Arquivos binários de assets não entram no histórico (só a entrada em `project.json`); undo não apaga o arquivo.
 - Ids de entidade não são renomeáveis (duplicar + apagar). Edições feitas fora do store não entram no histórico.
 - Sem trava entre processos: dois processos escrevendo no mesmo projeto ao mesmo tempo podem conflitar.
 - Física sem colisão contínua: sólidos finos (< 16 px) podem ser atravessados em queda rápida.
 - Corpos dinâmicos não colidem entre si (inimigos se sobrepõem).
-- Kinematic não carrega entidades em cima (plataforma móvel).
+- Plataforma móvel não empurra corpos de lado (só carrega quem está em cima); esmagar contra o teto não é tratado.
 - Contatos O(n²) — suficiente para cenas de centenas de entidades.

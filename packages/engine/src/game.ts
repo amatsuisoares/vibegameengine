@@ -6,8 +6,12 @@ import { Rng } from './rng';
 import { animationSystem } from './systems/animation';
 import { cameraSystem } from './systems/camera';
 import { controllerSystem } from './systems/controllers';
+import { moverSystem } from './systems/mover';
 import { healthSystem } from './systems/health';
-import { findContacts, interactionSystem } from './systems/interactions';
+import { RuleRunner } from './rules';
+import { SoundDirector, soundOf } from './sound';
+import { ScriptLibrary, ScriptRunner } from './scripts';
+import { findContacts, interactionSystem, pairKey } from './systems/interactions';
 import { physicsSystem } from './systems/physics';
 import { FIXED_DT, World, type GameEvent, type GameStatus } from './world';
 import type { Entity } from './entity';
@@ -127,12 +131,19 @@ export class Game {
   readonly console: GameConsole;
   world!: World;
   private readonly seed: number;
+  private readonly scripts: ScriptLibrary;
+  private scriptRunner!: ScriptRunner;
+  private ruleRunner!: RuleRunner;
+  private soundDirector!: SoundDirector;
+  /** Music asset playing (for the `music` event when a scene without music follows one with music). */
+  private music: string | null = null;
 
   constructor(project: Project, private readonly options: GameOptions = {}) {
     this.project = project;
     this.seed = options.seed ?? 1;
     this.input = new Input(project.config.actions);
     this.console = new GameConsole(1000, options.onLog);
+    this.scripts = new ScriptLibrary(project.scripts ?? {});
     this.loadScene(options.scene ?? project.config.startScene, {});
   }
 
@@ -157,11 +168,19 @@ export class Game {
     const prevEvents = this.world?.events ?? [];
     const vars = { score: 0, ...structuredClone(scene.vars), ...carryVars };
     this.world = new World(this.project.config, structuredClone(scene), this.input, this.console, new Rng(this.seed), vars);
+    this.world.prefabs = this.project.prefabs ?? {};
     this.world.frame = prevFrame;
     this.world.time = prevTime;
     this.world.events.push(...prevEvents);
     this.world.emit('scene_loaded', { scene: id });
     this.console.log(`Scene "${id}" loaded (${scene.entities.length} entities)`, 'engine');
+    this.scriptRunner = new ScriptRunner(this.world, this.scripts);
+    this.ruleRunner = new RuleRunner(this.world, this);
+    this.soundDirector = new SoundDirector(this.world);
+    const music = scene.music ? soundOf(scene.music) : null;
+    if (music) this.world.emit('music', music);
+    else if (this.music) this.world.emit('music', { asset: null });
+    this.music = music?.asset ?? null;
     cameraSystem(this.world);
   }
 
@@ -197,10 +216,17 @@ export class Game {
           e.prevY = e.y;
         }
         controllerSystem(w, dt);
+        moverSystem(w, dt);
+        this.scriptRunner.update(dt);
         physicsSystem(w, dt);
-        interactionSystem(w, findContacts(w));
+        const contacts = findContacts(w);
+        const entered = contacts.filter(([a, b]) => !w.prevContacts.has(pairKey(a, b)));
+        interactionSystem(w, contacts);
+        this.scriptRunner.collisions(entered);
         healthSystem(w, dt);
         animationSystem(w, dt);
+        this.ruleRunner.run(entered);
+        this.soundDirector.run();
         w.flushDestroyed();
       } catch (err) {
         w.status = 'crashed';

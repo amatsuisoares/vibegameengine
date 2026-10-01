@@ -1,7 +1,9 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseProject } from '@vibe/shared';
 import { describe, expect, it } from 'vitest';
-import { handleProjectRequest, projectOfFile, readProjectDir, resolveInside } from '../vite/project-files';
+import { handleProjectRequest, liveRunOfFile, projectOfFile, readProjectDir, resolveInside } from '../vite/project-files';
 import { PROJECTS_ROOT } from './helpers';
 
 const get = (url: string) => handleProjectRequest(PROJECTS_ROOT, url);
@@ -58,5 +60,27 @@ describe('dev server routes', () => {
     });
     expect(projectOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', '.vibe', 'runs', 'a.png'))).toBeNull();
     expect(projectOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, '..', 'package.json'))).toBeNull();
+  });
+
+  it('serves the agent run published in .vibe/live.json, or an inactive one', () => {
+    const root = mkdtempSync(join(tmpdir(), 'vibe-live-'));
+    try {
+      mkdirSync(join(root, 'game', '.vibe'), { recursive: true });
+      expect(JSON.parse(String(handleProjectRequest(root, '/api/projects/game/live')!.body))).toEqual({ version: 1, active: false, runId: null });
+      writeFileSync(join(root, 'game', '.vibe', 'live.json'), JSON.stringify({ version: 1, active: true, runId: 'run-1', ops: [] }));
+      const r = handleProjectRequest(root, '/api/projects/game/live')!;
+      expect(r.status).toBe(200);
+      expect(JSON.parse(String(r.body)).runId).toBe('run-1');
+      expect(handleProjectRequest(root, '/api/projects/a.b/live')!.status).toBe(404);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('recognizes the published run file among project files', () => {
+    expect(liveRunOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', '.vibe', 'live.json'))).toBe('demo-platformer');
+    expect(liveRunOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', '.vibe', 'history.jsonl'))).toBeNull();
+    expect(liveRunOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', 'live.json'))).toBeNull();
+    expect(projectOfFile(PROJECTS_ROOT, join(PROJECTS_ROOT, 'demo-platformer', '.vibe', 'live.json'))).toBeNull();
   });
 });

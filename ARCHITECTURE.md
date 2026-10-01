@@ -7,9 +7,9 @@ pelas tools de um servidor MCP. Não há editor nem chat separados.
 
 ```
 ┌──────────────── VS Code ───────────────────────────────────────────┐
-│  Claude Code (chat = agente)          painel do jogo (Etapa 7)       │
+│  Claude Code (chat = agente)          painel do jogo (Simple Browser)│
 └───────────┬──────────────────────────────────▲──────────────────────┘
-            │ MCP (stdio)                      │ hot reload
+            │ MCP (stdio)                      │ hot reload + run ao vivo
 ┌───────────▼──────── servidor MCP "vibe" (Node) ──────────────────────┐
 │ Workspace ── projeto aberto (list/open/create_project)               │
 │ ToolRegistry ── 38 tools: edição, histórico, runtime                 │
@@ -24,9 +24,10 @@ pelas tools de um servidor MCP. Não há editor nem chat separados.
 ```
 
 Implementado: `shared` e `engine` (Etapa 1), `runtime` no browser (Etapa 2), `server` com ProjectStore + tools
-de edição (Etapa 3), RuntimeHost com runs headless, testes e screenshots (Etapa 4) e o servidor MCP que faz do
-Claude Code o agente (Etapa 6). A Etapa 5 (agente embutido via API) foi removida quando o projeto passou a usar
-o Claude Code como agente.
+de edição (Etapa 3), RuntimeHost com runs headless, testes e screenshots (Etapa 4), o servidor MCP que faz do
+Claude Code o agente (Etapa 6), o jogo dentro do VS Code (Etapa 7) e memória, scripts, regras, prefabs, som e
+plataformas móveis (Etapa 8). A Etapa 5 (agente embutido via API) foi removida quando o projeto passou a usar o
+Claude Code como agente.
 
 ## Princípios
 
@@ -49,12 +50,17 @@ o Claude Code como agente.
 Project
 ├── config: ProjectConfig   name, width/height (viewport), gravity, startScene, actions, assets
 └── scenes: { [id]: Scene }
-       Scene: id, background, width/height (mundo), killY, fallDamage, camera, vars, entities[]
+       Scene: id, background, width/height (mundo), killY, fallDamage, camera, vars, entities[], rules[]
           Entity: id, name, tags[], enabled, transform{x,y,rotation,scaleX,scaleY},
                   components: { Sprite?, Body?, Collider?, PlatformerController?, ... }
 ```
 
-Em disco: `projects/<nome>/project.json` (config) + `scenes/<id>.json`.
+Em disco: `projects/<nome>/project.json` (config) + `scenes/<id>.json` + `scripts/**/*.js` + `prefabs/<id>.json`.
+Memória do agente em `.vibe/memory.json`.
+
+- **Prefabs:** `parseProject` expande as instâncias antes da validação (`expandPrefabs`: prefab ⊕ entidade por JSON
+  Merge Patch, mantendo o campo `prefab`), então a engine só vê entidades completas e erros apontam para a instância.
+  `World.spawn` cria entidades a partir de `Project.prefabs` em execução (regras e scripts).
 
 - Coordenadas em pixels, **y cresce para baixo**, `transform.x/y` é o **centro** da entidade.
 - `rotation` (graus, horário) e `scaleX/scaleY` são **só visuais**: não mudam o collider. Escala negativa espelha.
@@ -87,6 +93,8 @@ Em disco: `projects/<nome>/project.json` (config) + `scenes/<id>.json`.
 | `Checkpoint` | define ponto de respawn |
 | `Text` | texto/HUD com placeholders `{coins}`, `{player.health}` |
 | `Animator` | clipes de spritesheet; seleção automática idle/run/jump/fall |
+| `Script` | comportamento em JavaScript (`scripts/*.js`): `onStart/onUpdate/onCollision` com API restrita |
+| `Mover` | segue waypoints (vaivém ou loop, pausa); com Body kinematic vira plataforma móvel/elevador |
 
 ## Engine (`packages/engine`)
 
@@ -96,22 +104,45 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
       Passo fixo (1/60 s), nesta ordem:
         1. Input.beginFrame()        latch de teclas pressionadas entre frames
         2. controllerSystem           PlatformerController, Patrol, FollowTarget
+           moverSystem                Mover: velocidade dos kinematic rumo ao próximo waypoint
+           ScriptRunner.update        onStart (1ª vez) e onUpdate dos scripts
         3. physicsSystem              gravidade; move X e resolve; move Y e resolve (grounded)
         4. findContacts + interactionSystem   coleta, pisão, dano, checkpoint, goal
+           ScriptRunner.collisions    onCollision dos contatos que começaram neste frame
         5. healthSystem               timers, queda no abismo (killY), morte
         6. animationSystem            flip e frames de animação
+           RuleRunner.run             regras da cena (start/event/enter/expr/every → if → ações)
+           SoundDirector.run          eventos com som em config.sounds → evento sound
         7. flushDestroyed, cameraSystem
 ```
 
 - **Física:** arcade, AABB, resolução por eixo contra sólidos (colliders não-trigger sem Body dinâmico).
+  Kinematic se move primeiro; um corpo que estava apoiado nele (`groundId`) é levado junto (fica no topo e segue o
+  deslocamento lateral). One-way compara com a posição anterior da plataforma, então plataforma subindo não é atravessada.
   Corpos dinâmicos não bloqueiam uns aos outros — sobreposição vira contato (dano, pisão).
   Sem colisão contínua: sólidos devem ter ≥ 16 px de espessura (queda máx. 15 px/frame).
 - **Contatos:** pares sobrepostos (tolerância 0,5 px, então “encostar” conta). Goal/Checkpoint usam
   semântica de *enter* (só no primeiro frame de contato).
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash` — registrados com o frame, consultáveis por `game.events()`.
+  lose, scene_loaded, crash, script_error` e os que scripts emitem — registrados com o frame, consultáveis por
+  `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
+- **Scripts** (`engine/src/scripts.ts`): `Project.scripts` (fonte por caminho) vem do disco junto com config e
+  cenas, então runs, screenshots e o modo seguir usam exatamente o mesmo código. `ScriptLibrary` compila cada
+  arquivo uma vez por `Game` com `new Function` (igual no Node e no browser); o corpo começa na primeira linha, então
+  a linha do erro é a do stack menos as 2 do cabeçalho. Cada entidade chama a fábrica e ganha suas próprias
+  closures. Parâmetros com o nome de `Date`, `process`, `window`, `globalThis`... escondem esses globais; `Math` é
+  um objeto derivado com `random` da RNG do mundo. Exceções de script são capturadas por chamada (não viram
+  `crashed`). O `ProjectStore` checa a sintaxe com `node:vm` (que informa a linha) antes de gravar.
+- **Regras** (`engine/src/rules.ts`): `RuleRunner` por mundo. Eventos novos são lidos por contagem
+  (`World.emitted`), então eventos que uma regra emite são processados no frame seguinte. `expr` dispara na borda
+  (falso → verdadeiro); expressões são compiladas uma vez (`compileExpr`). Erro em regra → `rule_error` e a regra
+  fica desligada até a cena recarregar.
+- **Som** (`engine/src/sound.ts`): a simulação só emite eventos. `SoundDirector` (depois das regras) converte eventos
+  mapeados em `config.sounds` em `sound`; `loadScene` emite `music`. No browser, `Runtime.onEvents` entrega os eventos
+  novos a cada quadro e o `SoundPlayer` (`runtime/src/audio.ts`, Web Audio) toca — sons com mais de 6 frames de
+  atraso são descartados (o modo seguir adianta sem rajada). Páginas de screenshot (`?paused=1`) ficam mudas.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).
 - **Troca de cena:** variáveis são mantidas; frame/tempo/eventos continuam acumulando.
 
@@ -225,3 +256,28 @@ Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
   Code, então a run e o Chromium persistem entre chamadas; ao fechar, Chromium e Vite são encerrados.
 - **Annotations:** `readOnlyHint` (consulta), `destructiveHint` (`delete_*`, `write_file`).
 - **stdout é o protocolo:** logs vão para stderr. `VIBE_PROJECTS_DIR` troca a pasta de projetos (testes).
+
+## Jogo dentro do VS Code
+
+```
+VS Code ── Simple Browser ── http://localhost:5173/?project=<p>[&live=1]
+              ▲                       (dev server: `npm run dev`, a task "Vibe: abrir jogo"
+              │ vibe:project-changed   ou o DevServer do processo MCP, via open_game_view)
+              │ vibe:live-changed
+Vite plugin ──┴── observa projects/   ◀── ProjectStore grava cenas
+                                     ◀── RuntimeHost grava .vibe/live.json após cada ação da run
+```
+
+- **Sem extensão.** `.vscode/tasks.json` sobe o dev server (task em background) e abre o Simple Browser por um
+  `input` do tipo `command` (`simpleBrowser.show`). `.vscode/settings.json` mapeia `localhost:5173` para o opener do
+  Simple Browser, então o link devolvido por `open_game_view` abre no painel.
+- **DevServer** (`server/src/runtime/dev-server.ts`): um Vite por processo, sob demanda, de preferência na 5173,
+  compartilhado pelos screenshots e pela visualização. `open_game_view` reaproveita um dev server que já esteja
+  respondendo `/api/projects` na 5173.
+- **Modo seguir (`?live=1`).** Depois de toda tool com `changesRun` (no `finally`: um `wait_until` que estourou
+  também andou), o `ToolRegistry` chama `RuntimeHost.publishLive()`, que grava `LiveRun` (`shared/src/live.ts`): id da
+  run, seed, cena, frame, projeto cru e log de `GameOp`. O plugin serve `GET /api/projects/<p>/live` e emite
+  `vibe:live-changed`. A página fica pausada e o `LivePlayer` (`runtime/src/live.ts`) reaplica as ops no ritmo do
+  relógio (`FixedLoop`), quebrando `step`s longos em vários ticks. Se o atraso passa de 180 frames, adianta o excesso.
+  Run nova (id diferente) → `Runtime.setProject(raw da run, {seed, scene})` e replay do zero. Como na foto, a
+  reprodução é exata (mesmo projeto, seed e ops). O teclado da página vai para um `Input` descartável.

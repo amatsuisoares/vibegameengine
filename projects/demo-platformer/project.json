@@ -7,6 +7,20 @@
   "startScene": "level1",
   "assets": [
     { "id": "hero", "type": "spritesheet", "path": "hero.svg", "frameWidth": 24, "frameHeight": 32 },
-    { "id": "coin", "type": "spritesheet", "path": "coin.svg", "frameWidth": 16, "frameHeight": 16 }
-  ]
+    { "id": "coin", "type": "spritesheet", "path": "coin.svg", "frameWidth": 16, "frameHeight": 16 },
+    { "id": "sfx_jump", "type": "audio", "path": "sfx/sfx_jump.wav" },
+    { "id": "sfx_coin", "type": "audio", "path": "sfx/sfx_coin.wav" },
+    { "id": "sfx_hit", "type": "audio", "path": "sfx/sfx_hit.wav" },
+    { "id": "sfx_stomp", "type": "audio", "path": "sfx/sfx_stomp.wav" },
+    { "id": "sfx_win", "type": "audio", "path": "sfx/sfx_win.wav" },
+    { "id": "sfx_lose", "type": "audio", "path": "sfx/sfx_lose.wav" }
+  ],
+  "sounds": {
+    "jump": "sfx_jump",
+    "collect": "sfx_coin",
+    "damage": "sfx_hit",
+    "stomp": "sfx_stomp",
+    "win": "sfx_win",
+    "lose": "sfx_lose"
+  }
 }

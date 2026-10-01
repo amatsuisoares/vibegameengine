@@ -4,7 +4,7 @@ import type { World } from '../world';
 
 export type Contact = [Entity, Entity];
 
-const pairKey = (a: Entity, b: Entity) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`);
+export const pairKey = (a: Entity, b: Entity) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`);
 
 /**
  * All pairs of overlapping (or touching, within half a pixel) colliders where at
