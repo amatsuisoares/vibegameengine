@@ -26,6 +26,8 @@ export class Entity {
   // Runtime state maintained by systems (not part of the scene file).
   readonly spawnX: number;
   readonly spawnY: number;
+  /** Box before this frame's physics move (null when it did not move by physics): for swept contacts. */
+  sweptFrom: AABB | null = null;
   grounded = false;
   groundId: string | null = null;
   onWallLeft = false;

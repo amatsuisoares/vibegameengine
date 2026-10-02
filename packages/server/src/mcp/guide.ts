@@ -63,7 +63,7 @@ SCRIPTS (when built-in components and rules are not enough)
 GEOMETRY AND PHYSICS
 - Pixels; y grows downward; transform.x/y is the CENTER. An entity standing on ground whose top is at y=T has center y = T - height/2.
 - Gravity default 1400 px/s^2. Jump height = jumpSpeed^2/(2*gravity): default 560 -> 112 px. Default walk speed 180 px/s; a default jump spans about 140 px horizontally.
-- Solid colliders at least 16 px thick. isTrigger for pickups/goals/checkpoints; oneWay for jump-through platforms.
+- Solids can be thin: movement is swept (fast bodies stop at the first solid they cross, and pick up triggers/coins on their path). isTrigger for pickups/goals/checkpoints; oneWay for jump-through platforms.
 - The camera follows camera.follow, clamped to the scene; the viewport is config.width x config.height.
 
 PREFABS (reusable entities)

@@ -135,9 +135,14 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   Kinematic se move primeiro; um corpo que estava apoiado nele (`groundId`) é levado junto (fica no topo e segue o
   deslocamento lateral). One-way compara com a posição anterior da plataforma, então plataforma subindo não é atravessada.
   Corpos dinâmicos não bloqueiam uns aos outros — sobreposição vira contato (dano, pisão).
-  Sem colisão contínua: sólidos devem ter ≥ 16 px de espessura (queda máx. 15 px/frame).
+  **Colisão contínua (V0.6):** cada eixo é varrido antes de mover (`sweep`). O corpo para na primeira face sólida que
+  o caminho cruza, por mais fino o sólido e por mais rápido o corpo. Depois a resolução de sobreposição antiga trata o
+  resto: corpos empurrados por plataformas e one-way subindo. One-way só segura quem cai sobre o topo.
 - **Contatos:** pares sobrepostos (tolerância 0,5 px, então “encostar” conta). Goal/Checkpoint usam
-  semântica de *enter* (só no primeiro frame de contato).
+  semântica de *enter* (só no primeiro frame de contato). Quem a física moveu mais de meio collider no frame (corpo
+  rápido, projétil kinematic) usa a caixa varrida do movimento (`contactBox`, de `Entity.sweptFrom`). Assim não pula
+  moeda, gatilho, dano ou objetivo entre dois frames. Teleporte (script ou regra mudando a posição) não é caminho.
+  Dois corpos rápidos se cruzando no mesmo frame não são varridos um contra o outro.
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
   lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed, particles` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.

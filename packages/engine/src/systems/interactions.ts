@@ -1,5 +1,5 @@
 import type { Entity } from '../entity';
-import { inflate, overlaps } from '../math';
+import { inflate, overlaps, type AABB } from '../math';
 import type { World } from '../world';
 
 export type Contact = [Entity, Entity];
@@ -7,8 +7,23 @@ export type Contact = [Entity, Entity];
 export const pairKey = (a: Entity, b: Entity) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`);
 
 /**
+ * The box a mover covered this frame: its collider, or — when physics moved it more than half its
+ * size (fast bodies, projectiles) — the box swept from where it started, so it cannot jump over a
+ * pickup, trigger or enemy between two frames.
+ */
+export function contactBox(e: Entity): AABB {
+  const now = e.aabb()!;
+  const from = e.sweptFrom;
+  if (!from || (Math.abs(now.x - from.x) <= now.w / 2 && Math.abs(now.y - from.y) <= now.h / 2)) return now;
+  const x = Math.min(now.x, from.x);
+  const y = Math.min(now.y, from.y);
+  return { x, y, w: Math.max(now.x + now.w, from.x + from.w) - x, h: Math.max(now.y + now.h, from.y + from.h) - y };
+}
+
+/**
  * All pairs of overlapping (or touching, within half a pixel) colliders where at
- * least one side can move. O(n^2): fine for MVP scenes of a few hundred entities.
+ * least one side can move (fast movers use their swept box, see contactBox).
+ * O(n^2): fine for MVP scenes of a few hundred entities.
  */
 export function findContacts(world: World): Contact[] {
   const movers: Entity[] = [];
@@ -22,7 +37,7 @@ export function findContacts(world: World): Contact[] {
   const contacts: Contact[] = [];
   const seen = new Set<string>();
   for (const a of movers) {
-    const ab = inflate(a.aabb()!, 0.5);
+    const ab = inflate(contactBox(a), 0.5);
     for (const b of all) {
       if (a === b) continue;
       const key = pairKey(a, b);

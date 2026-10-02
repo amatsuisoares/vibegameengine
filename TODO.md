@@ -217,7 +217,12 @@ Um sistema por vez; só depois que os anteriores estão funcionando.
     agente, que são replay.
 - [x] meu-pet: `inicio` e `quarto` restauram sem erro (8 e 34 entidades); playbooks passando
 - [x] 380 testes unitários + 24 e2e
-- [ ] CCD (colisão contínua: objetos rápidos atravessando sólidos finos)
+- [x] **CCD**: cada eixo do movimento físico é varrido e o corpo para no primeiro sólido cruzado (piso, parede, teto
+  ou one-way caindo), mesmo de 2 px e a 4000 px/s. Contatos de corpos rápidos e projéteis kinematic usam a caixa
+  varrida (`contactBox`): moedas, gatilhos e dano no caminho contam; teleporte não. Corpos lentos se comportam como
+  antes. Spatial hash e broad phase ficam para quando houver necessidade real.
+- [x] meu-pet: playbooks passando
+- [x] 387 testes unitários + 24 e2e
 - [ ] AudioSource (som por entidade: clip, volume, loop, spatial, falloff)
 - [ ] Save slots (`saveSlot` / `loadSlot` / `deleteSlot` / `listSlots`, opcional por jogo)
 - [ ] Agent Planning (objetivo → tarefas → verificação, como memória operacional do agente)
@@ -235,7 +240,8 @@ O jogo de plataforma do enunciado não será feito como teste final; o próximo 
 - Arquivos binários de assets não entram no histórico (só a entrada em `project.json`); undo não apaga o arquivo.
 - Ids de entidade não são renomeáveis (duplicar + apagar). Edições feitas fora do store não entram no histórico.
 - Sem trava entre processos: dois processos escrevendo no mesmo projeto ao mesmo tempo podem conflitar.
-- Física sem colisão contínua: sólidos finos (< 16 px) podem ser atravessados em queda rápida (CCD planejada na V0.6).
+- Colisão contínua só contra sólidos parados ou kinematic; dois corpos rápidos se cruzando no mesmo frame não são
+  varridos um contra o outro.
 - Corpos dinâmicos não colidem entre si (inimigos se sobrepõem).
 - Plataforma móvel não empurra corpos de lado (só carrega quem está em cima); esmagar contra o teto não é tratado.
 - Contatos O(n²) — suficiente para cenas de centenas de entidades.
