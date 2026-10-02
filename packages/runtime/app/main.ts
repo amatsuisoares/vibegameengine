@@ -3,6 +3,7 @@ import { Input, type ClockOptions, type GameOp, type LogEntry } from '@vibe/engi
 import {
   AssetStore,
   attachDomInput,
+  buildHierarchy,
   createVibeApi,
   createWebAudioBackend,
   FixedLoop,
@@ -14,6 +15,7 @@ import {
   type VibeApi,
 } from '@vibe/runtime';
 import { parseProject, type LiveRun, type Project } from '@vibe/shared';
+import { HierarchyPanel, type PanelSelection } from './hierarchy-panel';
 
 declare global {
   interface Window {
@@ -254,6 +256,7 @@ async function main() {
   window.__vibe = createVibeApi(runtime, name);
   runtime.start();
   canvas.focus();
+  if (!host) setupHierarchy(name);
 
   // Restarting a played game keeps the saved data and the real date (a host page restarts its run).
   function restartPlay() {
@@ -293,6 +296,68 @@ async function main() {
         : `Agente${liveRun?.active ? '' : ' (run encerrada)'} · ${where} (run em ${liveRun?.frame ?? '?'})`;
   };
   setInterval(showStatus, 250);
+
+  /**
+   * Hierarchy panel (editor): scenes and entities, live for the current scene. The selection is
+   * outlined on the canvas and saved to .vibe/selection.json, so the agent knows what "this" is.
+   */
+  function setupHierarchy(project: string) {
+    const panelEl = $<HTMLElement>('hierarchy');
+    const toggleBtn = $<HTMLButtonElement>('toggleHierarchy');
+    toggleBtn.hidden = false;
+    const selectionUrl = `/api/projects/${encodeURIComponent(project)}/selection`;
+    const outline = (sel: PanelSelection | null) => {
+      const next = sel?.entity && sel.scene === runtime.game.world.scene.id ? sel.entity : null;
+      if (next === runtime.selected) return;
+      runtime.selected = next;
+      runtime.render();
+    };
+    const panel = new HierarchyPanel(panelEl, (sel) => {
+      outline(sel);
+      const req = sel
+        ? fetch(selectionUrl, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, ...sel, at: Date.now() }) })
+        : fetch(selectionUrl, { method: 'DELETE' });
+      req.catch((err) => appendLog('warn', `Could not save the selection: ${err instanceof Error ? err.message : String(err)}`));
+    });
+    const refresh = () => {
+      if (panelEl.hidden) return;
+      panel.update(buildHierarchy(runtime.game, runtime.project));
+      // The scene may have changed: only an entity of the current scene is outlined.
+      outline(panel.selected);
+    };
+    const readShown = () => {
+      try {
+        return localStorage.getItem('vibe:hierarchy') !== '0';
+      } catch {
+        return true;
+      }
+    };
+    const show = (on: boolean) => {
+      panelEl.hidden = !on;
+      toggleBtn.classList.toggle('active', on);
+      runtime.selected = on ? runtime.selected : null;
+      refresh();
+      runtime.render();
+    };
+    toggleBtn.onclick = () => {
+      show(panelEl.hidden);
+      try {
+        localStorage.setItem('vibe:hierarchy', panelEl.hidden ? '0' : '1');
+      } catch {
+        // Remembered for this page only.
+      }
+    };
+    show(readShown());
+    setInterval(refresh, 250);
+    // The previous selection (it survives reloads, like the agent's view of it).
+    fetchJson(selectionUrl)
+      .then((saved: PanelSelection | null) => {
+        if (!saved || panel.selected) return;
+        panel.setSelection({ scene: saved.scene, entity: saved.entity });
+        outline(panel.selected);
+      })
+      .catch(() => undefined);
+  }
 
   // Follow mode: mirror the run the agent publishes after every action.
   let liveRun: LiveRun | undefined;

@@ -177,9 +177,12 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
 - [x] 333 testes unitários + 18 e2e
 - [x] **V0.4 concluída**: observação unificada, percepção do mouse, controle do mouse
 
-## V0.5 — Editor amigável (próxima)
+## V0.5 — Editor amigável (em andamento)
 Complementa o Claude Code (fluxo IA-first continua), sem virar um editor tipo Unity.
-- [ ] Hierarquia (cena → entidades; selecionar)
+- [x] **Hierarquia**: painel na página do jogo (cenas → entidades, ao vivo na cena atual: criadas, destruídas e
+  desativadas marcadas; ícone por tipo; filtro por id/tag/componente/prefab); seleção com contorno no canvas, gravada
+  em `.vibe/selection.json` e lida pelo agente com `get_selection` ("deixa isso maior"); páginas de host sem painel
+- [x] 348 testes unitários + 20 e2e
 - [ ] Inspector (componentes e propriedades da entidade selecionada; edição segura pelo `ProjectStore`)
 - [ ] Viewport (seleção, posição, bounding box, câmera, gizmos básicos)
 - [ ] Asset browser (imagens, spritesheets, áudio, prefabs, scripts)

@@ -9,6 +9,7 @@
   <body>
     <header class="toolbar">
       <select id="project" title="Projeto"></select>
+      <button id="toggleHierarchy" hidden title="Mostra / esconde a hierarquia (cenas e entidades)">Hierarquia</button>
       <button id="restart" title="Reiniciar (R após fim de jogo)">Restart</button>
       <button id="pause">Pause</button>
       <button id="step" title="Avança 1 frame (pausado)">Step</button>
@@ -18,9 +19,12 @@
       <label title="Mostra ao vivo a run que o agente está jogando"><input type="checkbox" id="follow" /> Seguir agente</label>
       <span id="status" class="status"></span>
     </header>
-    <main class="stage">
-      <canvas id="game" tabindex="0"></canvas>
-    </main>
+    <div class="workspace">
+      <aside class="hierarchy" id="hierarchy" aria-label="Hierarquia" hidden></aside>
+      <main class="stage">
+        <canvas id="game" tabindex="0"></canvas>
+      </main>
+    </div>
     <section class="console" id="console" aria-label="Console"></section>
     <script type="module" src="./main.ts"></script>
   </body>

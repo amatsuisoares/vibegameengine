@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { ProjectStore, removeFile, ToolError, writeFileAtomic, type RawProjectData } from '@vibe/server';
-import { LIVE_RUN_FILE } from '@vibe/shared';
+import { EDITOR_SELECTION_FILE, EditorSelectionSchema, LIVE_RUN_FILE } from '@vibe/shared';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 
 /** Node-side access to project folders (projects/<name>/project.json + scenes/*.json + assets/). */
@@ -156,6 +156,44 @@ export function handleSaveRequest(projectsRoot: string, method: string, url: str
     }
     if (!data || typeof data !== 'object' || Array.isArray(data)) return jsonResult(400, { error: 'Save must be a JSON object' });
     writeFileAtomic(file, JSON.stringify(data));
+    return { status: 204, type: 'text/plain', body: '' };
+  }
+  if (method === 'DELETE') {
+    removeFile(file);
+    return { status: 204, type: 'text/plain', body: '' };
+  }
+  return jsonResult(405, { error: `Method ${method} not allowed` });
+}
+
+/**
+ * The entity selected in the editor panels, kept on disk so the agent can read it (get_selection):
+ *   GET    /api/projects/<name>/selection -> the selection, or null
+ *   PUT    /api/projects/<name>/selection -> stores { version: 1, scene, entity, at? } (204)
+ *   DELETE /api/projects/<name>/selection -> clears it (204)
+ * Returns null for any other URL.
+ */
+export function handleSelectionRequest(projectsRoot: string, method: string, url: string, body = ''): HttpResult | null {
+  const m = /^\/api\/projects\/([^/]+)\/selection$/.exec(decodeURIComponent(new URL(url, 'http://x').pathname));
+  if (!m) return null;
+  const name = m[1];
+  if (!PROJECT_NAME.test(name) || !existsSync(join(projectsRoot, name, 'project.json'))) {
+    return jsonResult(404, { error: `Project "${name}" not found` });
+  }
+  const file = join(projectsRoot, name, EDITOR_SELECTION_FILE);
+  if (method === 'GET') {
+    if (!existsSync(file)) return jsonResult(200, null);
+    return { status: 200, type: 'application/json; charset=utf-8', body: readFileSync(file, 'utf8') };
+  }
+  if (method === 'PUT' || method === 'POST') {
+    let data: unknown;
+    try {
+      data = JSON.parse(body);
+    } catch {
+      return jsonResult(400, { error: 'Selection must be JSON' });
+    }
+    const parsed = EditorSelectionSchema.safeParse(data);
+    if (!parsed.success) return jsonResult(400, { error: `Invalid selection: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}` });
+    writeFileAtomic(file, JSON.stringify(parsed.data));
     return { status: 204, type: 'text/plain', body: '' };
   }
   if (method === 'DELETE') {

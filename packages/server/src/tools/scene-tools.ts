@@ -32,6 +32,17 @@ function entitiesOf(scene: Raw): Raw[] {
   return scene.entities as Raw[];
 }
 
+/** An entity as stored in the scene file (`raw`) and with its prefab and defaults applied (`effective`). */
+export function gameObjectOf(store: ProjectStore, scene: string, id: string) {
+  const s = store.snapshot().scenes.find((x) => x.id === scene);
+  if (!s) throw new ToolError(`Scene "${scene}" does not exist`);
+  if (s.error) throw new ToolError(s.error);
+  const raw = entitiesOf(s.data as Raw)[entityIndex(s.data as Raw, scene, id)];
+  const prefabs = Object.fromEntries(store.snapshot().prefabs.map((p) => [p.id, p.data]));
+  const parsed = EntitySchema.safeParse(resolveInstance(raw, prefabs).entity);
+  return { raw, effective: parsed.success ? parsed.data : null };
+}
+
 function entityIndex(scene: Raw, sceneId: string, id: string): number {
   const list = entitiesOf(scene);
   const i = list.findIndex((e) => e.id === id);
@@ -203,15 +214,7 @@ export const sceneTools = [
     name: 'get_game_object',
     description: 'One entity: `raw` is what the scene file stores; `effective` has its prefab (if any) and every default filled in.',
     input: z.object({ scene: SceneId, id: EntityId }),
-    run: ({ store }, { scene, id }) => {
-      const s = store.snapshot().scenes.find((x) => x.id === scene);
-      if (!s) throw new ToolError(`Scene "${scene}" does not exist`);
-      if (s.error) throw new ToolError(s.error);
-      const raw = entitiesOf(s.data as Raw)[entityIndex(s.data as Raw, scene, id)];
-      const prefabs = Object.fromEntries(store.snapshot().prefabs.map((p) => [p.id, p.data]));
-      const parsed = EntitySchema.safeParse(resolveInstance(raw, prefabs).entity);
-      return { raw, effective: parsed.success ? parsed.data : null };
-    },
+    run: ({ store }, { scene, id }) => gameObjectOf(store, scene, id),
   }),
 
   defineTool({

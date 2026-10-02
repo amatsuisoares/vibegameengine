@@ -234,9 +234,18 @@ app/main.ts ── busca /api/projects/<nome> ─▶ parseProject ─▶ AssetSt
 Runtime ── Game (a mesma engine headless)
   ├─ FixedLoop      requestAnimationFrame → acumula tempo real → game.step(n) (máx. 5 frames/tick)
   ├─ attachDomInput teclado (KeyboardEvent.code) e ponteiro → Input virtual
-  ├─ render()       buildDrawList(world) → paint(ctx) → paintDebug? → paintStatusOverlay
+  ├─ render()       buildDrawList(world) → paint(ctx) → paintDebug? → paintSelection? → paintStatusOverlay
   └─ window.__vibe  controle externo (pause/step/perform/getState/...)
+app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶ seleção ─▶ PUT /api/projects/<p>/selection
 ```
+
+- **Hierarquia** (V0.5, `runtime/src/hierarchy.ts` + `app/hierarchy-panel.ts`): `buildHierarchy` é puro e só lê —
+  cena atual a partir do `World` (entidades criadas, destruídas e desativadas aparecem marcadas), demais cenas a partir
+  do projeto; `entityKind` classifica cada entidade (jogador, inimigo, coletável, zona, sólido...) por tags e
+  componentes. O painel redesenha só quando `hierarchyKey` muda. A seleção vira `Runtime.selected`, desenhada por
+  `paintSelection` por cima do jogo (nunca entra na simulação), e é gravada em `.vibe/selection.json`
+  (`EditorSelectionSchema`, `shared/src/editor.ts`) para o agente (`get_selection`). Páginas de host (`?paused=1`,
+  screenshots) não têm painéis.
 
 - **Renderização em duas fases.** `buildDrawList(world)` é pura: converte entidades em comandos em
   coordenadas de tela (câmera, zoom, escala, rotação, flip), descarta o que está fora da tela e ordena por
@@ -348,7 +357,7 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 
 ```
 Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
-                                   tools/list  → 3 tools de workspace + 59 do ToolRegistry (com annotations)
+                                   tools/list  → 3 tools de workspace + 60 do ToolRegistry (com annotations)
                                    tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
                                                  → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```

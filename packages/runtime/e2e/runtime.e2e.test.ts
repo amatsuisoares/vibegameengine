@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
@@ -183,4 +183,71 @@ describe('runtime page (Chromium)', () => {
     await page.waitForFunction((n) => window.__vibe!.getState({ tags: ['coin'] }).entities.length === n, before, { timeout: 10_000 });
     await page.close();
   });
+
+  it('lists scenes and entities in the hierarchy panel and shares the selection', async () => {
+    cpSync(repo('test-fixtures/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
+    rmSync(`${TMP_PROJECT}/.vibe/selection.json`, { force: true });
+    const { page, errors } = await open('project=e2e-tmp');
+    const panel = page.locator('#hierarchy');
+    await panel.locator('[data-entity="coin1"]').waitFor({ timeout: 10_000 });
+    expect(await panel.locator('summary').first().textContent()).toContain('atual');
+    const ids = await panel.locator('.hierarchy-entity').evaluateAll((rows) => rows.map((r) => (r as HTMLElement).dataset.entity));
+    expect(ids).toEqual(expect.arrayContaining(['player', 'ground1', 'coin1', 'enemy1', 'flag', 'hud']));
+
+    // Filtering, then selecting: the row is marked, the entity outlined, the agent can read it.
+    await panel.locator('input[type=search]').fill('coin');
+    expect(await panel.locator('.hierarchy-entity').count()).toBe(4);
+    await panel.locator('[data-entity="coin1"]').click();
+    await expect.poll(() => panel.locator('[data-entity="coin1"]').getAttribute('aria-selected')).toBe('true');
+    const selFile = `${TMP_PROJECT}/.vibe/selection.json`;
+    await expect.poll(() => (existsSync(selFile) ? JSON.parse(readFileSync(selFile, 'utf8')) : null), { timeout: 5000 }).toMatchObject({
+      version: 1,
+      scene: 'level1',
+      entity: 'coin1',
+    });
+    await page.screenshot({ path: `${RUNS_DIR}/hierarchy-selection.png` });
+
+    // Survives a reload; clicking again clears it.
+    await page.reload();
+    await page.waitForFunction(() => window.__vibe?.ready, undefined, { timeout: 20_000 });
+    await expect.poll(() => panel.locator('[data-entity="coin1"]').getAttribute('aria-selected'), { timeout: 5000 }).toBe('true');
+    await panel.locator('[data-entity="coin1"]').click();
+    await expect.poll(() => existsSync(selFile), { timeout: 5000 }).toBe(false);
+
+    // Hiding the panel is remembered.
+    await page.locator('#toggleHierarchy').click();
+    expect(await panel.isHidden()).toBe(true);
+    await page.locator('#toggleHierarchy').click();
+    expect(await panel.isVisible()).toBe(true);
+    expect(errors).toEqual([]);
+    await page.close();
+
+    // Pages driven by a host (screenshots) have no editor panels.
+    const host = await open('project=e2e-tmp&paused=1');
+    expect(await host.page.locator('#hierarchy').isHidden()).toBe(true);
+    expect(await host.page.locator('#toggleHierarchy').isHidden()).toBe(true);
+    await host.page.close();
+  });
+
+  it('outlines the selected entity on the canvas', async () => {
+    const { page } = await open('project=e2e-tmp');
+    await page.locator('#hierarchy [data-entity="player"]').waitFor({ timeout: 10_000 });
+    await vibe(page, (v) => v.pause());
+    await page.locator('#hierarchy [data-entity="player"]').click();
+    const cyan = await page.waitForFunction(
+      () => {
+        const c = document.querySelector('canvas')!;
+        const data = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+        let n = 0;
+        for (let i = 0; i < data.length; i += 4) if (data[i] < 40 && data[i + 1] > 200 && data[i + 2] > 230) n++;
+        return n > 20 ? n : 0;
+      },
+      undefined,
+      { timeout: 5000 },
+    );
+    expect(await cyan.jsonValue()).toBeGreaterThan(20);
+    await page.locator('#hierarchy [data-entity="player"]').click();
+    await page.close();
+  });
 });
+

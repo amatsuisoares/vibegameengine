@@ -375,3 +375,52 @@ export function paintDebug(ctx: CanvasRenderingContext2D, world: World, info: { 
   ctx.fillText(line, world.config.width - 8, 7);
   ctx.restore();
 }
+
+export const SELECTION_COLOR = '#00e5ff';
+
+/**
+ * Where the selected entity is on screen: its box (Collider or Sprite), or just its position
+ * when it has neither. Null when it is not in the running scene.
+ */
+export function selectionBox(world: World, id: string): { x: number; y: number; w: number; h: number; enabled: boolean } | null {
+  const e = world.get(id);
+  if (!e || e.destroyed) return null;
+  const cam = world.camera;
+  const b = hitBox(e) ?? { x: e.x, y: e.y, w: 0, h: 0 };
+  return { x: (b.x - cam.x) * cam.zoom, y: (b.y - cam.y) * cam.zoom, w: b.w * cam.zoom, h: b.h * cam.zoom, enabled: e.enabled };
+}
+
+/** Outline and label of the entity selected in the editor panels (drawn over the game, never into it). */
+export function paintSelection(ctx: CanvasRenderingContext2D, world: World, id: string) {
+  const box = selectionBox(world, id);
+  if (!box) return;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = ctx.fillStyle = SELECTION_COLOR;
+  ctx.lineWidth = 2;
+  // A disabled entity is not drawn: a dashed outline says it is there anyway.
+  if (!box.enabled) ctx.setLineDash([5, 4]);
+  const pad = 3;
+  if (box.w || box.h) ctx.strokeRect(Math.round(box.x) - pad, Math.round(box.y) - pad, box.w + pad * 2, box.h + pad * 2);
+  else {
+    ctx.beginPath();
+    ctx.moveTo(box.x - 8, box.y);
+    ctx.lineTo(box.x + 8, box.y);
+    ctx.moveTo(box.x, box.y - 8);
+    ctx.lineTo(box.x, box.y + 8);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  const label = box.enabled ? id : `${id} (desativada)`;
+  const w = ctx.measureText(label).width;
+  const lx = Math.max(0, Math.round(box.x) - pad);
+  const ly = Math.max(16, Math.round(box.y) - pad - 1);
+  ctx.fillRect(lx, ly - 15, w + 8, 15);
+  ctx.fillStyle = '#001318';
+  ctx.fillText(label, lx + 4, ly - 2);
+  ctx.restore();
+}

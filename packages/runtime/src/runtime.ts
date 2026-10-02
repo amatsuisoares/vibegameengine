@@ -1,7 +1,7 @@
 import { FIXED_DT, Game, type ClockOptions, type GameEvent, type LogEntry, type World } from '@vibe/engine';
 import type { Project } from '@vibe/shared';
 import { FixedLoop } from './loop';
-import { buildDrawList, paint, paintDebug, paintStatusOverlay, type AssetResolver } from './render';
+import { buildDrawList, paint, paintDebug, paintSelection, paintStatusOverlay, type AssetResolver } from './render';
 
 export interface Scheduler {
   request(cb: (now: number) => void): number;
@@ -66,6 +66,8 @@ export class Runtime {
   project!: Project;
   readonly loop: FixedLoop;
   debug: boolean;
+  /** Entity selected in the editor panels: outlined over the game (never part of the simulation). */
+  selected: string | null = null;
   fps = 0;
   private assets?: AssetResolver;
   private readonly ctx: CanvasRenderingContext2D;
@@ -183,6 +185,7 @@ export class Runtime {
       onAssetError: (message) => this.reportAssetError(message),
     });
     if (this.debug) paintDebug(this.ctx, world, { fps: this.running && !this._paused ? this.fps : undefined, paused: this._paused });
+    if (this.selected) paintSelection(this.ctx, world, this.selected);
     if (this.options.statusOverlay ?? true) {
       const crash = world.status === 'crashed' ? world.events.findLast((e) => e.type === 'crash') : undefined;
       paintStatusOverlay(this.ctx, world.status, config.width, config.height, crash?.message as string | undefined);

@@ -50,14 +50,156 @@ body {
   background: #2e3340;
 }
 
+.toolbar button.active {
+  border-color: #00e5ff;
+}
+
+.toolbar [hidden] {
+  display: none;
+}
+
 .status {
   margin-left: auto;
   color: var(--muted);
   font-family: ui-monospace, monospace;
 }
 
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.hierarchy {
+  width: 260px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  min-height: 0;
+}
+
+.hierarchy[hidden] {
+  display: none;
+}
+
+.hierarchy-search {
+  margin: 8px;
+  padding: 4px 8px;
+  background: #242833;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.hierarchy-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 4px 8px;
+}
+
+.hierarchy-scene > summary {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.hierarchy-scene > summary::before {
+  content: '▸';
+  color: var(--muted);
+}
+
+.hierarchy-scene[open] > summary::before {
+  content: '▾';
+}
+
+.hierarchy-scene .count {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: normal;
+}
+
+.hierarchy-entity {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 2px 6px 2px 22px;
+  background: none;
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.hierarchy-entity:hover {
+  background: #242833;
+}
+
+.hierarchy-entity.selected {
+  background: #0b3a44;
+  border-color: #00e5ff;
+}
+
+.hierarchy-entity.disabled .id,
+.hierarchy-entity.destroyed .id {
+  color: var(--muted);
+}
+
+.hierarchy-entity.destroyed .id {
+  text-decoration: line-through;
+}
+
+.hierarchy-entity.spawned .id {
+  font-style: italic;
+}
+
+.hierarchy-entity .icon {
+  width: 14px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.hierarchy-entity .icon.kind-player {
+  color: #7dd3fc;
+}
+
+.hierarchy-entity .icon.kind-enemy {
+  color: var(--error);
+}
+
+.hierarchy-entity .icon.kind-pickup {
+  color: var(--warn);
+}
+
+.hierarchy-entity .name {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: normal;
+}
+
 .stage {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   align-items: center;

@@ -747,6 +747,23 @@ links para `localhost:5173` no **Simple Browser**.
   3 s atrás (o agente simula mais rápido que o relógio), ela adianta o excesso. O teclado do usuário não chega ao jogo
   espelhado. `stop_game` marca a run como encerrada; um `restart_game` vira uma run nova.
 
+### Editor: hierarquia e seleção (`get_selection`)
+
+Implementado na V0.5. A página do jogo tem um painel **Hierarquia** (botão na barra; lembra se está aberto): as cenas
+do projeto e suas entidades, ao vivo para a cena atual — entidades criadas durante o jogo aparecem em itálico com
+"criada", destruídas riscadas, desativadas apagadas. Um ícone diz o que cada uma é (jogador, inimigo, coletável, zona,
+sólido, visual, texto, lógica); o filtro busca por id, nome, tag, componente ou prefab.
+
+Clicar numa entidade a **seleciona**: ela ganha um contorno ciano no jogo (tracejado se desativada) e a seleção é
+gravada em `.vibe/selection.json`. Clicar de novo (ou Esc) limpa. É estado do editor: não entra no histórico nem
+dispara hot reload, e sobrevive a recarregar a página.
+
+| Tool | Entrada | O que faz |
+|------|---------|-----------|
+| `get_selection` | — | o que o usuário selecionou: `selection {scene, entity, selectedAt}`, os dados da entidade (`raw` + `effective`, como `get_game_object`) e, se a run do agente está nessa cena, `inYourRun` (snapshot ao vivo); `note` quando não há seleção ou ela está desatualizada |
+
+Use quando o usuário disser "isso", "esse", "o selecionado": selecionar no painel + "deixa maior" basta.
+
 ## Runtime no browser (`window.__vibe`)
 
 Implementado na Etapa 2. É a superfície que o RuntimeHost (Etapa 4) vai usar via Playwright
