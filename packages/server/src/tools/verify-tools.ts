@@ -110,6 +110,55 @@ function savePlaybook(ctx: ToolContext, id: string, playbook: Playbook, meta: (s
   return { playbook: id, file, ...(existed && { replaced: true }), ...changeInfo(r) };
 }
 
+export interface PlaybookRunResult {
+  id: string;
+  scenario?: string;
+  passed: boolean;
+  summary: string;
+  failures?: string[];
+  likelySystems?: string[];
+  screenshots?: string[];
+}
+
+/** Runs saved playbooks (all, or by ids / tags), each on a fresh game: the run_playbooks scoreboard. */
+export async function runPlaybooks(ctx: ToolContext, { ids, tags, screenshots = false }: { ids?: string[]; tags?: string[]; screenshots?: boolean }) {
+  const all = ctx.store.playbooks();
+  if (!all.length) throw new ToolError('No playbooks yet: save one with save_playbook or verify_game saveAs');
+  const unknown = (ids ?? []).filter((id) => !all.some((p) => p.id === id));
+  if (unknown.length) throw new ToolError(`Unknown playbook(s): ${unknown.join(', ')}. Saved: ${all.map((p) => p.id).join(', ')}`);
+  const chosen = all.filter((p) => (!ids || ids.includes(p.id)) && (!tags || p.playbook?.tags?.some((t) => tags.includes(t))));
+  if (!chosen.length) throw new ToolError('No playbook matches those tags');
+
+  const results: PlaybookRunResult[] = [];
+  const images: ToolImage[] = [];
+  for (const p of chosen) {
+    if (!p.playbook) {
+      results.push({ id: p.id, passed: false, summary: 'INVALID playbook file', failures: p.errors });
+      continue;
+    }
+    const pb = screenshots ? p.playbook : { ...p.playbook, screenshot: false, steps: p.playbook.steps.filter((st) => st.type !== 'screenshot') };
+    try {
+      const { result, images: shots } = await verifyScenario(ctx, pb);
+      images.push(...shots);
+      results.push({
+        id: p.id,
+        scenario: result.scenario,
+        passed: result.passed,
+        summary: result.summary,
+        ...(!result.passed && {
+          failures: result.report.filter((l) => !l.startsWith('PASS') && !l.startsWith('LIKELY')),
+          likelySystems: result.diagnosis?.likelySystems.slice(0, 3).map((g) => g.system),
+        }),
+        ...(screenshots && { screenshots: result.screenshots.map((sh) => sh.path).filter((path): path is string => !!path) }),
+      });
+    } catch (err) {
+      results.push({ id: p.id, scenario: p.playbook.scenario, passed: false, summary: 'ERROR', failures: [err instanceof Error ? err.message : String(err)] });
+    }
+  }
+  const passed = results.filter((r) => r.passed).length;
+  return { passed: passed === results.length, summary: `${passed}/${results.length} playbooks passed`, results, images };
+}
+
 export const verifyTools = [
   defineTool({
     name: 'verify_game',
@@ -174,41 +223,7 @@ export const verifyTools = [
       screenshots: z.boolean().default(false).describe("Take each playbook's screenshots (slower; the last 6 images are attached)."),
     }),
     run: async (ctx, { ids, tags, screenshots }) => {
-      const all = ctx.store.playbooks();
-      if (!all.length) throw new ToolError('No playbooks yet: save one with save_playbook or verify_game saveAs');
-      const unknown = (ids ?? []).filter((id) => !all.some((p) => p.id === id));
-      if (unknown.length) throw new ToolError(`Unknown playbook(s): ${unknown.join(', ')}. Saved: ${all.map((p) => p.id).join(', ')}`);
-      const chosen = all.filter((p) => (!ids || ids.includes(p.id)) && (!tags || p.playbook?.tags?.some((t) => tags.includes(t))));
-      if (!chosen.length) throw new ToolError('No playbook matches those tags');
-
-      const results: Record<string, unknown>[] = [];
-      const images: ToolImage[] = [];
-      for (const p of chosen) {
-        if (!p.playbook) {
-          results.push({ id: p.id, passed: false, summary: 'INVALID playbook file', failures: p.errors });
-          continue;
-        }
-        const pb = screenshots ? p.playbook : { ...p.playbook, screenshot: false, steps: p.playbook.steps.filter((st) => st.type !== 'screenshot') };
-        try {
-          const { result, images: shots } = await verifyScenario(ctx, pb);
-          images.push(...shots);
-          results.push({
-            id: p.id,
-            scenario: result.scenario,
-            passed: result.passed,
-            summary: result.summary,
-            ...(!result.passed && {
-              failures: result.report.filter((l) => !l.startsWith('PASS') && !l.startsWith('LIKELY')),
-              likelySystems: result.diagnosis?.likelySystems.slice(0, 3).map((g) => g.system),
-            }),
-            ...(screenshots && { screenshots: result.screenshots.map((sh) => sh.path).filter(Boolean) }),
-          });
-        } catch (err) {
-          results.push({ id: p.id, scenario: p.playbook.scenario, passed: false, summary: 'ERROR', failures: [err instanceof Error ? err.message : String(err)] });
-        }
-      }
-      const passed = results.filter((r) => r.passed).length;
-      const out = { passed: passed === results.length, summary: `${passed}/${results.length} playbooks passed`, results };
+      const { images, ...out } = await runPlaybooks(ctx, { ids, tags, screenshots });
       return images.length ? new WithImages(out, images.slice(-MAX_PLAYBOOK_IMAGES)) : out;
     },
   }),

@@ -203,7 +203,7 @@ Complementa o Claude Code (fluxo IA-first continua), sem virar um editor tipo Un
   passando
 - [x] 373 testes unitários + 23 e2e
 
-## V0.6 — Robustez (em andamento)
+## ✅ V0.6 — Robustez (concluída)
 Um sistema por vez; só depois que os anteriores estão funcionando.
 - [x] **Hot reload com estado**: capturar → recarregar → restaurar o que é compatível (`captureHotState` /
   `restoreHotState`, `engine/src/hot-state.ts`).
@@ -240,7 +240,12 @@ Um sistema por vez; só depois que os anteriores estão funcionando.
   - Limites: 20 slots e 2 MB.
 - [x] meu-pet: salvar e carregar slot sem erro em `inicio` e `quarto` (6 KB e 29 KB); playbooks passando
 - [x] 402 testes unitários + 26 e2e
-- [ ] Agent Planning (objetivo → tarefas → verificação, como memória operacional do agente)
+- [x] **Agent Planning**: planos na memória do projeto (`update_plan`): objetivo → tarefas em ordem
+  (`todo`/`doing`/`done`/`blocked`, nota, evidência) → verificação por playbooks (`verifyWith`, `verify: true` reusa
+  `runPlaybooks`). `verified` só com tudo feito e os playbooks passando; mexer nas tarefas reabre. `read_memory` e
+  `get_project_summary` mostram os planos abertos. É memória operacional: quem planeja continua sendo o Claude.
+- [x] meu-pet: um plano verificado pelos 4 playbooks do pet (numa cópia, sem tocar na memória real)
+- [x] 406 testes unitários + 26 e2e
 
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.

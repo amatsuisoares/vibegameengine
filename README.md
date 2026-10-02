@@ -20,6 +20,12 @@ Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa,
 > seleciona, arrastar move a entidade gravando na cena, gizmos de limites, câmera do jogo e posição) e o **asset browser**
 > (imagens, spritesheets, áudio, prefabs e scripts, com onde cada um é usado; usar na seleção, colocar prefab na cena;
 > o agente vê o mesmo catálogo em `list_assets`).
+> **V0.6 concluída** (robustez):
+> - **hot reload que mantém o estado** do jogo (as edições valem, o progresso continua);
+> - **colisão contínua** (objetos rápidos não atravessam sólidos finos nem pulam moedas e gatilhos);
+> - **som por entidade** (`AudioSource`);
+> - **slots de save**;
+> - **planos do agente** (`update_plan`: objetivo → tarefas → verificação por playbooks).
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos

@@ -908,6 +908,41 @@ Itens: `{ id, kind: feature|todo|issue|note, text, status: open|done|verified, e
 cria o item (ids `f1`, `t1`, `i1`, `n1`...); com `id`, altera só os campos passados. `verified` = feito e checado
 por teste ou jogando; `evidence` diz como. `get_project_summary` traz os itens em aberto (`memory`).
 
+### Planos (`update_plan`)
+
+Implementado na V0.6 (`tools/plan-tools.ts`, `plan-view.ts`). É memória operacional para trabalho com várias etapas:
+**objetivo → tarefas → verificação**. O agente decide e faz as tarefas; o plano só guarda o checklist entre conversas
+e fecha com uma checagem de verdade. Fica na mesma `.vibe/memory.json`.
+
+| Parâmetro | Efeito |
+|---|---|
+| `goal` (sem `id`) | cria um plano (`p1`, `p2`...); com `id`, renomeia |
+| `add: [textos]` | acrescenta tarefas em ordem (`t1`, `t2`...) |
+| `set: [{task, status?, note?, evidence?}]` | `status`: `todo`, `doing`, `done` ou `blocked`; `note` diz o motivo ou o que falta |
+| `remove: [ids]` | apaga tarefas |
+| `verifyWith: [playbooks]` | playbooks salvos que provam o objetivo (substitui a lista) |
+| `status: active\|abandoned` | reabre ou abandona |
+| `verify: true` | roda os playbooks de `verifyWith` e grava o resultado |
+
+- **Status do plano:**
+  - `active`: em andamento;
+  - `done`: todas as tarefas feitas, ainda sem verificação aprovada;
+  - `verified`: todas as tarefas feitas e os playbooks passando;
+  - `abandoned`.
+- **Mudanças no plano:** mudar tarefas depois de verificado volta o plano para `done` ou `active`.
+- **Plano padrão:** sem `id`, a tool atua no último plano aberto.
+- **Verificação que não roda:** se um playbook de `verifyWith` não existe, a tool responde com erro. As mudanças de
+  tarefas da mesma chamada ficam salvas e o plano registra `could not run the playbooks`.
+- **Reabrir:** `status: active` num plano com todas as tarefas feitas volta para `done`.
+- **Retorno:** o checklist (`[ ]`, `[>]` fazendo, `[x]` feita, `[!]` bloqueada), o progresso, a próxima tarefa, a
+  última verificação (com as falhas) e `missingPlaybooks`, se algum ainda não foi salvo.
+- **Onde aparece:** `read_memory` mostra os planos abertos como checklist e os encerrados em uma linha.
+  `get_project_summary` mostra uma linha por plano aberto.
+
+```json
+{ "goal": "Fase de plataforma", "add": ["player", "plataformas", "inimigo", "bandeira", "testar movimento", "verificar vitória"], "verifyWith": ["fase_vence"] }
+```
+
 ## Nomes de teclas
 
 Normalizados por `normalizeKey`: `"d"`, `"D"`, `"KeyD"` → `D`; `"SPACE"`, `" "` → `Space`;

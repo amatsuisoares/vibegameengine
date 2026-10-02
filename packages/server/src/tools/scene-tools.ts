@@ -3,6 +3,7 @@ import { COMPONENT_DOCS, COMPONENT_TYPES, ComponentSchemas, EntitySchema, IdSche
 import { isPlainObject, mergePatch } from '../merge-patch';
 import { ToolError, type CommitResult, type ProjectStore, type Transaction } from '../project-store';
 import { openMemoryItems } from './memory-tools';
+import { openPlanLines } from './plan-view';
 import { defineTool } from './registry';
 
 type Raw = Record<string, unknown>;
@@ -99,6 +100,7 @@ export const sceneTools = [
       const status = store.validate(snap);
       const config = (snap.config ?? {}) as Raw;
       const { done, undone } = store.history.stacks();
+      const plans = openPlanLines(store);
       return {
         name: store.name,
         config: { ...config },
@@ -123,6 +125,7 @@ export const sceneTools = [
           recent: store.history.all().slice(-5).map((e) => ({ seq: e.seq, author: e.author, action: e.action, summary: e.summary })),
         },
         memory: openMemoryItems(store),
+        ...(plans.length && { plans }),
       };
     },
   }),

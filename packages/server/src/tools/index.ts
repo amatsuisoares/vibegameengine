@@ -2,6 +2,7 @@ import { assetTools } from './asset-tools';
 import { editorTools } from './editor-tools';
 import { fileTools, historyTools } from './file-tools';
 import { memoryTools } from './memory-tools';
+import { planTools } from './plan-tools';
 import { prefabTools } from './prefab-tools';
 import { ToolRegistry } from './registry';
 import { ruleTools } from './rule-tools';
@@ -19,5 +20,5 @@ export function createEditingTools() {
 
 /** Everything the agent can use: editing tools plus runtime tools (these need a RuntimeHost in the context). */
 export function createAgentTools() {
-  return new ToolRegistry([...sceneTools, ...prefabTools, ...ruleTools, ...assetTools, ...fileTools, ...historyTools, ...memoryTools, ...editorTools, ...runtimeTools, ...verifyTools]);
+  return new ToolRegistry([...sceneTools, ...prefabTools, ...ruleTools, ...assetTools, ...fileTools, ...historyTools, ...memoryTools, ...editorTools, ...runtimeTools, ...verifyTools, ...planTools]);
 }

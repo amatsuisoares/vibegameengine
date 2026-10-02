@@ -1,6 +1,7 @@
 import { MEMORY_KINDS, MEMORY_STATUSES, type MemoryItem, type ProjectMemory } from '@vibe/shared';
 import { z } from 'zod';
 import { ToolError, type ProjectStore } from '../project-store';
+import { plansView } from './plan-view';
 import { defineTool } from './registry';
 
 const Kind = z.enum(MEMORY_KINDS);
@@ -48,6 +49,7 @@ export const memoryTools = [
       const project = store.validate().project;
       return {
         ...memoryView(memory),
+        ...(memory.plans.length && { plans: plansView(memory) }),
         project: project && {
           scenes: Object.values(project.scenes).map((s) => ({ id: s.id, entities: s.entities.length })),
           assets: project.config.assets.map((a) => `${a.id} (${a.type})`),

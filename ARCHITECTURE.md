@@ -57,7 +57,10 @@ Project
 
 Em disco: `projects/<nome>/project.json` (config) + `scenes/<id>.json` + `scripts/**/*.js` + `prefabs/<id>.json`
 (+ `playbooks/<id>.json`: cenários de verificação, fora do jogo em si).
-Memória do agente em `.vibe/memory.json`.
+Memória do agente em `.vibe/memory.json`: itens (features, todos, issues, notas) e **planos** (V0.6, `update_plan`).
+Um plano tem objetivo, tarefas em ordem com status, nota e evidência, e `verifyWith`, os playbooks que o provam. O
+`verify` reusa `runPlaybooks`, o mesmo de `run_playbooks`, e só marca `verified` com todas as tarefas feitas e os
+playbooks passando. É memória operacional: a engine não planeja.
 
 - **Prefabs:** `parseProject` expande as instâncias antes da validação (`expandPrefabs`: prefab ⊕ entidade por JSON
   Merge Patch, mantendo o campo `prefab`), então a engine só vê entidades completas e erros apontam para a instância.
@@ -416,7 +419,7 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 
 ```
 Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
-                                   tools/list  → 3 tools de workspace + 61 do ToolRegistry (com annotations)
+                                   tools/list  → 3 tools de workspace + 62 do ToolRegistry (com annotations)
                                    tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
                                                  → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```
