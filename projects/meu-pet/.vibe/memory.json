@@ -145,6 +145,28 @@
       "text": "Gostos de comida: subjectWeight 0.4, tagBlend 0.7, faixas largas nas tags (simulação: ~60% dos pets com favorita, ~35% com uma recusada). Playbooks precisam fixar TODAS as tags do item (a mais forte domina)",
       "status": "open",
       "updatedAt": "2026-10-02T16:15:41.735Z"
+    },
+    {
+      "id": "f12",
+      "kind": "feature",
+      "text": "Moedas, inventário e loja: botão Loja · N 🪙; cesta de boas-vindas (15 moedas + maçã, cenoura, leite, biscoito); +10 por dia, +3 por descobrir o gosto de uma comida, +2 brincar (30 min), +1 limpar, +2 pet feliz; bandeja só com o que se tem (sai só se o pet comer); ração grátis",
+      "status": "verified",
+      "evidence": "teste de regressão economy (cesta única, compra, recusa por falta de moedas, descoberta, dia seguinte); playtest com screenshots da loja e da bandeja; reabrir mantém inventário e moedas sem nova cesta",
+      "updatedAt": "2026-10-02T16:29:22.439Z"
+    },
+    {
+      "id": "n7",
+      "kind": "note",
+      "text": "Ids de spawn usam um contador global: a sujeira agora tem id estável (primeiro sujeiraN livre) para playbooks",
+      "status": "open",
+      "updatedAt": "2026-10-02T16:29:22.439Z"
+    },
+    {
+      "id": "n8",
+      "kind": "note",
+      "text": "Hot reload (Manter estado) recria entidades criadas em jogo, mas não a memória dos scripts: UI/efeitos transitórios devem ser achados pela tag (game.find) e fechados no onStart; comida no chão some sozinha em 8 s. Origem: dois bugs da usuária (cenoura e carta de queijo congeladas) depois que o agente gravou scripts com o jogo aberto",
+      "status": "open",
+      "updatedAt": "2026-10-02T16:39:08.949Z"
     }
   ],
   "plans": []

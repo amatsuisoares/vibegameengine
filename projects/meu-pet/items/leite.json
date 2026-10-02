@@ -3,5 +3,6 @@
   "category": "comida",
   "icon": "🥛",
   "tags": ["laticinio", "liquido"],
-  "props": { "artigo": "o", "fome": 12, "energia": 4 }
+  "props": { "artigo": "o", "fome": 12, "energia": 4 },
+  "price": 4
 }

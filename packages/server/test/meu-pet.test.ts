@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { Game, type GameEvent } from '@vibe/engine';
+import { captureHotState, Game, restoreHotState, type GameEvent } from '@vibe/engine';
 import type { Project } from '@vibe/shared';
 import { describe, expect, it } from 'vitest';
 import { ProjectStore, RuntimeHost } from '../src';
@@ -157,7 +157,7 @@ describe('meu-pet (regression)', () => {
     expect(Number(lively.vars.fome)).toBeLessThan(Number(calm.vars.fome)); // and a greedy one gets hungry sooner
   });
 
-  it('foods: a pet saved before the catalog only gets the new tastes drawn; the tray lists the foods; a full pet refuses without eating', () => {
+  it('foods: a pet saved before the catalog only gets the new tastes drawn; the tray lists what you own; a full pet refuses without eating it', () => {
     const t = Date.parse('2026-03-10T10:00:00Z');
     const pet = {
       version: 2, name: 'Mimi', born: t, stage: 'bebe', needs: { fome: 95, energia: 80, diversao: 70, higiene: 90, saude: 100, afeto: 60 }, sick: false,
@@ -174,15 +174,126 @@ describe('meu-pet (regression)', () => {
 
     game.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
     const cards = game.world.withTag('carta');
-    expect(cards.map((c) => c.components.Script!.props.item)).toEqual(['banana', 'biscoito', 'cenoura', 'leite', 'maca', 'peixe', 'queijo']);
-    expect(cards.map((c) => c.components.Text!.text)).toContain('🍎\nMaçã');
-    game.perform([{ type: 'click', x: 315, y: 435 }, { type: 'wait', ms: 3000 }]); // the apple card
+    // The welcome basket: one of each of four foods, in catalog order.
+    expect(cards.map((c) => c.components.Script!.props.item)).toEqual(['biscoito', 'cenoura', 'leite', 'maca']);
+    expect(cards.map((c) => c.components.Text!.text)).toContain('🍎 ×1\nMaçã');
+    game.perform([{ type: 'click', x: 645, y: 349 }, { type: 'wait', ms: 3000 }]); // the apple card
     expect(game.world.withTag('carta')).toEqual([]); // the tray closed
     expect(game.events(0, 'item_used').at(-1)).toMatchObject({ item: 'maca', target: 'pet', category: 'comida' });
     expect(game.events(0, 'observacao').at(-1)!.text).toBe('Mimi não parece estar com fome agora.');
     expect(game.events(0, 'reacao')).toEqual([]);
     expect(game.world.withTag('oferta')).toEqual([]);
+    expect(game.economy.inventory().count('maca')).toBe(1); // refused: still yours
     expect(game.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('economy: a welcome basket once, coins for a new day and for discovering a taste, buying in the shop, food leaves the bag only when eaten', () => {
+    const game = new Game(load(), { seed: 4, clock: { start: '2026-03-10T10:00:00Z' } });
+    game.perform([{ type: 'wait', ms: 200 }, { type: 'type', text: 'Mimi\n' }, { type: 'wait', ms: 500 }]);
+    expect(game.getState().wallet).toEqual({ moedas: 15 });
+    expect(game.getState().inventories).toEqual({ default: { maca: 1, cenoura: 1, leite: 1, biscoito: 1 } });
+    expect(game.entity('botaoLoja')!.components.Text!.text).toBe('Loja · 15 🪙');
+
+    // Shop: 7 foods for sale; buy a fish (8) and two carrots (2 each); then not enough for cheese (6 > 3).
+    game.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 50 }]);
+    const shop = game.world.withTag('cartaLoja');
+    expect(shop.map((c) => c.components.Script!.props.item)).toEqual(['banana', 'biscoito', 'cenoura', 'leite', 'maca', 'peixe', 'queijo']);
+    const at = (id: string) => shop.find((c) => c.components.Script!.props.item === id)!;
+    for (const id of ['peixe', 'cenoura', 'cenoura', 'queijo']) game.perform([{ type: 'click', x: at(id).x, y: at(id).y }, { type: 'wait', ms: 50 }]);
+    expect(game.getState().wallet).toEqual({ moedas: 3 });
+    expect(game.economy.inventory().count('cenoura')).toBe(3);
+    expect(game.events(0, 'purchase_failed').map((e) => [e.item, e.reason])).toEqual([['queijo', 'funds']]);
+    expect(game.entity('lojaInfo')!.components.Text!.text).toMatch(/^Faltam moedas para queijo\..*Você tem 3 🪙$/);
+
+    // A hungry pet, a food it was never offered: +3 for the discovery; the fish leaves the bag only if eaten.
+    game.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 50 }]);
+    game.apply({ op: 'advanceClock', ms: 4 * 3_600_000 });
+    game.perform([{ type: 'wait', ms: 1500 }, { type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
+    const fish = game.world.withTag('carta').find((c) => c.components.Script!.props.item === 'peixe')!;
+    game.perform([{ type: 'click', x: fish.x, y: fish.y }, { type: 'wait', ms: 4000 }]);
+    const reaction = game.events(0, 'reacao').at(-1)!;
+    expect(reaction.item).toBe('peixe');
+    expect(game.economy.inventory().count('peixe')).toBe(reaction.level === 'hate' ? 1 : 0);
+    expect(game.events(0, 'currency_change').some((e) => e.reason === 'descoberta' && e.delta === 3)).toBe(true);
+
+    // The next day: +10 once, no second basket.
+    const coins = game.economy.wallet.get('moedas');
+    game.apply({ op: 'advanceClock', ms: 24 * 3_600_000 });
+    game.perform([{ type: 'wait', ms: 3000 }]);
+    expect(game.economy.wallet.get('moedas')).toBe(coins + 10);
+    expect(game.events(0, 'currency_change').filter((e) => e.reason === 'cesta')).toHaveLength(1);
+    expect(game.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('offered food never gets stuck on the floor: interrupted (petting, another food) the pet still eats it; a stray one fades by itself', () => {
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const pet = {
+      version: 2, name: 'test1', born: t, stage: 'bebe', needs: { fome: 30, energia: 80, diversao: 70, higiene: 90, saude: 100, afeto: 60 }, sick: false,
+      asleep: false, lightOn: true, bowl: 0, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 70, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, notes: [], lastSeen: t,
+    };
+    const individual = { version: 1, traits: { paciencia: 0.8 }, preferences: { cenoura: { innate: 0.5, learned: 0, n: 0 }, maca: { innate: 0.5, learned: 0, n: 0 } } };
+    const start = (bag: Record<string, number>) =>
+      new Game(load(), {
+        seed: 1, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z' },
+        storage: { pet, petIndividuo: individual, 'vibe.inventory': { default: bag }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } },
+      });
+    const offer = (x: number) => [{ type: 'click' as const, entity: 'botaoPetisco' }, { type: 'wait' as const, ms: 50 }, { type: 'click' as const, x, y: 349 }];
+
+    // Report: a carrot given to "test1" stayed frozen on screen. Petting while it sniffs or eats used to strand it (and it was not eaten).
+    for (const during of [300, 1400]) {
+      const game = start({ cenoura: 1 });
+      game.perform([{ type: 'wait', ms: 500 }, ...offer(315), { type: 'wait', ms: during }, { type: 'click', entity: 'pet' }, { type: 'wait', ms: 3000 }]);
+      expect(game.world.withTag('oferta'), `petting after ${during} ms`).toEqual([]);
+      expect(game.world.vars.fome).toBeGreaterThan(30); // eaten anyway
+      expect(game.economy.inventory().count('cenoura')).toBe(0);
+    }
+
+    // A second food while the first is still on the floor: both are eaten, nothing stays.
+    const game = start({ cenoura: 1, maca: 1 });
+    game.perform([{ type: 'wait', ms: 500 }, ...offer(315), { type: 'wait', ms: 400 }, ...offer(315), { type: 'wait', ms: 5000 }]);
+    expect(game.world.withTag('oferta')).toEqual([]);
+    expect(game.events(0, 'reacao').map((e) => e.item)).toEqual(['cenoura', 'maca']);
+    expect(game.economy.inventory().size).toBe(0);
+    expect(game.events(0, 'observacao').filter((e) => String(e.kind).startsWith('comida:')).map((e) => e.kind)).toEqual(['comida:cenoura', 'comida:maca']);
+
+    // Safety net: a food nobody handles (e.g. recreated by a hot reload) fades out on its own.
+    const stray = game.world.spawn('oferta', 300, 450);
+    game.perform([{ type: 'wait', ms: 9000 }]);
+    expect(game.entity(stray.id)).toBeUndefined();
+    expect(game.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('card panels never leave a stale card: a hot reload with the tray or the shop open comes back closed and clean', () => {
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const pet = {
+      version: 2, name: 'test1', born: t, stage: 'bebe', needs: { fome: 30, energia: 80, diversao: 70, higiene: 90, saude: 100, afeto: 60 }, sick: false,
+      asleep: false, lightOn: true, bowl: 0, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 70, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, notes: [], lastSeen: t,
+    };
+    const storage = { pet, 'vibe.inventory': { default: { queijo: 1 } }, 'vibe.wallet': { moedas: 20 }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } };
+    const opts = { seed: 1, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z' } };
+    const cards = (g: Game) => g.world.withTag('carta').filter((e) => !e.destroyed);
+    for (const button of ['botaoPetisco', 'botaoLoja']) {
+      const before = new Game(load(), { ...opts, storage });
+      before.perform([{ type: 'wait', ms: 500 }, { type: 'click', entity: button }, { type: 'wait', ms: 50 }]);
+      expect(cards(before).length, button).toBeGreaterThan(0);
+      // Report: the "🧀 ×1 Queijo" card stayed frozen on screen after the game reloaded with the tray open.
+      const state = captureHotState(before);
+      const after = new Game(load(), { ...opts, storage: before.storage.snapshot() });
+      restoreHotState(after, state);
+      after.perform([{ type: 'wait', ms: 100 }]);
+      expect(cards(after), button).toEqual([]);
+      expect(after.entity('bandeja')!.components.Sprite!.visible).toBe(false);
+      expect(after.entity('loja')!.components.Sprite!.visible).toBe(false);
+      // And it still works afterwards.
+      after.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
+      expect(cards(after).map((c) => c.components.Text!.text)).toEqual(['🧀 ×1\nQueijo']);
+      after.perform([{ type: 'click', x: 315, y: 349 }, { type: 'wait', ms: 4000 }]);
+      expect(cards(after)).toEqual([]);
+      expect(after.events(0, 'item_used').at(-1)).toMatchObject({ item: 'queijo' });
+      expect(after.console.read(0, 'error')).toEqual([]);
+    }
   });
 
   it('verify_game plays a scenario of the real game and reports PASS per check', async () => {

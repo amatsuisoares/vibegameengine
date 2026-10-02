@@ -13,6 +13,7 @@ import { screenToWorld } from './systems/camera';
  *   names        status  frame  time  scene  vars  camera  clock  mouse  self (StateMachine/Interactable conditions)
  *   functions    entity(id) exists(id) hasSlot(name) count(tag) events(type) distance(a,b) pathDistance(a,b) abs(x) min(a,b) max(a,b) clamp(x,lo,hi)
  *                trait([entity,] axis) likes([entity,] subject or item id)   (one argument = self)   item(id)
+ *                itemCount(id [, inventory]) currency([name])
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
  * Field access on null yields null (the assertion then fails and shows the null).
  */
@@ -250,6 +251,12 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'item':
           arity(1);
           return game.items.get(String(args[0]));
+        case 'itemCount':
+          if (args.length < 1 || args.length > 2) throw new ExprError('itemCount() takes 1 or 2 arguments (item [, inventory])', src);
+          return game.economy.inventory(args[1] === undefined ? undefined : String(args[1])).count(String(args[0]));
+        case 'currency':
+          if (args.length > 1) throw new ExprError('currency() takes 0 or 1 argument', src);
+          return game.economy.wallet.get(args[0] === undefined ? undefined : String(args[0]));
         case 'trait':
         case 'likes': {
           if (args.length !== 1 && args.length !== 2) throw new ExprError(`${n.fn}() takes 1 or 2 arguments ([entity,] name)`, src);
@@ -282,7 +289,7 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'max':
           return Math.max(...args.map(Number));
         default:
-          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, item)`, src);
+          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, item, itemCount, currency)`, src);
       }
     }
     case 'unary': {

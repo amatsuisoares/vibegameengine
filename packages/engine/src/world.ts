@@ -6,6 +6,7 @@ import { Rng } from './rng';
 import { Scheduler } from './timers';
 import { TweenRunner } from './tweens';
 import { ParticleSystem } from './particles';
+import type { Economy } from './economy';
 import type { SlotHost } from './saves';
 
 export type GameStatus = 'running' | 'won' | 'lost' | 'crashed';
@@ -41,6 +42,8 @@ export class World {
   pendingScene: string | null = null;
   /** Save slots (set by the Game) for rule actions. */
   slots: SlotHost | null = null;
+  /** Inventories, wallets and shop (set by the Game) for rule actions. */
+  economy: Economy | null = null;
   /** Interactable that the interaction key would use now, and by which actor (for the on-screen prompt). */
   interactFocus: { entity: string; by: string } | null = null;
   readonly events: GameEvent[] = [];

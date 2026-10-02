@@ -92,6 +92,26 @@ propriedades dizem **o que ele é**, para cada indivíduo reagir do seu jeito (e
 - O `ProjectStore` valida cada arquivo de item em toda escrita (forma, asset e prefab existentes) e o entrega às runs, ao
   screenshot e à página (`rawProject().items`).
 
+## Inventário, moedas e loja
+
+Implementado na V0.7 (`engine/src/economy.ts`). Tudo fica no `game.storage` (persiste com o save, entra nos save slots,
+volta ao início no `restart`), em chaves reservadas: `vibe.inventory` (`{inventário: {item: quantidade}}`) e `vibe.wallet`
+(`{moeda: valor}`). Inventário sem nome = `"default"`; moeda sem nome = `"coins"`.
+
+- **Scripts:** `game.inventory(nome?)` → `count(item)`, `has(item, n?)`, `add(item, n?, motivo?)` (só itens do catálogo),
+  `remove(item, n?, motivo?)` (`false` sem tirar nada se não há o bastante), `list({category?, tag?})` →
+  `[{item, count}]` na ordem do catálogo, `size`. `game.wallet` → `get(moeda?)`, `add(valor, moeda?, motivo?)` (negativo
+  tira, nunca abaixo de 0), `spend(valor, moeda?, motivo?)` → `true/false`, `all()`. `game.shop.list({category?, tag?})` =
+  itens com `price`; `game.shop.buy(item, {qty?, currency?, inventory?})` → `{ok: true, item, qty, price, currency, count}` ou
+  `{ok: false, item, reason: 'unknown' | 'notForSale' | 'funds'}` (nunca lança).
+- **Regras:** ações `giveItem {item, count?, inventory?}`, `takeItem {item, count?, inventory?}` (sem o bastante: linha no
+  console) e `addCurrency {amount, currency?}`. O item precisa existir (validado ao gravar).
+- **Expressões:** `itemCount('id', inventário?)`, `currency('moeda'?)`.
+- **Eventos:** `inventory_change {inventory, item, delta, count, reason?}`, `currency_change {currency, delta, amount,
+  reason?}`, `purchase {item, qty, price, currency, inventory}`, `purchase_failed {item, reason}`.
+- **Estado:** `inspect_game_state` mostra `inventories` e `wallet` quando não estão vazios. Para começar uma run com itens:
+  `run_game {storage: {"vibe.inventory": {"default": {"maca": 2}}, "vibe.wallet": {"coins": 10}}}`.
+
 ## Prefabs
 
 Implementado na Etapa 8 (`shared/src/prefabs.ts`, `tools/prefab-tools.ts`). Um prefab é uma entidade sem `id` em
@@ -698,7 +718,7 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
   uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
-  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)` (sem id = `self`)
+  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)` (sem id = `self`), `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").
@@ -869,6 +889,9 @@ links para `localhost:5173` no **Simple Browser**.
     `Hot reload: state kept in "level1" (15 entities); edited: coin2`.
   - Timers, tweens, partículas e o `self.state` dos scripts recomeçam: o `onStart` roda de novo. Um script que
     precisa guardar algo usa `props` ou `game.storage`.
+  - Entidades criadas em jogo (cartas de menu, comida no chão...) **voltam**, mas a lista que o script guardava delas
+    não: ache-as pela tag (`game.find(tag)`) em vez de guardar uma lista, e no `onStart` feche/limpe o que for
+    transitório; efeitos transitórios devem saber sumir sozinhos (`self.after` no próprio script).
   - A caixa **Manter estado** desligada (ou o botão Restart) recomeça do zero. O modo Editar mostra a cena como está
     no arquivo.
 - `follow: true` (`?live=1`): a página **segue a run do agente**. Depois de cada ação que muda a run

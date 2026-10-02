@@ -9,6 +9,7 @@ import type { Ease, TweenInfo } from './tweens';
 import type { EmitterOptions } from './particles';
 import { aiOf, type UtilityRunner } from './utility';
 import { ItemCatalog, type ItemFilter, type ItemInfo } from './items';
+import type { BuyOptions, BuyResult, Economy, Inventory, Wallet } from './economy';
 import { affinityOf, evaluate, evaluateItem, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
@@ -60,6 +61,7 @@ export interface ScriptHost extends SlotHost {
   readonly utility: UtilityRunner;
   readonly individuals: IndividualRunner;
   readonly items: ItemCatalog;
+  readonly economy: Economy;
   useItem(itemId: string, target: Entity, by?: Entity): { handled: boolean; result: unknown };
 }
 
@@ -355,6 +357,12 @@ export interface ScriptGame {
   nearbyInteractables(actor: string | ScriptEntity): NearbyInteractable[];
   /** The item catalog: get(id) (null if unknown), has(id), list({category?, tag?}). */
   readonly items: { get(id: string): ItemInfo | null; has(id: string): boolean; list(filter?: ItemFilter): ItemInfo[] };
+  /** An inventory (default "default"): count, has, add, remove, list({category, tag}), size. Kept in storage. */
+  inventory(name?: string): Inventory;
+  /** Wallets: get(currency?), add(amount, currency?, reason?), spend(amount, currency?) → bool, all(). Default currency "coins". */
+  readonly wallet: Wallet;
+  /** Shop: list({category, tag}) = items with a price; buy(item, {qty, currency, inventory}) → {ok, ...} | {ok: false, reason}. */
+  readonly shop: { list(filter?: ItemFilter): ItemInfo[]; buy(item: string, options?: BuyOptions): BuyResult };
   /** Uses an item on an entity: event "item_used" and its onItem hook; returns {handled, result}. */
   useItem(item: string | ItemInfo, target: string | ScriptEntity, by?: string | ScriptEntity): { handled: boolean; result: unknown };
 }
@@ -502,6 +510,12 @@ class ScriptApi {
         get: (id) => host.items.get(String(id)),
         has: (id) => host.items.has(String(id)),
         list: (filter = {}) => host.items.list({ category: filter.category, tag: filter.tag }),
+      },
+      inventory: (name) => host.economy.inventory(name),
+      wallet: host.economy.wallet,
+      shop: {
+        list: (filter = {}) => host.economy.forSale({ category: filter.category, tag: filter.tag }),
+        buy: (item, options = {}) => host.economy.buy(String(item), options),
       },
       useItem: (item, target, by) =>
         host.useItem(

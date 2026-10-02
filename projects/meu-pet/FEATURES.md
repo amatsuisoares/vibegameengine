@@ -165,7 +165,8 @@ ao investigar, postura caída emburrado, tremor doente, pulsar ao evoluir. Vira 
 |---|---|---|
 | Carinho | clicar no pet | afeto +15 (carinhoso +22), diversão +3, pulinho e ♥; repetido em < 6 s: "não parece muito interessado"; dormindo: "se mexeu um pouco" (irritável acorda incomodado) |
 | Encher a tigela | clicar na tigela | 3 porções (som); se o pet está acordado e com fome < 70, vai comer |
-| Comida | botão → bandeja com as comidas do catálogo → clicar numa | o pet cheira e reage pelo gosto (ver seção 7a); satisfeito (fome > 92): "não parece estar com fome agora" |
+| Loja | botão "Loja · N 🪙" (canto superior direito) → cartas com preço e quanto você tem → clicar compra 1 | sem moedas: "Faltam moedas para…" |
+| Comida | botão → bandeja com as comidas que você **tem** (com quantidade) → clicar numa; vazia: carta que leva à Loja | só sai do inventário se o pet comer | o pet cheira e reage pelo gosto (ver seção 7a); satisfeito (fome > 92): "não parece estar com fome agora" |
 | Jogar a bola | clicar na bola | a bola voa e rola; o pet corre atrás se tiver energia > 20, não estiver doente e diversão < 85 (brincalhão sempre); brinca 4 s: diversão +30, energia −8, afeto +5, "ficou animado!" |
 | Limpar | clicar na sujeira | uma nuvem de poeira (partículas); higiene +18; sem sujeira: "parece mais à vontade com o quarto limpo" |
 | Remédio | botão | doente: cura, saúde +25; saudável: "não parece muito interessado" |
@@ -203,6 +204,24 @@ maçã e odeia banana; outro adora queijo e odeia cenoura.
 
 Mais de 4 doces por dia: saúde −2 e "parece ter comido doce demais hoje". A ração da tigela também é um item: quem não
 gosta dela come devagar e só com mais fome. A bola é o item `bola` (brinquedo: ativo, rola).
+
+## 7b. Moedas, inventário e loja (V0.7)
+
+Economia da engine (`game.wallet`, `game.inventory()`, `game.shop`), salva junto com o jogo. Moeda: **moedas** (🪙).
+O botão **Loja · N 🪙** mostra o saldo; cada ganho sobe dele como "+N 🪙".
+
+| Ganho | Moedas | Limite |
+|---|---|---|
+| cesta de boas-vindas (uma vez por save) | 15 + maçã, cenoura, leite e biscoito | — |
+| primeira visita de cada dia | 10 ("Um novo dia com Mimi: +10 moedas.") | 1 por dia (dias fora não acumulam) |
+| oferecer uma comida que o pet nunca provou (descobrir o gosto) | 3 | 1 por comida por pet |
+| brincar com a bola | 2 | a cada 30 min de jogo |
+| limpar uma sujeira | 1 | — |
+| o pet ficar muito feliz | 2 | junto da observação (a cada 3 h de jogo) |
+
+Preços: cenoura e biscoito 2, maçã e banana 3, leite 4, queijo 6, peixe 8. A ração da tigela é grátis (cuidado básico
+não é pago). A ideia é comprar algo novo para experimentar a cada dia ou dois, sem planilha: descobrir gostos é o que
+mais rende. Brinquedos e móveis entram na loja quando tiverem efeito no comportamento (fases 5 e 8).
 
 ## 8. Sistema de observação
 

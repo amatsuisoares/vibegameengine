@@ -1,5 +1,6 @@
-// Botão. props.acao: comida | remedio | diario | velocidade | colecao | novoPet | voltar.
+// Botão. props.acao: comida | loja | remedio | diario | velocidade | colecao | novoPet | voltar.
 const SPEEDS = [1, 60, 600];
+const MOEDA = 'moedas';
 let confirmUntil = -1;
 let time = 0;
 
@@ -18,11 +19,29 @@ function onUpdate(self, game, dt) {
   time += dt;
   self.get('Sprite').color = inside(self, game) ? '#5b8def' : self.state.base;
   if (self.props.acao === 'velocidade') self.get('Text').text = `Velocidade ${game.clock.speed}×`;
+  if (self.props.acao === 'loja') self.get('Text').text = `Loja · ${game.wallet.get(MOEDA)} 🪙`;
   if (self.props.acao === 'novoPet') {
     const confirming = time < confirmUntil;
     self.get('Text').text = confirming ? 'Tem certeza? Clique de novo' : self.state.label;
     if (confirming) self.get('Sprite').color = '#c2410c';
   }
+}
+
+/** Abre/fecha um painel de cartas (bandeja, loja) e fecha o outro. */
+function painel(game, id, other) {
+  const o = game.entity(other);
+  if (o && o.state.fechar) o.state.fechar();
+  const p = game.entity(id);
+  if (p && p.state.toggle) p.state.toggle();
+}
+
+/** Ganhou moedas: "+N 🪙" sobe do botão da loja. */
+function onEvent(self, ev, game) {
+  if (self.props.acao !== 'loja' || ev.type !== 'currency_change' || ev.currency !== MOEDA || ev.delta <= 0) return;
+  const e = game.spawn('emote', self.x, self.y - 6);
+  e.get('Text').text = `+${ev.delta} 🪙`;
+  e.get('Text').fontSize = 18;
+  e.props.color = '#ffd166';
 }
 
 /** Mostra ou esconde o diário (painel, texto e o botão de novo pet, que só aparece na fase adulta). */
@@ -42,11 +61,12 @@ function onClick(self, game) {
   const api = pet && pet.state.api;
   game.playSound('sfx_clique');
   switch (self.props.acao) {
-    case 'comida': {
-      const tray = game.entity('bandeja');
-      if (tray && tray.state.toggle) tray.state.toggle();
+    case 'comida':
+      painel(game, 'bandeja', 'loja');
       break;
-    }
+    case 'loja':
+      painel(game, 'loja', 'bandeja');
+      break;
     case 'remedio':
       if (api) api.remedio();
       break;

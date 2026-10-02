@@ -3,5 +3,6 @@
   "category": "comida",
   "icon": "🍎",
   "tags": ["fruta", "doce", "fresco"],
-  "props": { "artigo": "a", "fome": 15, "energia": 3 }
+  "props": { "artigo": "a", "fome": 15, "energia": 3 },
+  "price": 3
 }

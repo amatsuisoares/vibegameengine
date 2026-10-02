@@ -82,6 +82,23 @@ const immediateActions = [
   z.strictObject({ action: z.literal('loadSlot'), slot: SlotName.describe('Loaded at the end of the frame; nothing happens (a log line) if it does not exist.') }),
   z.strictObject({ action: z.literal('deleteSlot'), slot: SlotName }),
   z.strictObject({
+    action: z.literal('giveItem'),
+    item: z.string().min(1).describe('Catalog item id (items/<id>.json).'),
+    count: z.number().int().min(1).default(1),
+    inventory: z.string().min(1).optional().describe('Inventory name (default "default").'),
+  }),
+  z.strictObject({
+    action: z.literal('takeItem'),
+    item: z.string().min(1),
+    count: z.number().int().min(1).default(1).describe('Taken only if there are that many (otherwise a log line).'),
+    inventory: z.string().min(1).optional(),
+  }),
+  z.strictObject({
+    action: z.literal('addCurrency'),
+    amount: z.number().describe('Negative takes (never below 0).'),
+    currency: z.string().min(1).optional().describe('Currency name (default "coins").'),
+  }),
+  z.strictObject({
     action: z.literal('spawn'),
     prefab: z.string().min(1),
     x: z.number().optional().describe('World x (or offset from "at").'),

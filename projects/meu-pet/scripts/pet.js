@@ -77,6 +77,7 @@ const NEEDS = ['fome', 'energia', 'diversao', 'higiene', 'saude', 'afeto'];
 let pet; // dados salvos
 let me; // a entidade (traços e gostos: me.traits, me.prefs)
 let mind; // comportamento do momento (não salvo)
+let refeicao = null; // comida oferecida sendo cheirada/comida: {item, level, food, dir}
 let lastNow = 0;
 let localOffset = 0;
 let anim = 0;
@@ -507,6 +508,7 @@ function finish(game, self) {
     n.energia = clamp(n.energia - 8);
     n.afeto = clamp(n.afeto + 5 * lerp(0.4, 1.6, T('sociabilidade')));
     pet.care.brincadeiras++;
+    ganhar(game, 2, 'brincar', 30);
     reveal('brincadeira', 'alto');
     if (b.level === 'love') {
       observe(game, 'brincou', '{n} ficou animado!', 20);
@@ -624,6 +626,7 @@ function makeApi(game, self) {
       const level = [75, 50, 30][pet.dirt] ?? 0; // com folga sobre os limites (70, 45, 25)
       pet.needs.higiene = clamp(Math.max(pet.needs.higiene + 18, level));
       pet.care.limpezas++;
+      ganhar(game, 1, 'limpar');
       if (pet.dirt === 0) observe(game, 'limpo', '{n} parece mais à vontade com o quarto limpo.', 60);
     },
     alternarLuz() {
@@ -686,6 +689,46 @@ function diaryText(game) {
   return lines.join('\n');
 }
 
+// ---------------------------------------------------------------- moedas (engine: game.wallet / game.inventory)
+
+const MOEDA = 'moedas';
+const VISITA = 10;
+// Cesta de boas-vindas: um pouco de cada para começar a descobrir os gostos.
+const CESTA = { maca: 1, cenoura: 1, leite: 1, biscoito: 1 };
+const CESTA_MOEDAS = 15;
+
+/** Moedas por cuidar; com cooldown (minutos de jogo) para não virar fazenda de cliques. */
+function ganhar(game, n, motivo, cooldownMin = 0) {
+  if (cooldownMin > 0) {
+    const k = `moeda:${motivo}`;
+    const last = pet.cooldowns[k];
+    if (last !== undefined && game.clock.now - last < cooldownMin * 60000) return;
+    pet.cooldowns[k] = game.clock.now;
+  }
+  game.wallet.add(n, MOEDA, motivo);
+}
+
+/** Cesta de boas-vindas (uma vez por save) e moedas pela primeira visita de cada dia. */
+function economiaDoDia(game) {
+  const e = game.storage.get('economia') || {};
+  const day = Math.floor((game.clock.now + localOffset) / DAY);
+  if (e.cesta && e.dia === day) return;
+  if (!e.cesta) {
+    e.cesta = true;
+    for (const [id, n] of Object.entries(CESTA)) game.inventory().add(id, n, 'cesta');
+    game.wallet.add(CESTA_MOEDAS, MOEDA, 'cesta');
+  }
+  if (e.dia !== day) {
+    const first = e.dia === undefined;
+    e.dia = day;
+    if (!first) {
+      game.wallet.add(VISITA, MOEDA, 'visita');
+      observe(game, 'visita', `Um novo dia com ${pet.name}: +${VISITA} moedas.`);
+    }
+  }
+  game.storage.set('economia', e);
+}
+
 // ---------------------------------------------------------------- comida oferecida (itens)
 
 const DOCES_POR_DIA = 4;
@@ -715,58 +758,77 @@ function onItem(self, item, game) {
     observe(game, 'semFome', '{n} não parece estar com fome agora.', 1);
     return { consumed: false, reason: 'satisfeito' };
   }
+  // Uma comida ainda no chão (oferecida logo antes): termina aquela primeiro.
+  terminarRefeicao(game, self, false);
   const r = me.prefs.item(item.id);
+  // Primeira vez que este pet prova algo: descobrir rende moedas (incentiva experimentar).
+  pet.provou = pet.provou || {};
+  if (!pet.provou[item.id]) {
+    pet.provou[item.id] = r.level;
+    ganhar(game, 3, 'descoberta');
+  }
   const dir = self.get('Sprite').flipX ? -1 : 1;
   const food = game.spawn('oferta', self.x + dir * 70, FEET_Y - 12);
   food.get('Text').text = item.icon || '•';
+  refeicao = { item, level: r.level, food, dir };
   // Primeiro cheira (inclina a cabeça); a reação vem depois.
-  mind = { act: 'investigate', t: 0.9, then: () => react(game, self, item, r.level, food, dir) };
+  mind = { act: 'investigate', t: 0.9, refeicao: true, then: () => react(game, self) };
   game.emit('reacao', { item: item.id, level: r.level });
   return { consumed: r.level !== 'hate', level: r.level };
 }
 
-function react(game, self, item, level, food, dir) {
-  const n = pet.needs;
+/** Depois de cheirar: recusa (odeia) ou come; o efeito vem no fim (terminarRefeicao). */
+function react(game, self) {
+  const { item, level, food, dir } = refeicao;
   if (level === 'hate') {
+    refeicao = null;
     observe(game, `comida:${item.id}`, `{n} cheirou ${oItem(item)} e se afastou.`);
     sumir(food, 1.5);
     go(game, self.x - dir * 140, 'idle');
     return;
   }
   const eatFor = { love: 1.3, like: 2, neutral: 2.6, dislike: 1.4 }[level];
-  mind = {
-    act: 'eat',
-    t: eatFor,
-    then: () => {
-      sumir(food, 0.3);
-      const part = level === 'dislike' ? 0.5 : 1;
-      n.fome = clamp(n.fome + (Number(item.props.fome) || 10) * part);
-      n.energia = clamp(n.energia + (Number(item.props.energia) || 0) * part);
-      pet.care.petiscos++;
-      game.playSound('sfx_comer');
-      if (level === 'love') {
-        n.afeto = clamp(n.afeto + 10);
-        n.diversao = clamp(n.diversao + 5);
-        emote(game, self, '♥', '#ff8fab');
-        self.after(300, () => emote(game, self, '♥', '#ff8fab'));
-        reveal('apetite', 'alto');
-        observe(game, `comida:${item.id}`, `{n} parece ter adorado ${oItem(item)}!`);
-        mind = { act: 'happy', t: 1.4 };
-      } else if (level === 'like') {
-        n.afeto = clamp(n.afeto + 5);
-        emote(game, self, '♥', '#ff8fab');
-        observe(game, `comida:${item.id}`, `{n} parece ter gostado ${doItem(item)}.`);
-        mind = { act: 'happy', t: 0.9 };
-      } else if (level === 'neutral') {
-        observe(game, `comida:${item.id}`, `{n} comeu ${oItem(item)} sem muito entusiasmo.`);
-        mind = { act: 'idle', t: 1 };
-      } else {
-        observe(game, `comida:${item.id}`, `{n} comeu só um pouco ${doItem(item)}. Não parece ter gostado muito.`);
-        mind = { act: 'sulk', t: 1.5 };
-      }
-      if (item.tags.includes('doce')) comeuDoce(game);
-    },
-  };
+  mind = { act: 'eat', t: eatFor, refeicao: true, then: () => terminarRefeicao(game, self, true) };
+}
+
+/**
+ * Fim da refeição: a comida some do chão e o pet fica com o que comeu. Também vale quando algo
+ * interrompe (carinho, sono, outra comida...): ele já tinha decidido comer, então come — só não
+ * troca a ação nova pela reação (`reagir` = false).
+ */
+function terminarRefeicao(game, self, reagir) {
+  if (!refeicao) return;
+  const { item, level, food } = refeicao;
+  refeicao = null;
+  sumir(food, 0.3);
+  if (level === 'hate') return;
+  const n = pet.needs;
+  const part = level === 'dislike' ? 0.5 : 1;
+  n.fome = clamp(n.fome + (Number(item.props.fome) || 10) * part);
+  n.energia = clamp(n.energia + (Number(item.props.energia) || 0) * part);
+  pet.care.petiscos++;
+  game.playSound('sfx_comer');
+  if (item.tags.includes('doce')) comeuDoce(game);
+  if (level === 'love') {
+    n.afeto = clamp(n.afeto + 10);
+    n.diversao = clamp(n.diversao + 5);
+    reveal('apetite', 'alto');
+    observe(game, `comida:${item.id}`, `{n} parece ter adorado ${oItem(item)}!`);
+  } else if (level === 'like') {
+    n.afeto = clamp(n.afeto + 5);
+    observe(game, `comida:${item.id}`, `{n} parece ter gostado ${doItem(item)}.`);
+  } else if (level === 'neutral') observe(game, `comida:${item.id}`, `{n} comeu ${oItem(item)} sem muito entusiasmo.`);
+  else observe(game, `comida:${item.id}`, `{n} comeu só um pouco ${doItem(item)}. Não parece ter gostado muito.`);
+  if (!reagir) return;
+  if (level === 'love') {
+    emote(game, self, '♥', '#ff8fab');
+    self.after(300, () => emote(game, self, '♥', '#ff8fab'));
+    mind = { act: 'happy', t: 1.4 };
+  } else if (level === 'like') {
+    emote(game, self, '♥', '#ff8fab');
+    mind = { act: 'happy', t: 0.9 };
+  } else if (level === 'neutral') mind = { act: 'idle', t: 1 };
+  else mind = { act: 'sulk', t: 1.5 };
 }
 
 /** Doce demais num dia faz mal (um pouco). */
@@ -810,9 +872,11 @@ function onStart(self, game) {
   self.state.api = makeApi(game, self);
   game.vars.petName = pet.name;
   discover(game, pet.stage);
+  economiaDoDia(game);
   save(game);
   // Timers da engine (tempo de jogo em frames, reproduzível): observações a cada 1 s, save a cada 3 s.
   self.every(1000, () => {
+    economiaDoDia(game);
     checkObservations(game, self);
     checkEvolution(game, self);
   }, 'observar');
@@ -860,6 +924,8 @@ function onUpdate(self, game, dt) {
 }
 
 function behave(self, game, dt) {
+  // Algo interrompeu a refeição (a ação nova não faz parte dela): termina sem trocar a ação.
+  if (refeicao && !mind.refeicao) terminarRefeicao(game, self, false);
   if (pet.asleep && mind.act !== 'sleep') mind = { act: 'sleep' };
   const act = mind.act;
   if (act === 'sleep') {
@@ -960,7 +1026,10 @@ function updateDirt(game) {
   if (target > pet.dirt) pet.dirt = target;
   let existing = game.find('sujeira').length;
   while (existing < pet.dirt) {
-    game.spawn('sujeira', 160 + game.random() * 640, 452 + game.random() * 30);
+    // Id estável (o primeiro livre: sujeira1, sujeira2...), para playbooks e testes clicarem nela.
+    let k = 1;
+    while (game.entity(`sujeira${k}`)) k++;
+    game.spawn('sujeira', 160 + game.random() * 640, 452 + game.random() * 30, `sujeira${k}`);
     existing++;
   }
 }
@@ -986,6 +1055,7 @@ function checkObservations(game, self) {
   if (n.higiene < 30 && observe(game, 'sujo', '{n} parece incomodado com a sujeira.', 120)) return;
   if (pet.asleep && pet.lightOn && isNightAt(game.clock.now) && lightBothers() && observe(game, 'luz', '{n} parece incomodado com a luz.', 60)) return;
   if (awake && Math.min(n.fome, n.energia, n.diversao, n.higiene, n.afeto) > 80 && observe(game, 'feliz', '{n} parece muito feliz!', 180)) {
+    ganhar(game, 2, 'feliz');
     emote(game, self, '♪', '#ffd166');
     mind = { act: 'happy', t: 1.5 };
   }

@@ -386,6 +386,41 @@
         "Sprite": { "width": 470, "height": 196, "color": "#3a3355", "opacity": 0.92, "layer": 65 },
         "Script": { "src": "scripts/bandeja.js" }
       }
+    },
+    {
+      "id": "loja",
+      "tags": ["ui"],
+      "transform": { "x": 480, "y": 290 },
+      "components": {
+        "Sprite": { "width": 510, "height": 260, "color": "#2f3a55", "opacity": 0.95, "layer": 65 },
+        "Script": { "src": "scripts/loja.js" }
+      }
+    },
+    {
+      "id": "lojaInfo",
+      "tags": ["ui"],
+      "transform": { "x": 480, "y": 392 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 15,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#fff3c4",
+          "screenSpace": false,
+          "layer": 67
+        }
+      }
+    },
+    {
+      "id": "botaoLoja",
+      "prefab": "botao",
+      "transform": { "x": 880, "y": 82 },
+      "components": {
+        "Sprite": { "width": 140, "color": "#7a5c16" },
+        "Text": { "text": "Loja" },
+        "Script": { "props": { "acao": "loja" } }
+      }
     }
   ]
 }

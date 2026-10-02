@@ -87,6 +87,17 @@ export function runAction(w: World, a: RuleAction, target: (ref: string) => Enti
     case 'deleteSlot':
       w.slots?.deleteSlot(a.slot);
       return;
+    case 'giveItem':
+      w.economy?.inventory(a.inventory).add(a.item, a.count, origin.label);
+      return;
+    case 'takeItem':
+      if (w.economy && !w.economy.inventory(a.inventory).remove(a.item, a.count, origin.label)) {
+        w.console.log(`takeItem: not enough "${a.item}" (${origin.label})`, origin.source);
+      }
+      return;
+    case 'addCurrency':
+      w.economy?.wallet.add(a.amount, a.currency, origin.label);
+      return;
     case 'after': {
       const owner = origin.kind === 'state' ? w.get(origin.data.entity) : undefined;
       const id = w.timers.schedule({

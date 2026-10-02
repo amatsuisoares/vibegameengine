@@ -21,6 +21,7 @@ import { aiOf, UtilityRunner } from './utility';
 import { NavRunner, snapshotNav } from './nav';
 import { affinityOf, IndividualRunner } from './individual';
 import { ItemCatalog } from './items';
+import { Economy } from './economy';
 import { cooldownsLeft, type TimerInfo } from './timers';
 import type { TweenInfo } from './tweens';
 import { SoundDirector, soundOf } from './sound';
@@ -210,6 +211,9 @@ export interface GameState {
   storage?: Record<string, unknown>;
   /** Save slots (name, label, game time saved, scene), when there are any. */
   slots?: SlotInfo[];
+  /** Non-empty inventories (item id → count) and wallets (currency → amount). */
+  inventories?: Record<string, Record<string, number>>;
+  wallet?: Record<string, number>;
 }
 
 /** An entity's box in viewport pixels (top-left, size). */
@@ -270,6 +274,8 @@ export class Game implements SlotHost {
   individuals!: IndividualRunner;
   /** The item catalog (items/<id>.json). */
   readonly items: ItemCatalog;
+  /** Inventories, wallets and shop (kept in storage). */
+  readonly economy: Economy;
   /** Music asset playing (for the `music` event when a scene without music follows one with music). */
   private music: string | null = null;
 
@@ -283,6 +289,7 @@ export class Game implements SlotHost {
     this.saves = new GameSaves(options.slots, options.onSlotsChange);
     this.scripts = new ScriptLibrary(project.scripts ?? {});
     this.items = new ItemCatalog(project.items ?? {});
+    this.economy = new Economy(this.storage, this.items, () => this.world);
     this.loadScene(options.scene ?? project.config.startScene, {});
   }
 
@@ -320,6 +327,7 @@ export class Game implements SlotHost {
     this.world = new World(this.project.config, structuredClone(scene), this.input, this.console, new Rng(this.seed), vars);
     this.world.prefabs = this.project.prefabs ?? {};
     this.world.slots = this;
+    this.world.economy = this.economy;
     this.world.particles.reseed(this.seed);
     this.world.frame = prevFrame;
     this.world.time = prevTime;
@@ -611,6 +619,7 @@ export class Game implements SlotHost {
       clock: this.clock.snapshot(),
       ...(query.storage && { storage: this.storage.snapshot() }),
       ...(this.saves.list().length && { slots: this.saves.list() }),
+      ...this.economy.snapshot(),
     };
   }
 }

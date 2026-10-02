@@ -8,6 +8,7 @@
       "align": "center",
       "screenSpace": false,
       "layer": 9
-    }
+    },
+    "Script": { "src": "scripts/oferta.js" }
   }
 }

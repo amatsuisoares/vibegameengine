@@ -267,7 +267,19 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
 - [x] meu-pet: 8 comidas com tags + bola como item; botão Comida abre a bandeja; o pet cheira e reage pelo gosto
   (come com vontade / sem entusiasmo / belisca / recusa e se afasta); gostos calibrados por simulação (cada pet com
   favoritas e rejeições); 2 playbooks de pets com gostos opostos; 428 testes unitários + 26 e2e + 8 playbooks
-- [ ] **Fase 4 — Inventário + loja + moeda**
+- [x] **Fase 4 — Inventário + loja + moeda**: `game.inventory()` (itens do catálogo, contagem, lista por categoria/tag),
+  `game.wallet` (moedas por nome, nunca negativas), `game.shop` (preço do catálogo → carteira → inventário, motivo da
+  recusa), tudo no storage (`vibe.inventory`/`vibe.wallet`: save, slots, restart); ações `giveItem`/`takeItem`/
+  `addCurrency`, expressões `itemCount()`/`currency()`, eventos, `inventories`/`wallet` no estado
+- [x] meu-pet: botão "Loja · N 🪙", loja com preços, bandeja só com o que se tem (sai só se o pet comer), cesta de
+  boas-vindas, moedas por visita diária, descoberta de gosto, brincar, limpar e pet feliz; sujeira com id estável;
+  434 testes unitários + 8 playbooks
+- [x] Bug (teste da usuária): comida oferecida ficava congelada no chão se algo interrompesse o pet (carinho, sono,
+  outra comida) e ele não comia. A refeição virou um estado do pet que termina mesmo interrompida; a comida no chão
+  some sozinha depois de 8 s (rede de segurança para hot reload/slots); regressão no `meu-pet.test.ts` (435 testes)
+- [x] Bug (teste da usuária): carta da bandeja ("🧀 ×1 Queijo") ficava congelada depois de um hot reload com o painel
+  aberto: as entidades criadas voltavam, mas a lista de cartas do script não. Bandeja e loja acham as cartas pela tag
+  e começam fechadas; a carta clicada se remove; lição no guia do agente e no AGENT_TOOLS (436 testes)
 - [ ] **Fase 5 — Utility AI com alvos + rotina**
 - [ ] **Fase 6 — Memória + observações (`Notifier`)**
 - [ ] **Fase 7 — Diário individual** (`Knowledge`, `Journal`, `Text.maxWidth`)

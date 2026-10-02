@@ -153,7 +153,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   moeda, gatilho, dano ou objetivo entre dois frames. Teleporte (script ou regra mudando a posição) não é caminho.
   Dois corpos rápidos se cruzando no mesmo frame não são varridos um contra o outro.
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed, particles, individual, persist_error, item_used` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed, particles, individual, persist_error, item_used, inventory_change, currency_change, purchase, purchase_failed` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -265,6 +265,11 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   `Game`. `Game.useItem(item, alvo, por?)` emite `item_used` e chama `ScriptRunner.itemUsed` → hook `onItem` do alvo,
   devolvendo o retorno do hook (clonado como JSON). A engine não interpreta o item: o alvo decide, normalmente pelo
   `evaluateItem` das suas `Preferences` (id + categoria + tags, combinadas por `subjectWeight` e `tagBlend`).
+- **Economia** (V0.7, `engine/src/economy.ts`): `Economy` no `Game` (não por cena), sobre o `GameStorage` e o
+  `ItemCatalog`: inventários (`vibe.inventory`), carteiras (`vibe.wallet`) e `buy` (preço do catálogo → `spend` →
+  `add`). Cada operação lê e grava o storage (dados pequenos), então save slots, hot reload e `restart` valem sem código
+  extra. `World.economy` aponta para ela para as ações de regra (`giveItem`, `takeItem`, `addCurrency`); os eventos vão
+  para o mundo atual. `getState` traz `inventories` e `wallet`.
 - **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
   conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).

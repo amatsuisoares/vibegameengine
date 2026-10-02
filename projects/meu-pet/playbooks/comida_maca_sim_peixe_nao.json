@@ -5,7 +5,7 @@
     { "type": "wait", "ms": 500 },
     { "type": "click", "entity": "botaoPetisco" },
     { "type": "wait", "ms": 100 },
-    { "type": "click", "x": 315, "y": 435 },
+    { "type": "click", "x": 315, "y": 349 },
     { "type": "wait", "ms": 2500 },
     {
       "type": "assert",
@@ -16,7 +16,7 @@
     { "type": "wait", "ms": 2000 },
     { "type": "click", "entity": "botaoPetisco" },
     { "type": "wait", "ms": 100 },
-    { "type": "click", "x": 425, "y": 435 },
+    { "type": "click", "x": 425, "y": 349 },
     { "type": "wait", "ms": 1300 },
     {
       "type": "assert",
@@ -49,7 +49,9 @@
       "match": { "kind": "comida:peixe" },
       "name": "observação da recusa"
     },
-    { "assert": "variable", "var": "fome", "lt": 70, "name": "não comeu peixe" }
+    { "assert": "variable", "var": "fome", "lt": 70, "name": "não comeu peixe" },
+    { "name": "maca saiu do inventário", "expr": "itemCount('maca') == 1" },
+    { "name": "peixe recusado continua no inventário", "expr": "itemCount('peixe') == 2" }
   ],
   "screenshot": true,
   "annotate": false,
@@ -105,6 +107,8 @@
         "proteina": { "innate": 0, "learned": 0, "n": 0 },
         "salgado": { "innate": 0, "learned": 0, "n": 0 }
       }
-    }
+    },
+    "vibe.inventory": { "default": { "maca": 2, "peixe": 2 } },
+    "economia": { "cesta": true, "dia": 20522 }
   }
 }

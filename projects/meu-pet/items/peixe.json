@@ -3,5 +3,6 @@
   "category": "comida",
   "icon": "🐟",
   "tags": ["proteina", "salgado", "cheiroso"],
-  "props": { "artigo": "o", "fome": 30 }
+  "props": { "artigo": "o", "fome": 30 },
+  "price": 8
 }

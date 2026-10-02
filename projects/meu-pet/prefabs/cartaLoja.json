@@ -1,0 +1,16 @@
+{
+  "tags": ["carta", "cartaLoja"],
+  "components": {
+    "Sprite": { "width": 112, "height": 80, "color": "#fffaf0", "layer": 66 },
+    "Text": {
+      "text": "",
+      "fontSize": 15,
+      "font": "sans-serif",
+      "align": "center",
+      "color": "#3b2f2f",
+      "screenSpace": false,
+      "layer": 67
+    },
+    "Script": { "src": "scripts/cartaLoja.js", "props": { "item": "" } }
+  }
+}

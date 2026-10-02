@@ -3,5 +3,6 @@
   "category": "comida",
   "icon": "🍪",
   "tags": ["doce", "crocante", "petisco"],
-  "props": { "artigo": "o", "fome": 10 }
+  "props": { "artigo": "o", "fome": 10 },
+  "price": 2
 }
