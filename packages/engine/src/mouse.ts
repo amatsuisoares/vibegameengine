@@ -1,6 +1,6 @@
 import type { Entity } from './entity';
 import type { Game, ScreenBox } from './game';
-import { hitBox, isDrawn, type ClickInfo, type DragInfo } from './interact';
+import { hitBox, isDrawn, pickLayer, type ClickInfo, type DragInfo } from './interact';
 import { round2 } from './math';
 import { screenToWorld } from './systems/camera';
 
@@ -53,7 +53,7 @@ export interface MouseTarget {
   drag?: DragInfo;
 }
 
-/** Topmost first: higher Sprite layer, then later in the scene (same order a click uses). */
+/** Topmost first: higher layer (Sprite or Text, pickLayer), then later in the scene (same order a click uses). */
 export function stackAt(game: Game, x: number, y: number): Entity[] {
   const hits: { e: Entity; layer: number; i: number }[] = [];
   game.world.entities.forEach((e, i) => {
@@ -61,7 +61,7 @@ export function stackAt(game: Game, x: number, y: number): Entity[] {
     const b = hitBox(e);
     if (!b || x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h) return;
     if (!isDrawn(e) && !e.aabb()) return;
-    hits.push({ e, layer: e.components.Sprite?.layer ?? 0, i });
+    hits.push({ e, layer: pickLayer(e), i });
   });
   return hits.sort((a, b) => b.layer - a.layer || b.i - a.i).map((h) => h.e);
 }
@@ -84,7 +84,7 @@ export function mouseTarget(game: Game): MouseTarget {
     tags: [...e.tags],
     screen: game.screenBoxOf(e),
     distance: boxDistance(e, p.x, p.y),
-    layer: e.components.Sprite?.layer ?? 0,
+    layer: pickLayer(e),
     ...game.interactions.clickInfo(e),
   });
 

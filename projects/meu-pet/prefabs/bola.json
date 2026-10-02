@@ -1,0 +1,9 @@
+{
+  "tags": ["brinquedo"],
+  "components": {
+    "Sprite": { "shape": "circle", "width": 34, "height": 34, "color": "#e63946", "layer": 9 },
+    "Collider": { "width": 50, "height": 50, "isTrigger": true },
+    "Script": { "src": "scripts/bola.js", "props": { "item": "bola" } },
+    "Interactable": { "action": "jogar", "via": ["click"] }
+  }
+}

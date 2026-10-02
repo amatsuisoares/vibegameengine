@@ -1,0 +1,10 @@
+{
+  "name": "Pelúcia",
+  "category": "brinquedo",
+  "icon": "🧸",
+  "tags": ["macio", "silencioso", "aconchego"],
+  "consumable": false,
+  "price": 12,
+  "description": "Macia e quieta: boa para brincar sozinho e se aconchegar.",
+  "props": { "artigo": "a", "diversao": 8, "afeto": 4, "lugar": 300 }
+}

@@ -9,6 +9,7 @@ import type { Ease, TweenInfo } from './tweens';
 import type { EmitterOptions } from './particles';
 import { aiOf, type UtilityRunner } from './utility';
 import { ItemCatalog, type ItemFilter, type ItemInfo } from './items';
+import { habitOf, patternsOf, peakOf, recordActivity, type Habit } from './routine';
 import type { BuyOptions, BuyResult, Economy, Inventory, Wallet } from './economy';
 import { affinityOf, evaluate, evaluateItem, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
@@ -30,7 +31,7 @@ import { FIXED_DT, type GameEvent, type World } from './world';
  *   function onEvent(self, event, game) {}        // every game event (end of frame), incl. custom ones
  *   function onInteract(self, by, game, info) {}  // self (an Interactable) was used; by = actor or null, info = { action, via }
  *   function onStateChange(self, change, game) {} // self's StateMachine changed state: change = { from, to } (from null at start)
- *   function onDecision(self, decision, game) {}  // self's UtilityAI chose something new: { choice, from, scores }
+ *   function onDecision(self, decision, game) {}  // self's UtilityAI chose something new: { choice, from, scores, target }
  *   function onItem(self, item, game, by) {}      // an item was used on self (game.useItem); its return value goes back to the caller
  *
  * Top-level variables are per entity (each entity runs its own copy of the script).
@@ -46,7 +47,7 @@ export interface ScriptHooks {
   onEvent?: (self: ScriptEntity, event: GameEvent, game: ScriptGame) => void;
   onInteract?: (self: ScriptEntity, by: ScriptEntity | null, game: ScriptGame, info: { action: string; via: InteractVia }) => void;
   onStateChange?: (self: ScriptEntity, change: { from: string | null; to: string }, game: ScriptGame) => void;
-  onDecision?: (self: ScriptEntity, decision: { choice: string; from: string | null; scores: Record<string, number | null> }, game: ScriptGame) => void;
+  onDecision?: (self: ScriptEntity, decision: { choice: string; from: string | null; scores: Record<string, number | null>; target: string | null }, game: ScriptGame) => void;
   onItem?: (self: ScriptEntity, item: ItemInfo, game: ScriptGame, by: ScriptEntity | null) => unknown;
 }
 
@@ -95,6 +96,18 @@ export interface ScriptPrefs {
   all(): Record<string, number>;
 }
 
+/** self.routine: the entity's habits by time of day (Routine). */
+export interface ScriptRoutine {
+  /** It did `activity` now (weight default 1); saved with Persist. */
+  record(activity: string, weight?: number): void;
+  /** Share 0..1 of `activity` among what it does at that hour (default: now). */
+  habit(activity: string, hour?: number): number;
+  /** The time of day it does `activity` most: {slot, from, to, weight} or null. */
+  peak(activity: string): { slot: number; from: number; to: number; weight: number } | null;
+  /** Stable habits: [{activity, slot, from, to, share, weight}], strongest first. */
+  patterns(minShare?: number): Habit[];
+}
+
 /** self.persist: where the individual data is kept (Persist). */
 export interface ScriptPersist {
   /** Storage key, or null without Persist. */
@@ -139,6 +152,8 @@ export interface ScriptAi {
   readonly choice: string | null;
   /** Scores of the last decision (null = option not available). */
   readonly scores: Record<string, number | null>;
+  /** Entity the current choice is about (options with targets), or null. */
+  readonly target: string | null;
   /** Scores the options now and applies the choice; returns it. */
   decide(): string | null;
 }
@@ -259,6 +274,8 @@ export interface ScriptEntity {
   readonly traits: ScriptTraits;
   /** The entity's Preferences. */
   readonly prefs: ScriptPrefs;
+  /** The entity's Routine. */
+  readonly routine: ScriptRoutine;
   /** The entity's Persist. */
   readonly persist: ScriptPersist;
   /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
@@ -554,6 +571,9 @@ class ScriptApi {
       get scores() {
         return { ...(aiOf(e)?.scores ?? {}) };
       },
+      get target() {
+        return aiOf(e)?.target ?? null;
+      },
       decide: () => host.utility.decide(e),
     };
     const schedule = (ms: number, every: number | undefined, fn: () => void, id?: string) => {
@@ -689,6 +709,20 @@ class ScriptApi {
         return Object.fromEntries(Object.keys(p.values).map((k) => [k, affinityOf(e, k)]));
       },
     };
+    const routineData = () => {
+      if (!e.components.Routine) throw new Error(`entity "${e.id}" has no Routine`);
+      individuals.ensure(e);
+    };
+    const routine: ScriptRoutine = {
+      record: (activity, weight = 1) => {
+        routineData();
+        recordActivity(e, host.clock, String(activity), finite(weight, 'weight'));
+        individuals.touch(e);
+      },
+      habit: (activity, hour) => (routineData(), habitOf(e, String(activity), hour === undefined ? host.clock.hour : finite(hour, 'hour'))),
+      peak: (activity) => (routineData(), peakOf(e, String(activity))),
+      patterns: (minShare) => (routineData(), patternsOf(e, minShare === undefined ? undefined : finite(minShare, 'minShare'))),
+    };
     const persist: ScriptPersist = {
       get key() {
         return e.components.Persist?.key ?? null;
@@ -705,6 +739,7 @@ class ScriptApi {
       hasTag: (t) => e.hasTag(t),
       traits,
       prefs,
+      routine,
       persist,
       get x() {
         return e.x;
@@ -927,7 +962,7 @@ export class ScriptRunner {
   }
 
   /** onDecision of an entity whose UtilityAI chose something new. */
-  decided(e: Entity, decision: { choice: string; from: string | null; scores: Record<string, number | null> }) {
+  decided(e: Entity, decision: { choice: string; from: string | null; scores: Record<string, number | null>; target: string | null }) {
     const inst = this.instance(e);
     if (inst && !inst.failed && inst.hooks.onDecision && e.active) {
       this.call(e, inst, 'onDecision', () => inst.hooks.onDecision!(this.api.entity(e), structuredClone(decision), this.api.game));

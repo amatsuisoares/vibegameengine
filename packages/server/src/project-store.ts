@@ -112,6 +112,7 @@ function expressionErrors(project: Project): string[] {
       for (const [name, o] of Object.entries(ai.options)) {
         if (typeof o.score === 'string') check(o.score, `${at}.components.UtilityAI.options.${name}.score`);
         check(o.when, `${at}.components.UtilityAI.options.${name}.when`);
+        check(o.targets?.when, `${at}.components.UtilityAI.options.${name}.targets.when`);
       }
     }
     const sm = c.StateMachine;

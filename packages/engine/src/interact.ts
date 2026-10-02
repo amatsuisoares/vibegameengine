@@ -97,7 +97,18 @@ export interface ClickInfo {
   interactable?: { action: string; label?: string; enabled: boolean; uses: number; ready: boolean; blocked?: BlockReason; cooldownMs?: number };
 }
 
-/** Topmost (highest Sprite layer, then latest in the scene) active entity containing the point. */
+/** Topmost (highest pickLayer, then latest in the scene) active entity containing the point. */
+/**
+ * Layer an entity is drawn on for picking: the highest of its Sprite and Text layers (an entity
+ * drawn only by its Text, e.g. an emoji toy, is on top of what its Text covers).
+ */
+export function pickLayer(e: Entity): number {
+  const s = e.components.Sprite;
+  const t = e.components.Text;
+  if (s && t) return Math.max(s.layer, t.layer);
+  return s?.layer ?? t?.layer ?? 0;
+}
+
 export function topmostAt(world: World, x: number, y: number, accept: (e: Entity) => boolean): Entity | null {
   let best: Entity | null = null;
   let bestLayer = -Infinity;
@@ -105,7 +116,7 @@ export function topmostAt(world: World, x: number, y: number, accept: (e: Entity
     if (!e.active) continue;
     const b = hitBox(e);
     if (!b || x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h || !accept(e)) continue;
-    const layer = e.components.Sprite?.layer ?? 0;
+    const layer = pickLayer(e);
     if (layer >= bestLayer) {
       best = e;
       bestLayer = layer;

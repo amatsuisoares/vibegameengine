@@ -213,6 +213,13 @@ export const UtilityOptionSchema = z.strictObject({
   when: z.string().min(1).optional().describe('Expression that must be true for the option to be considered.'),
   cooldownMs: z.number().min(0).default(0).describe('After the option stops being the choice, it waits this long before it can be chosen again.'),
   state: z.string().min(1).optional().describe('StateMachine state entered when chosen (default: a state with the option name, if any).'),
+  targets: z
+    .strictObject({
+      tag: z.string().min(1).describe('Candidates: active entities with this tag (never the entity itself).'),
+      when: z.string().min(1).optional().describe('Expression a candidate must pass (`target` is the candidate).'),
+    })
+    .optional()
+    .describe('Smart objects: score and when are evaluated once per candidate with `target` = that entity (e.g. "likes(target.props.item)", "-distance(self, target) / 500"); the best candidate gives the option its score and becomes self.ai.target. No candidate = not available.'),
 });
 
 export const UtilityAISchema = z.strictObject({
@@ -225,6 +232,12 @@ export const UtilityAISchema = z.strictObject({
   decideWhen: z.string().min(1).optional().describe(`Only decide while this expression is true, e.g. "self.state == 'idle'".`),
   inertia: z.number().min(0).default(0.1).describe("Added to the current choice's score (best) so close scores do not flip-flop."),
   noise: z.number().min(0).default(0).describe('Random amount in [0, noise) added to each score (seeded; varied but reproducible).'),
+  sharpness: z
+    .number()
+    .min(0.1)
+    .max(8)
+    .default(1)
+    .describe('weighted: chance proportional to score^sharpness. 1 = proportional; 2-3 = the strongest option clearly dominates but others still happen.'),
 });
 
 export const NavTargetSchema = z.union([z.string().min(1), z.strictObject({ x: z.number(), y: z.number() })]);
@@ -344,11 +357,22 @@ export const PreferencesSchema = z
   })
   .refine((p) => Object.values(p.generate).every((g) => g.min <= g.max), 'generate: min must be <= max');
 
+export const RoutineSchema = z.strictObject({
+  slots: z.number().int().min(1).max(48).default(8).describe('Parts the day is split into (8 = 3 h each), by the local clock hour.'),
+  halfLifeDays: z.number().positive().default(3).describe('Older habits fade: a record weighs half after this many days of game clock.'),
+  values: z
+    .record(z.string(), z.array(z.number().min(0)))
+    .default(() => ({}))
+    .describe('Learned weights per activity and day slot (filled by self.routine.record; kept by Persist).'),
+  updatedAt: z.number().optional().describe('Game clock (ms) of the last decay (internal).'),
+  minEvidence: z.number().min(0).default(3).describe('patterns(): weight a slot needs before it counts as a habit.'),
+});
+
 export const PersistSchema = z.strictObject({
   key: z
     .string()
     .min(1)
-    .describe('game.storage key where the entity keeps its individual data (Traits and Preferences values) across sessions and scenes.'),
+    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences and Routine values) across sessions and scenes.'),
 });
 
 /** Registry of all built-in components. Add new component types here. */
@@ -376,6 +400,7 @@ export const ComponentSchemas = {
   AudioSource: AudioSourceSchema,
   Traits: TraitsSchema,
   Preferences: PreferencesSchema,
+  Routine: RoutineSchema,
   Persist: PersistSchema,
   Script: ScriptSchema,
 } as const;
@@ -407,7 +432,8 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   AudioSource: 'Sound attached to an entity: a loop (ambient, footsteps, machines) or a one-shot replayed by setting playing; optionally positional (fades with distance, pans).',
   Traits: 'Personality of an individual: named axes 0..1, fixed or drawn from ranges by the seed; read by expressions (trait()) and scripts (self.traits).',
   Preferences: 'Likes and dislikes per subject (item, tag, context): innate (optionally from traits) + slowly learned; evaluate(subject, tags) gives a score and a level (love..hate).',
-  Persist: 'Keeps the individual data of the entity (Traits, Preferences) in game.storage under a key: loaded before onStart, saved when it changes.',
+  Routine: 'Habits: what the entity tends to do at each time of day, learned from what it does (self.routine.record), fading with time; habit() biases decisions, patterns() lists stable habits.',
+  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine) in game.storage under a key: loaded before onStart, saved when it changes.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -436,6 +462,7 @@ export const ComponentsSchema = z.strictObject({
   AudioSource: AudioSourceSchema.optional(),
   Traits: TraitsSchema.optional(),
   Preferences: PreferencesSchema.optional(),
+  Routine: RoutineSchema.optional(),
   Persist: PersistSchema.optional(),
   Script: ScriptSchema.optional(),
 });

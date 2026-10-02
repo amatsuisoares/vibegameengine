@@ -72,7 +72,7 @@ describe('meu-pet (regression)', () => {
     expect(visited.size).toBeGreaterThan(2);
 
     // Its weighted choice of activities is a UtilityAI fed by self.props (needs and traits).
-    expect(pet.ai!.scores.passear).toBeCloseTo(1 + pet.traits!.atividade * 2 + pet.traits!.curiosidade, 2); // trait() in the scores
+    expect(pet.ai!.scores.passear).toBeCloseTo(0.4 + pet.traits!.atividade * 1.5 + 0.5 * (pet.habits?.passear ?? 0), 1); // trait() and habit() in the scores (habits fade a little since the decision)
     expect(pet.props).toMatchObject({ fome: expect.any(Number) });
     expect(Object.keys(pet.traits!).sort()).toEqual(['apetite', 'atividade', 'brincadeira', 'curiosidade', 'independencia', 'paciencia', 'sensibilidade', 'sociabilidade']);
     expect(game.events(0, 'ai_choice').filter((e) => e.entity === 'pet').length).toBeGreaterThan(1);
@@ -139,20 +139,22 @@ describe('meu-pet (regression)', () => {
     const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
     const live = (name: string, traits: Record<string, number>, preferences: Record<string, unknown>) => {
       const g = new Game(load(), { seed: 11, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z', speed: 60 }, storage: { pet: pet(name), petIndividuo: { version: 1, traits, preferences } } });
-      g.advance(150_000); // 2.5 h of game time, nobody around
-      const choices: Record<string, number> = {};
-      for (const e of g.events(0, 'ai_choice')) if (e.entity === 'pet') choices[String(e.choice)] = (choices[String(e.choice)] ?? 0) + 1;
-      const states = new Set(g.events(0, 'state_change').filter((e) => e.entity === 'pet').map((e) => String(e.to)));
-      return { choices, states, vars: g.world.vars, errors: g.console.read(0, 'error') };
+      // 3 h of game time, nobody around; the activity is sampled every game minute.
+      const time: Record<string, number> = {};
+      for (let m = 0; m < 180; m++) {
+        g.step(60);
+        time[String(g.world.vars.acao)] = (time[String(g.world.vars.acao)] ?? 0) + 1;
+      }
+      return { time, vars: g.world.vars, errors: g.console.read(0, 'error') };
     };
     const lively = live('Faísca', { atividade: 0.9, sociabilidade: 0.8, curiosidade: 0.9, independencia: 0.2, sensibilidade: 0.3, apetite: 0.8, paciencia: 0.7, brincadeira: 0.9 }, { bola: p(0.8), carinho: p(0.6) });
     const calm = live('Sereno', { atividade: 0.1, sociabilidade: 0.2, curiosidade: 0.1, independencia: 0.9, sensibilidade: 0.6, apetite: 0.2, paciencia: 0.8, brincadeira: 0.1 }, { bola: p(-0.6), carinho: p(-0.2) });
     expect(lively.errors).toEqual([]);
     expect(calm.errors).toEqual([]);
-    const moving = (c: Record<string, number>) => (c.passear ?? 0) + (c.investigar ?? 0) + (c.brincar ?? 0);
-    // ai_choice counts changes of choice (seed 11: lively moves 18 times and idles once; calm 10 and 11).
-    expect(moving(lively.choices)).toBeGreaterThan(moving(calm.choices) * 1.5);
-    expect(calm.choices.parado ?? 0).toBeGreaterThan((lively.choices.parado ?? 0) * 3);
+    // Minutes spent: the lively one plays and roams; the calm one mostly rests.
+    const busy = (t: Record<string, number>) => (t.toy ?? 0) + (t.play ?? 0) + (t.walk ?? 0) + (t.investigate ?? 0);
+    expect(busy(lively.time)).toBeGreaterThan(busy(calm.time) * 1.5);
+    expect(calm.time.idle ?? 0).toBeGreaterThan((lively.time.idle ?? 0) * 2);
     expect(Number(lively.vars.afeto)).toBeLessThan(Number(calm.vars.afeto)); // a sociable pet misses you sooner
     expect(Number(lively.vars.fome)).toBeLessThan(Number(calm.vars.fome)); // and a greedy one gets hungry sooner
   });
@@ -191,13 +193,13 @@ describe('meu-pet (regression)', () => {
     const game = new Game(load(), { seed: 4, clock: { start: '2026-03-10T10:00:00Z' } });
     game.perform([{ type: 'wait', ms: 200 }, { type: 'type', text: 'Mimi\n' }, { type: 'wait', ms: 500 }]);
     expect(game.getState().wallet).toEqual({ moedas: 15 });
-    expect(game.getState().inventories).toEqual({ default: { maca: 1, cenoura: 1, leite: 1, biscoito: 1 } });
+    expect(game.getState().inventories).toEqual({ default: { maca: 1, cenoura: 1, leite: 1, biscoito: 1, bola: 1 } }); // the ball comes with the room
     expect(game.entity('botaoLoja')!.components.Text!.text).toBe('Loja · 15 🪙');
 
     // Shop: 7 foods for sale; buy a fish (8) and two carrots (2 each); then not enough for cheese (6 > 3).
     game.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 50 }]);
     const shop = game.world.withTag('cartaLoja');
-    expect(shop.map((c) => c.components.Script!.props.item)).toEqual(['banana', 'biscoito', 'cenoura', 'leite', 'maca', 'peixe', 'queijo']);
+    expect(shop.map((c) => c.components.Script!.props.item)).toEqual(['banana', 'biscoito', 'cenoura', 'chocalho', 'leite', 'maca', 'peixe', 'pelucia', 'queijo']);
     const at = (id: string) => shop.find((c) => c.components.Script!.props.item === id)!;
     for (const id of ['peixe', 'cenoura', 'cenoura', 'queijo']) game.perform([{ type: 'click', x: at(id).x, y: at(id).y }, { type: 'wait', ms: 50 }]);
     expect(game.getState().wallet).toEqual({ moedas: 3 });
@@ -254,7 +256,7 @@ describe('meu-pet (regression)', () => {
     game.perform([{ type: 'wait', ms: 500 }, ...offer(315), { type: 'wait', ms: 400 }, ...offer(315), { type: 'wait', ms: 5000 }]);
     expect(game.world.withTag('oferta')).toEqual([]);
     expect(game.events(0, 'reacao').map((e) => e.item)).toEqual(['cenoura', 'maca']);
-    expect(game.economy.inventory().size).toBe(0);
+    expect(game.economy.inventory().list({ category: 'comida' })).toEqual([]);
     expect(game.events(0, 'observacao').filter((e) => String(e.kind).startsWith('comida:')).map((e) => e.kind)).toEqual(['comida:cenoura', 'comida:maca']);
 
     // Safety net: a food nobody handles (e.g. recreated by a hot reload) fades out on its own.
@@ -294,6 +296,142 @@ describe('meu-pet (regression)', () => {
       expect(after.events(0, 'item_used').at(-1)).toMatchObject({ item: 'queijo' });
       expect(after.console.read(0, 'error')).toEqual([]);
     }
+  });
+
+  it('need conflict: hungry, tired and bored at once, each personality goes for something else (UtilityAI, weighted, sharpness 2)', () => {
+    const t = Date.parse('2026-03-10T14:00:00Z');
+    const pet = {
+      version: 2, name: 'x', born: t, stage: 'bebe', needs: { fome: 25, energia: 30, diversao: 15, higiene: 90, saude: 100, afeto: 70 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, notes: [], lastSeen: t,
+    };
+    const base = { atividade: 0.5, sociabilidade: 0.4, curiosidade: 0.4, independencia: 0.5, sensibilidade: 0.5, apetite: 0.5, paciencia: 0.6, brincadeira: 0.5 };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const project = load();
+    const firstChoices = (traits: Record<string, number>) => {
+      const count: Record<string, number> = {};
+      for (let seed = 1; seed <= 30; seed++) {
+        const g = new Game(project, {
+          seed, scene: 'quarto', clock: { start: '2026-03-10T14:00:00Z' },
+          storage: { pet, petIndividuo: { version: 1, traits: { ...base, ...traits }, preferences: { bola: p(0.4), ativo: p(0.2), rola: p(0.2) } }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } },
+        });
+        g.step(150);
+        const c = String(g.events(0, 'ai_choice').find((e) => e.entity === 'pet')?.choice);
+        count[c] = (count[c] ?? 0) + 1;
+      }
+      return Object.entries(count).sort((a, b) => b[1] - a[1])[0][0];
+    };
+    expect(firstChoices({ brincadeira: 0.95, atividade: 0.8, apetite: 0.2 })).toBe('brincar');
+    expect(firstChoices({ atividade: 0.05, brincadeira: 0.2, apetite: 0.3 })).toBe('dormir');
+    expect(firstChoices({ apetite: 0.95, brincadeira: 0.2 })).toBe('comer');
+  });
+
+  it('toys are UtilityAI targets: with the same toys, each pet picks the ones it likes; owned toys are placed in the room', () => {
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const pet = {
+      version: 2, name: 'x', born: t, stage: 'bebe', needs: { fome: 95, energia: 95, diversao: 20, higiene: 95, saude: 100, afeto: 95 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, notes: [], lastSeen: t,
+    };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const traits = { atividade: 0.7, sociabilidade: 0.3, curiosidade: 0.3, independencia: 0.7, sensibilidade: 0.5, apetite: 0.5, paciencia: 0.7, brincadeira: 0.9 };
+    const project = load();
+    const play = (preferences: Record<string, unknown>) => {
+      const g = new Game(project, {
+        seed: 5, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z', speed: 60 },
+        storage: { pet, petIndividuo: { version: 1, traits, preferences }, 'vibe.inventory': { default: { pelucia: 1, chocalho: 1 } }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } },
+      });
+      g.step(2);
+      expect(['pelucia', 'chocalho'].map((id) => g.entity(id)?.components.Text?.text)).toEqual(['🧸', '🔔']);
+      const targets: Record<string, number> = {};
+      for (let m = 0; m < 120; m++) {
+        g.step(60);
+        const ai = g.getState({ ids: ['pet'] }).entities[0].ai!;
+        if (ai.choice === 'brincar' && ai.target) targets[ai.target] = (targets[ai.target] ?? 0) + 1;
+      }
+      expect(g.console.read(0, 'error')).toEqual([]);
+      return targets;
+    };
+    const quiet = play({ pelucia: p(0.9), macio: p(0.8), silencioso: p(0.8), aconchego: p(0.5), chocalho: p(-0.9), barulhento: p(-1), ativo: p(0), bola: p(-0.5), rola: p(-0.3) });
+    const loud = play({ pelucia: p(-0.9), macio: p(-0.6), silencioso: p(-0.5), aconchego: p(-0.5), chocalho: p(0.9), barulhento: p(1), ativo: p(0.6), bola: p(-0.5), rola: p(-0.3) });
+    expect(quiet.pelucia ?? 0).toBeGreaterThan((quiet.chocalho ?? 0) * 3);
+    expect(loud.chocalho ?? 0).toBeGreaterThan((loud.pelucia ?? 0) * 3);
+  });
+
+  it('at 1x speed the favorite toy is obvious within minutes: most of the play time, longer sessions, ♥ and an observation', () => {
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const pet = {
+      version: 2, name: 'Mimi', born: t, stage: 'bebe', needs: { fome: 80, energia: 90, diversao: 60, higiene: 95, saude: 100, afeto: 80 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, notes: [], lastSeen: t,
+    };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const traits = { atividade: 0.5, sociabilidade: 0.4, curiosidade: 0.4, independencia: 0.6, sensibilidade: 0.4, apetite: 0.5, paciencia: 0.7, brincadeira: 0.6 };
+    const project = load();
+    const minutes = (preferences: Record<string, unknown>) => {
+      const g = new Game(project, {
+        seed: 9, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z', speed: 1 },
+        storage: { pet, petIndividuo: { version: 1, traits, preferences }, 'vibe.inventory': { default: { bola: 1, pelucia: 1, chocalho: 1 } }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } },
+      });
+      const secs: Record<string, number> = {};
+      for (let s = 0; s < 180; s++) {
+        g.step(60);
+        const st = g.getState({ ids: ['pet'] }).entities[0];
+        if (st.state === 'toy') secs[st.ai!.target!] = (secs[st.ai!.target!] ?? 0) + 1;
+      }
+      expect(g.console.read(0, 'error')).toEqual([]);
+      return { secs, g };
+    };
+    const neutralTags = { ativo: p(0), rola: p(0), macio: p(0), silencioso: p(0), aconchego: p(0), barulhento: p(0) };
+    const plush = minutes({ ...neutralTags, pelucia: p(0.9), bola: p(0.3), chocalho: p(0.1) });
+    const ball = minutes({ ...neutralTags, pelucia: p(0.1), bola: p(0.9), chocalho: p(0.3) });
+    const total = (s: Record<string, number>) => Object.values(s).reduce((a, b) => a + b, 0);
+    // 3 real minutes: the favorite takes most of the toy time (and the others still get a turn now and then).
+    expect(total(plush.secs)).toBeGreaterThan(30);
+    expect(plush.secs.pelucia / total(plush.secs)).toBeGreaterThan(0.6);
+    expect(ball.secs.bola / total(ball.secs)).toBeGreaterThan(0.6);
+    // It says so (observation) and shows it (♥ over the pet).
+    expect(plush.g.events(0, 'observacao').map((e) => e.kind)).toContain('favorito:pelucia');
+    expect(ball.g.events(0, 'observacao').map((e) => e.kind)).toContain('favorito:bola');
+    expect(plush.g.events(0, 'spawn').filter((e) => e.prefab === 'emote').length).toBeGreaterThan(3);
+  });
+
+  it('toy box: any toy (the ball too) can be stored and put back, the pet reacts on the spot; plush and rattle can be dragged; the layout is saved', () => {
+    const game = new Game(load(), { seed: 4, clock: { start: '2026-03-10T10:00:00Z' } });
+    game.perform([{ type: 'wait', ms: 200 }, { type: 'type', text: 'Mimi\n' }, { type: 'wait', ms: 500 }]);
+    // A fresh room only has the ball (it comes with the room); a toy bought appears on the spot.
+    expect(game.world.withTag('brinquedo').map((e) => e.id)).toEqual(['bola']);
+    game.economy.wallet.add(30, 'moedas');
+    game.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 50 }]);
+    const card = (tag: string, item: string) => game.world.withTag(tag).find((c) => c.components.Script!.props.item === item)!;
+    game.perform([{ type: 'click', entity: card('cartaLoja', 'pelucia').id }, { type: 'wait', ms: 50 }]);
+    expect(game.entity('pelucia')).toBeTruthy();
+    expect(game.events(0, 'observacao').some((e) => String(e.kind).match(/:pelucia$/))).toBe(true); // the pet went to see it
+
+    // Toy box: one card per toy owned; clicking stores it (leaves the room), clicking again puts it back.
+    game.perform([{ type: 'click', entity: 'botaoBrinquedos' }, { type: 'wait', ms: 50 }]);
+    expect(game.world.withTag('cartaLoja')).toEqual([]); // the other panels close
+    expect(game.world.withTag('cartaBrinquedo').map((c) => c.components.Text!.text)).toEqual(['⚽ Bola\nno quarto', '🧸 Pelúcia\nno quarto']);
+    game.perform([{ type: 'click', entity: card('cartaBrinquedo', 'bola').id }, { type: 'wait', ms: 50 }]);
+    expect(game.entity('bola')).toBeUndefined();
+    expect(card('cartaBrinquedo', 'bola').components.Text!.text).toBe('⚽ Bola\nguardado');
+    expect(game.economy.inventory().count('bola')).toBe(1); // still yours
+
+    // Dragging the plush moves it; it lands back on the floor and the spot is kept.
+    game.perform([{ type: 'click', entity: 'caixa' }, { type: 'wait', ms: 50 }]);
+    const from = game.entity('pelucia')!;
+    game.perform([{ type: 'drag', from: { x: from.x, y: from.y }, to: { x: 820, y: 300 } }, { type: 'wait', ms: 600 }]);
+    expect(Math.round(game.entity('pelucia')!.x)).toBe(820);
+    expect(Math.round(game.entity('pelucia')!.y)).toBe(452);
+    expect(game.storage.get('quarto')).toMatchObject({ brinquedos: { bola: { guardado: true }, pelucia: { x: 820 } } });
+
+    // Reopening the game keeps the arrangement.
+    const again = new Game(load(), { seed: 5, scene: 'quarto', clock: { start: '2026-03-10T10:05:00Z' }, storage: game.storage.snapshot() });
+    again.step(2);
+    expect(again.entity('bola')).toBeUndefined();
+    expect(again.entity('pelucia')!.x).toBe(820);
+    expect(again.console.read(0, 'error')).toEqual([]);
+    expect(game.console.read(0, 'error')).toEqual([]);
   });
 
   it('verify_game plays a scenario of the real game and reports PASS per check', async () => {

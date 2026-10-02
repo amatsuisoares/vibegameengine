@@ -278,6 +278,12 @@ horário (`clock.hour`), variáveis, estado, cooldown... quem define é o jogo.
 | `decideWhen` | — | só decide enquanto a expressão vale (ex. `"self.state == 'idle'"`) |
 | `inertia` | `0.1` | somado à escolha atual no `best`, para notas próximas não ficarem trocando |
 | `noise` | `0` | soma um aleatório em [0, noise) a cada nota (seed: variado e reproduzível) |
+| `sharpness` | `1` | no `weighted`, a chance é proporcional a nota^sharpness: 2–3 = a opção mais forte domina, as outras ainda acontecem |
+| `options.<nome>.targets` | — | `{tag, when?}`: "smart objects" — a nota (e o `when`) é calculada para cada entidade ativa com a tag, com `target` nas expressões; a melhor dá a nota da opção; o alvo (`self.ai.target`) é a melhor no `best` e sorteado (∝ nota^sharpness) no `weighted`; sem candidato = indisponível |
+
+**Alvos** (V0.7): `"brincar": { "targets": { "tag": "brinquedo" }, "score": "trait('brincadeira') * (1 + likes(target.props.item))" }`
+escolhe **qual** brinquedo pelo gosto. O `ai_choice` traz `target`, o hook `onDecision` recebe `target`, o estado mostra
+`ai.target` e `ai.targets` (o melhor candidato de cada opção). Trocar só o alvo também é uma decisão nova.
 
 - **Escolha nova:** evento `ai_choice {entity, choice, from, score}`, entra no estado correspondente e chama o hook
   `onDecision(self, {choice, from, scores}, game)`. Sem opção disponível, a escolha fica como está.
@@ -333,6 +339,25 @@ sentido aos eixos e aos assuntos.
 - **Estado:** `inspect_game_state` mostra `traits` e `prefs` (afinidade efetiva) da entidade.
 - **Validação ao gravar:** influência de traço precisa de um eixo existente; `Persist` precisa de `Traits` ou
   `Preferences`; `min ≤ max`.
+
+## Rotina (`Routine`)
+
+Implementado na V0.7 (`engine/src/routine.ts`). Hábitos aprendidos do que a entidade **faz**: o dia é dividido em `slots`
+pela hora local do relógio; cada `self.routine.record(atividade)` soma peso à faixa de agora, e tudo esquece com meia-vida
+em dias de jogo. Ninguém escreve "brinca depois do almoço": a entidade acaba fazendo isso.
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `slots` | `8` | faixas do dia (8 = 3 h cada) |
+| `halfLifeDays` | `3` | um registro pesa metade depois disso (rotinas mudam) |
+| `minEvidence` | `3` | peso mínimo para `patterns()` contar como hábito |
+| `values` | `{}` | pesos por atividade e faixa (preenchido pelo jogo; salvo com `Persist`) |
+
+- **Scripts:** `self.routine.record(atividade, peso?)`, `habit(atividade, hora?)` (fração 0..1 dessa atividade entre tudo
+  que ela faz nessa faixa), `peak(atividade)` (`{slot, from, to, weight}`), `patterns(minShare?)`
+  (`[{activity, slot, from, to, share, weight}]`, hábitos estáveis — base do diário).
+- **Expressões:** `habit('atividade')` (própria entidade, agora) ou `habit('id', 'atividade')`: viés de hábito nas notas.
+- **Estado:** `habits` = fração de cada atividade na faixa de agora. `Persist` guarda a rotina junto com traços e gostos.
 
 ## Animação (`Animator`)
 
@@ -705,7 +730,11 @@ mouse do sistema operacional.
     `drop` = a entidade desenhada sob o mouse ao soltar). Scripts: `game.input.drag` (`entity`, `startX/Y`, `x/y`).
   - **Tag `draggable`:** a entidade segue o mouse enquanto é arrastada (mantendo o ponto onde foi pega) — sem código.
 - **O clique acontece ao apertar**, não ao soltar: começar um arrasto sobre uma entidade clicável também a clica (no
-  meu-pet, arrastar a bola a joga). Para algo só arrastável, use a tag `draggable` sem `Interactable`/`onClick`.
+  meu-pet, arrastar a bola a joga). Para algo só arrastável, use a tag `draggable` sem `Interactable`/`onClick`. Para
+  algo clicável **e** arrastável, guarde o clique e só aja ao soltar se `game.input.drag` não apareceu (meu-pet,
+  `scripts/brinquedo.js`).
+- **Quem está por cima:** a camada mais alta entre `Sprite.layer` e `Text.layer` (um emoji só de `Text` na camada 8 fica
+  na frente de um sprite na camada 5), depois a ordem da cena. Vale para clique, arrasto e `get_mouse_target`.
 
 ### Expressões
 
@@ -718,7 +747,7 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
   uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
-  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)` (sem id = `self`), `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
+  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").

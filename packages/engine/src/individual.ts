@@ -12,7 +12,8 @@ import type { World } from './world';
  *   Traits       personality axes 0..1 (fixed, or drawn from ranges); stable
  *   Preferences  affinity -1..1 per subject (item id, tag, context) = innate + learned; innate values
  *                may lean on traits; learning moves slowly and is bounded
- *   Persist      keeps both in game.storage[key]: loaded before the entity's first onStart, drawn
+ *   Routine      habits by time of day (see routine.ts)
+ *   Persist      keeps them in game.storage[key]: loaded before the entity's first onStart, drawn
  *                when missing, saved at the end of any frame in which they changed
  *
  * Generated values go into the component data itself (Traits.values, Preferences.values), so the
@@ -40,6 +41,7 @@ export interface PersistedIndividual {
   version: 1;
   traits?: Record<string, number>;
   preferences?: Record<string, { innate: number; learned: number; n: number }>;
+  routine?: { values: Record<string, number[]>; updatedAt?: number };
 }
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -156,6 +158,7 @@ export function persistedOf(c: Components): PersistedIndividual {
   const out: PersistedIndividual = { version: 1 };
   if (c.Traits) out.traits = { ...c.Traits.values };
   if (c.Preferences) out.preferences = structuredClone(c.Preferences.values);
+  if (c.Routine) out.routine = { values: structuredClone(c.Routine.values), ...(c.Routine.updatedAt !== undefined && { updatedAt: c.Routine.updatedAt }) };
   return out;
 }
 
@@ -178,6 +181,12 @@ function applyPersisted(c: Components, saved: unknown): boolean {
       };
     }
   }
+  if (c.Routine && s.routine && typeof s.routine === 'object') {
+    for (const [activity, w] of Object.entries(s.routine.values ?? {})) {
+      if (Array.isArray(w)) c.Routine.values[activity] = w.map((v) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0));
+    }
+    if (typeof s.routine.updatedAt === 'number') c.Routine.updatedAt = s.routine.updatedAt;
+  }
   return true;
 }
 
@@ -193,7 +202,7 @@ export class IndividualRunner {
   private readonly dirty = new Set<Entity>();
   private resets = 0;
   /** Values the entity was authored with (before loading and drawing), for reset. */
-  private readonly authored = new WeakMap<Entity, { traits?: Record<string, number>; preferences?: PersistedIndividual['preferences'] }>();
+  private readonly authored = new WeakMap<Entity, { traits?: Record<string, number>; preferences?: PersistedIndividual['preferences']; routine?: Record<string, number[]> }>();
 
   constructor(
     private readonly world: World,
@@ -209,9 +218,9 @@ export class IndividualRunner {
   ensure(e: Entity) {
     if (this.ready.has(e)) return;
     const c = e.components;
-    if (!c.Traits && !c.Preferences) return;
+    if (!c.Traits && !c.Preferences && !c.Routine) return;
     this.ready.add(e);
-    this.authored.set(e, { traits: c.Traits && { ...c.Traits.values }, preferences: c.Preferences && structuredClone(c.Preferences.values) });
+    this.authored.set(e, { traits: c.Traits && { ...c.Traits.values }, preferences: c.Preferences && structuredClone(c.Preferences.values), routine: c.Routine && structuredClone(c.Routine.values) });
     const key = c.Persist?.key;
     const loaded = key !== undefined && applyPersisted(c, this.host.storage.get(key));
     const rng = new Rng(hash(`${this.host.seed}:${e.id}:${this.host.clock.now}`));
@@ -251,6 +260,10 @@ export class IndividualRunner {
       c.Traits.values[axis] = clamp(v, 0, 1);
     }
     if (c.Preferences) c.Preferences.values = structuredClone(authored?.preferences ?? {});
+    if (c.Routine) {
+      c.Routine.values = structuredClone(authored?.routine ?? {});
+      delete c.Routine.updatedAt;
+    }
     const key = c.Persist?.key;
     if (key !== undefined) this.host.storage.remove(key);
     this.dirty.delete(e);

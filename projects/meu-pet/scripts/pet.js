@@ -5,7 +5,8 @@
 // Quem o pet É fica nos componentes da entidade (scenes/quarto.json), não aqui:
 //   Traits       8 eixos de personalidade 0..1, sorteados ao nascer (self.traits.get('atividade'))
 //   Preferences  gostos por assunto: itens (maçã, bola...), tags (fruta, doce...) e contextos (carinho, escuro)
-//   Persist      os dois ficam em storage.petIndividuo e voltam em toda sessão
+//   Routine      hábitos por hora do dia, aprendidos do que ele faz (self.routine.record)
+//   Persist      tudo isso fica em storage.petIndividuo e volta em toda sessão
 // Aqui só se decide o que cada traço e cada gosto MUDA no comportamento.
 
 const HOUR = 3600000;
@@ -77,6 +78,7 @@ const NEEDS = ['fome', 'energia', 'diversao', 'higiene', 'saude', 'afeto'];
 let pet; // dados salvos
 let me; // a entidade (traços e gostos: me.traits, me.prefs)
 let mind; // comportamento do momento (não salvo)
+let lastSleepHour = -1;
 let refeicao = null; // comida oferecida sendo cheirada/comida: {item, level, food, dir}
 let lastNow = 0;
 let localOffset = 0;
@@ -273,7 +275,12 @@ function lightBothers() {
 /** Hora de dormir: cansado, ou de noite sem estar totalmente descansado. */
 function sleepy(at) {
   const e = pet.needs.energia;
-  return e < 25 || (isNightAt(at) && e < 85);
+  return e < 25 || (isNightAt(at) && e < limiteSono());
+}
+
+/** À noite, abaixo disso vai dormir: quem é ativo aguenta acordado até mais cansado. */
+function limiteSono() {
+  return lerp(92, 68, T('atividade'));
 }
 
 /** À noite só acorda de manhã (ou se for incomodado); de dia, quando descansou. */
@@ -281,7 +288,8 @@ function shouldWake(at) {
   const e = pet.needs.energia;
   if (isNightAt(at)) return false;
   const morning = hourAt(at) < 9;
-  return e >= 95 || (morning && e >= 60);
+  // Quem é ativo levanta mais cedo (menos descansado); o calmo fica mais na cama.
+  return e >= lerp(99, 88, T('atividade')) || (morning && e >= lerp(75, 50, T('atividade')));
 }
 
 /** Decisões automáticas enquanto ninguém está olhando (tempo fora, velocidade alta). */
@@ -384,6 +392,32 @@ const racao = () => me.prefs.item('racao');
 const bola = () => me.prefs.item('bola');
 
 /**
+ * O jeito do pet com um brinquedo: o FAVORITO é o que ele mais gosta entre os que você tem (todo pet
+ * que gosta de algum tem um, e dá para ver: vai nele bem mais vezes, brinca um tempão, pula e mostra ♥);
+ * depois "gosta", "neutro" e "nao" (não gosta: cheira e se afasta, nunca escolhe sozinho).
+ */
+function jeitoCom(game, id) {
+  const r = me.prefs.item(id);
+  if (r.score <= -0.2) return 'nao';
+  if (id === favorito(game)) return 'favorito';
+  return r.score >= 0.2 ? 'gosta' : 'neutro';
+}
+
+function favorito(game) {
+  let best = null;
+  for (const e of game.inventory().list({ category: 'brinquedo' })) {
+    const s = me.prefs.item(e.item.id).score;
+    if (s > -0.2 && (!best || s > best.s)) best = { id: e.item.id, s };
+  }
+  return best && best.id;
+}
+
+// Peso de cada jeito na nota de brincar (UtilityAI, target.props.peso) e quanto dura uma brincadeira.
+const PESO = { favorito: 2.4, gosta: 1.3, neutro: 0.5, nao: 0 };
+const DURA = { favorito: 7, gosta: 4, neutro: 2.2, nao: 1.2 };
+const MEXE_A_CADA = { favorito: 0.8, gosta: 1.3, neutro: 2, nao: 99 };
+
+/**
  * Fome a partir da qual vai até a tigela: guloso vai antes; quem não gosta da ração espera
  * mais (acaba comendo, mas sem pressa).
  */
@@ -398,39 +432,37 @@ function speed() {
   return v;
 }
 
-/** Escolhe a próxima atividade pelas necessidades, a hora e a personalidade. */
+/**
+ * Escolhe a próxima atividade. TODAS as opções concorrem na UtilityAI do pet (scenes/quarto.json):
+ * cada nota é necessidade × personalidade × gosto + hábito (Routine). Não há prioridade fixa: com
+ * fome, cansado e entediado ao mesmo tempo, quem decide é o jeito do pet — o preguiçoso dorme, o
+ * guloso come, o brincalhão brinca mesmo cansado. Brinquedos e cantos do quarto são alvos
+ * ("smart objects"): a IA escolhe também QUAL (self.ai.target), pelo gosto do pet.
+ */
 function decide(game, self) {
-  const n = pet.needs;
-  if (sleepy(game.clock.now)) {
-    mind = { act: 'yawn', t: 1.6, then: () => go(game, spot(game, 'cama'), 'sleep') };
-    return;
-  }
-  const hungry = n.fome < hungerLimit();
-  if (hungry && (pet.bowl > 0 || realTime - lastLookBowl > 20)) {
-    go(game, spot(game, 'tigela') + 55, pet.bowl > 0 ? 'eat' : 'lookBowl');
-    return;
-  }
-  if (hungry && game.random() < lerp(0.2, 0.8, T('sociabilidade'))) {
-    // Tigela vazia e já olhou: quem é apegado vem até você.
-    go(game, 480, 'greet');
-    return;
-  }
-  const ball = game.entity('bola');
-  // A escolha ponderada é da UtilityAI do pet (scenes/quarto.json): os pesos são expressões sobre as
-  // necessidades (self.props), os traços (trait('atividade')) e os gostos (likes('bola')).
-  sincronizarProps(self, ball);
+  sincronizarProps(game, self);
   const choice = self.ai.decide();
-  if (choice === 'passear') {
-    go(game, MIN_X + game.random() * (MAX_X - MIN_X), 'idle');
-    reveal('atividade', 'alto');
-  }
-  else if (choice === 'investigar') {
-    const target = pick(game, ['janela', 'lampada', 'planta', 'cama']);
+  const target = self.ai.target;
+  if (choice) me.routine.record(choice);
+  if (choice === 'dormir') {
+    mind = { act: 'yawn', t: 1.6, then: () => go(game, spot(game, 'cama'), 'sleep') };
+  } else if (choice === 'comer') {
+    go(game, spot(game, 'tigela') + 55, pet.bowl > 0 ? 'eat' : 'lookBowl');
+  } else if (choice === 'brincar' && target) {
+    go(game, spot(game, target) - 55, 'toy');
+    mind.what = target;
+    // Para o favorito ele vai correndo.
+    const item = toyItem(game, game.entity(target));
+    if (item && jeitoCom(game, item.id) === 'favorito') mind.pressa = 1.5;
+  } else if (choice === 'explorar' && target) {
     go(game, spot(game, target) + (game.random() - 0.5) * 30, 'investigate');
     mind.what = target;
-  } else if (choice === 'cumprimentar') go(game, 480, 'greet');
-  else if (choice === 'brincar' && ball) go(game, ball.x - 60, 'toy');
-  else if (choice === 'emburrar') {
+  } else if (choice === 'procurar') {
+    go(game, 480, 'greet');
+  } else if (choice === 'passear') {
+    go(game, MIN_X + game.random() * (MAX_X - MIN_X), 'idle');
+    reveal('atividade', 'alto');
+  } else if (choice === 'emburrar') {
     mind = { act: 'sulk', t: 4 };
     reveal('paciencia', 'baixo');
   } else {
@@ -439,12 +471,17 @@ function decide(game, self) {
   }
 }
 
-/** Necessidades que as expressões da UtilityAI leem (self.props.fome...); traços e gostos elas leem direto. */
-function sincronizarProps(self, ball) {
+/** O que as expressões da UtilityAI leem em self.props; traços, gostos e hábitos elas leem direto. */
+function sincronizarProps(game, self) {
   const p = self.props;
   for (const k of NEEDS) p[k] = Math.round(pet.needs[k]);
   p.doente = pet.sick;
-  p.temBola = !!ball;
+  p.noite = isNightAt(game.clock.now);
+  p.temRacao = pet.bowl > 0;
+  p.olhouTigela = realTime - lastLookBowl < 20;
+  p.limiteFome = Math.round(hungerLimit());
+  p.limiteSono = Math.round(limiteSono());
+  for (const toy of game.find('brinquedo')) toy.props.peso = PESO[jeitoCom(game, String(toy.props.item))];
 }
 
 function arrive(game, self, then) {
@@ -470,13 +507,99 @@ function arrive(game, self, then) {
     reveal('sociabilidade', 'alto');
     if (n.afeto < 40) observe(game, 'saudade', '{n} parece estar com saudade de você.', 90);
   } else if (then === 'toy') {
-    mind = { act: 'toy', t: 2.5 };
-    reveal('brincadeira', 'alto');
-    reveal('independencia', 'alto');
-    if (n.diversao < 50) observe(game, 'brinquedo', '{n} está olhando para o brinquedo.', 90);
+    comecarBrincar(game, self, mind.what);
   } else if (then === 'chase') {
     mind = { act: 'play', t: 4 };
   } else mind = { act: 'idle', t: 1.5 + game.random() * 2 };
+}
+
+const toyItem = (game, toy) => toy && game.items.get(String(toy.props.item));
+const barulhoIncomoda = (item) => item.tags.includes('barulhento') && T('sensibilidade') > HIGH;
+
+/**
+ * Começa a brincar sozinho com um brinquedo do quarto. O jeito decide como: com o favorito é um tempão,
+ * pulando, mexendo nele sem parar (a bola ele vai empurrando e correndo atrás); com um neutro, um
+ * pouquinho e perde o interesse. Durante a brincadeira ele segue o brinquedo (behave, "toy").
+ */
+function comecarBrincar(game, self, id) {
+  const item = toyItem(game, game.entity(id));
+  if (!item) return decide(game, self);
+  const jeito = jeitoCom(game, item.id);
+  mind = { act: 'toy', t: DURA[jeito], what: id, jeito, tick: 0.3 };
+  reveal('brincadeira', 'alto');
+  reveal('independencia', 'alto');
+  if (jeito === 'favorito') emote(game, self, '♥', '#ff8fab');
+}
+
+/** Uma mexida no brinquedo durante a brincadeira: a bola é empurrada para longe do pet, os outros balançam. */
+function mexerNo(game, self, toy) {
+  if (toy.state.push) toy.state.push((toy.x >= self.x ? 1 : -1) * (110 + game.random() * 130));
+  else if (toy.state.mexer) toy.state.mexer();
+  if (mind.jeito === 'favorito' && game.random() < 0.5) {
+    const item = toyItem(game, toy);
+    emote(game, self, item && item.tags.includes('aconchego') ? '♥' : '♪', item && item.tags.includes('aconchego') ? '#ff8fab' : '#ffd166');
+  }
+}
+
+/**
+ * Fim da brincadeira sozinho: diverte pelo item e pelo jeito (o favorito diverte muito mais); quem é
+ * independente se diverte mais sozinho. Um brinquedo barulhento incomoda quem é sensível.
+ */
+function brincouSozinho(game, self, id) {
+  const item = toyItem(game, game.entity(id));
+  if (!item) return;
+  const n = pet.needs;
+  const jeito = mind.jeito || jeitoCom(game, item.id);
+  const k = { favorito: 1.6, gosta: 1, neutro: 0.4, nao: 0 }[jeito];
+  n.diversao = clamp(n.diversao + (Number(item.props.diversao) || 8) * k * lerp(0.7, 1.4, T('independencia')));
+  n.afeto = clamp(n.afeto + (Number(item.props.afeto) || 0) * k);
+  if (barulhoIncomoda(item)) {
+    n.diversao = clamp(n.diversao - 6);
+    reveal('sensibilidade', 'alto');
+    observe(game, `barulho:${item.id}`, `{n} não parece gostar do barulho ${doItem(item)}.`, 120);
+  } else if (jeito === 'favorito') {
+    emote(game, self, '♥', '#ff8fab');
+    observe(game, `favorito:${item.id}`, `{n} brincou um tempão com ${oItem(item)}. Parece ser o brinquedo preferido.`, 30);
+  } else if (jeito === 'neutro') observe(game, `neutro:${item.id}`, `{n} mexeu um pouco ${noItem(item)} e logo perdeu o interesse.`, 60);
+}
+
+/**
+ * Um brinquedo apareceu ("novo": comprado; "voltou": saiu da caixa) ou você o mexeu ("mostrou"). O pet
+ * reage pelo jeito, na hora: corre para o favorito com ♥; vai brincar com o que gosta; com o neutro,
+ * cheira e brinca um pouquinho; do que não gosta (ou do barulho, se é sensível) se afasta.
+ */
+function verBrinquedo(game, self, id, como) {
+  const toy = game.entity(id);
+  const item = toyItem(game, toy);
+  if (!item || pet.asleep || refeicao) return;
+  const jeito = jeitoCom(game, item.id);
+  const lado = self.x < toy.x ? -1 : 1;
+  if (jeito === 'nao' || barulhoIncomoda(item)) {
+    const susto = barulhoIncomoda(item) && como !== 'novo';
+    const perto = () => {
+      emote(game, self, susto ? '!' : '…', '#cfd8dc');
+      observe(game, `naoGosta:${item.id}`, susto ? `{n} se assustou com o barulho ${doItem(item)} e foi para longe.` : `{n} cheirou ${oItem(item)} e se afastou. Não parece ter gostado.`, 10);
+      go(game, toy.x + lado * 230, 'idle');
+    };
+    if (susto) perto();
+    else go(game, toy.x + lado * 70, () => (mind = { act: 'investigate', t: 1.2, what: id, then: perto }));
+    return;
+  }
+  if (pet.needs.energia < 15 || pet.sick) {
+    observe(game, `cansado:${item.id}`, `{n} olhou ${oItem(item)}, mas parece sem energia para brincar.`, 10);
+    mind = { act: 'investigate', t: 1.2, what: id };
+    return;
+  }
+  if (jeito === 'favorito') {
+    emote(game, self, '♥', '#ff8fab');
+    const msg = como === 'novo' ? `{n} foi correndo ver ${oItem(item)} e parece adorar!` : `{n} se animou na hora com ${oItem(item)}!`;
+    observe(game, `animou:${item.id}`, msg, 10);
+  } else if (como === 'novo') {
+    observe(game, `novo:${item.id}`, jeito === 'gosta' ? `{n} foi ver ${oItem(item)} e começou a brincar.` : `{n} cheirou ${oItem(item)} e brincou só um pouquinho.`, 10);
+  }
+  go(game, toy.x + lado * 55, 'toy');
+  mind.what = id;
+  if (jeito === 'favorito') mind.pressa = 1.7;
 }
 
 /** Ações que terminam com um efeito. */
@@ -517,12 +640,7 @@ function finish(game, self) {
       observe(game, 'brincou', '{n} parece ter gostado de brincar.', 20);
       emote(game, self, '♪', '#ffd166');
     } else observe(game, 'brincou', '{n} brincou um pouco com a bola.', 20);
-  } else if (act === 'toy') {
-    // Brincar sozinho com a bola: quem é independente se diverte mais assim.
-    const ball = game.entity('bola');
-    if (ball && ball.state.push) ball.state.push(60 + game.random() * 120);
-    n.diversao = clamp(n.diversao + 8 * (1 + bola().score * 0.5) * lerp(0.7, 1.4, T('independencia')));
-  }
+  } else if (act === 'toy') brincouSozinho(game, self, mind.what);
   decide(game, self);
 }
 
@@ -599,6 +717,16 @@ function makeApi(game, self) {
       pet.needs.saude = clamp(pet.needs.saude + 25);
       observe(game, 'remedio', '{n} parece estar se sentindo melhor.', 2);
     },
+    /** Você mexeu num brinquedo: reage pelo jeito com ele (verBrinquedo). */
+    brinquedoMostrado(id) {
+      verBrinquedo(game, self, id, 'mostrou');
+    },
+    /** Um brinquedo apareceu no quarto: comprado ("novo") ou tirado da caixa ("voltou"). */
+    brinquedoNovo(id, como) {
+      verBrinquedo(game, self, id, como || 'novo');
+    },
+    /** O favorito entre os brinquedos que você tem (id), ou null. */
+    favorito: () => favorito(game),
     bolaJogada(x) {
       const n = pet.needs;
       if (pet.asleep) return;
@@ -616,6 +744,7 @@ function makeApi(game, self) {
         return;
       }
       reveal('brincadeira', 'alto');
+      if (jeitoCom(game, 'bola') === 'favorito') emote(game, self, '♥', '#ff8fab');
       mind = { act: 'chase' };
     },
     limpar(id) {
@@ -736,6 +865,7 @@ const DOCES_POR_DIA = 4;
 const nomeDe = (item) => item.name.toLowerCase();
 const oItem = (item) => `${item.props.artigo || 'o'} ${nomeDe(item)}`;
 const doItem = (item) => `d${item.props.artigo || 'o'} ${nomeDe(item)}`;
+const noItem = (item) => `n${item.props.artigo || 'o'} ${nomeDe(item)}`;
 
 /** A comida no chão some aos poucos. */
 function sumir(food, s) {
@@ -903,6 +1033,13 @@ function onUpdate(self, game, dt) {
   }
 
   if (pet.asleep && shouldWake(now)) wake(game, self, false);
+  if (pet.asleep) {
+    const h = Math.floor(game.clock.hour);
+    if (h !== lastSleepHour) {
+      lastSleepHour = h;
+      me.routine.record('dormir');
+    }
+  }
 
   updateDirt(game);
   behave(self, game, dt);
@@ -935,7 +1072,7 @@ function behave(self, game, dt) {
   }
   if (act === 'walk') {
     const dx = mind.targetX - self.x;
-    const stepX = speed() * dt;
+    const stepX = speed() * (mind.pressa || 1) * dt;
     if (Math.abs(dx) <= stepX) {
       self.x = mind.targetX;
       const then = mind.then;
@@ -955,6 +1092,20 @@ function behave(self, game, dt) {
     self.get('Sprite').flipX = dx < 0;
     if (Math.abs(dx) < 8 && Math.abs(ball.state.vx || 0) < 20) arrive(game, self, 'chase');
     return;
+  }
+  if (act === 'toy') {
+    // Brincando sozinho: fica junto do brinquedo (a bola rola, ele vai atrás) e mexe nele de tempos em tempos.
+    const toy = game.entity(mind.what);
+    if (!toy) return decide(game, self);
+    const want = toy.x + (self.x <= toy.x ? -1 : 1) * 55;
+    const dx = Math.max(MIN_X, Math.min(MAX_X, want)) - self.x;
+    if (Math.abs(dx) > 6) self.x += Math.sign(dx) * Math.min(Math.abs(dx), speed() * 1.3 * dt);
+    self.get('Sprite').flipX = toy.x < self.x;
+    mind.tick -= dt;
+    if (mind.tick <= 0) {
+      mind.tick = MEXE_A_CADA[mind.jeito] || 2;
+      mexerNo(game, self, toy);
+    }
   }
   if (act === 'play' && Math.floor(anim * 1.5) !== Math.floor((anim - dt) * 1.5)) {
     const ball = game.entity('bola');
@@ -1001,6 +1152,9 @@ function animate(self, game) {
   } else if (act === 'yawn') {
     sy = 1 + Math.sin(Math.min(1, (1.6 - (mind.t || 0)) / 1.6) * Math.PI) * 0.12;
     sx = 2 - sy;
+  } else if (act === 'toy' && (mind.jeito === 'favorito' || mind.jeito === 'gosta')) {
+    // Com o favorito pula alto; com um que só gosta, pulinhos.
+    y -= Math.abs(Math.sin(anim * 8)) * (mind.jeito === 'favorito' ? 20 : 9);
   } else if (act === 'lookBowl' || act === 'investigate' || act === 'toy') {
     rot = Math.sin(anim * 3) * 6;
   } else if (act === 'sulk') {
@@ -1039,19 +1193,11 @@ function checkObservations(game, self) {
   if (realTime - lastNoteReal < 4) return; // não empilhar avisos
   const awake = !pet.asleep;
   if (pet.sick && observe(game, 'doente', '{n} não parece estar se sentindo bem.', 90)) return emote(game, self, '~', '#9fd8a4');
-  if (awake && n.fome < 30 && observe(game, 'fome', '{n} parece estar com fome.', 90)) {
-    if (mind.act === 'idle' && (pet.bowl > 0 || realTime - lastLookBowl > 20)) go(game, spot(game, 'tigela') + 55, pet.bowl > 0 ? 'eat' : 'lookBowl');
-    return;
-  }
-  if (awake && n.energia < 20 && observe(game, 'cansaco', n.energia < 10 ? '{n} parece estar muito cansado.' : '{n} está ficando cansado.', 90)) {
-    if (mind.act !== 'walk') mind = { act: 'yawn', t: 1.6, then: () => go(game, spot(game, 'cama'), 'sleep') };
-    return;
-  }
+  // Observações só contam o que se vê; decidir o que fazer é da UtilityAI (decide).
+  if (awake && n.fome < 30 && observe(game, 'fome', '{n} parece estar com fome.', 90)) return;
+  if (awake && n.energia < 20 && observe(game, 'cansaco', n.energia < 10 ? '{n} parece estar muito cansado.' : '{n} está ficando cansado.', 90)) return;
   if (awake && n.diversao < 30 && observe(game, 'tedio', '{n} parece entediado.', 120)) return;
-  if (awake && n.afeto < 30 && observe(game, 'saudade', '{n} parece estar com saudade de você.', 120)) {
-    if (mind.act === 'idle') go(game, 480, 'greet');
-    return;
-  }
+  if (awake && n.afeto < 30 && observe(game, 'saudade', '{n} parece estar com saudade de você.', 120)) return;
   if (n.higiene < 30 && observe(game, 'sujo', '{n} parece incomodado com a sujeira.', 120)) return;
   if (pet.asleep && pet.lightOn && isNightAt(game.clock.now) && lightBothers() && observe(game, 'luz', '{n} parece incomodado com a luz.', 60)) return;
   if (awake && Math.min(n.fome, n.energia, n.diversao, n.higiene, n.afeto) > 80 && observe(game, 'feliz', '{n} parece muito feliz!', 180)) {

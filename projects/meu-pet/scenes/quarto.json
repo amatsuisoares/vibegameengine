@@ -37,7 +37,8 @@
       "components": {
         "Sprite": { "width": 176, "height": 136, "color": "#8fd3ff", "layer": -15 },
         "Script": { "src": "scripts/ceu.js" }
-      }
+      },
+      "tags": ["pontoCurioso"]
     },
     {
       "id": "astro",
@@ -61,7 +62,8 @@
       "transform": { "x": 905, "y": 330 },
       "components": {
         "Sprite": { "shape": "circle", "width": 70, "height": 80, "color": "#4f9d5a", "layer": -10 }
-      }
+      },
+      "tags": ["pontoCurioso"]
     },
     {
       "id": "vaso",
@@ -95,12 +97,14 @@
         "Collider": { "width": 80, "height": 60, "isTrigger": true },
         "Script": { "src": "scripts/lampada.js" },
         "Interactable": { "action": "luz", "via": ["click"] }
-      }
+      },
+      "tags": ["pontoCurioso"]
     },
     {
       "id": "cama",
       "transform": { "x": 150, "y": 452 },
-      "components": { "Sprite": { "width": 190, "height": 46, "color": "#7b9acc", "layer": 1 } }
+      "components": { "Sprite": { "width": 190, "height": 46, "color": "#7b9acc", "layer": 1 } },
+      "tags": ["pontoCurioso"]
     },
     {
       "id": "travesseiro",
@@ -122,16 +126,6 @@
       "transform": { "x": 430, "y": 456 },
       "components": {
         "Sprite": { "width": 58, "height": 8, "color": "#8d5524", "layer": 8, "visible": false }
-      }
-    },
-    {
-      "id": "bola",
-      "transform": { "x": 690, "y": 458 },
-      "components": {
-        "Sprite": { "shape": "circle", "width": 34, "height": 34, "color": "#e63946", "layer": 9 },
-        "Collider": { "width": 50, "height": 50, "isTrigger": true },
-        "Script": { "src": "scripts/bola.js" },
-        "Interactable": { "action": "jogar", "via": ["click"] }
       }
     },
     {
@@ -166,21 +160,39 @@
           "select": "weighted",
           "intervalMs": 0,
           "options": {
-            "passear": { "score": "1 + trait('atividade') * 2 + trait('curiosidade')" },
-            "parado": { "score": "0.6 + (1 - trait('atividade')) * 3 + self.props.doente * 6" },
-            "investigar": { "score": "0.2 + trait('curiosidade') * 3" },
-            "cumprimentar": {
-              "score": "0.2 + trait('sociabilidade') * 2.5 * (1.2 - trait('independencia')) + (self.props.afeto < 40) * 2 * trait('sociabilidade')"
-            },
+            "passear": { "score": "0.4 + trait('atividade') * 1.5 + habit('passear') * 0.5" },
             "brincar": {
-              "score": "0.3 + trait('brincadeira') * 2.5 + max(0, likes('bola')) * 1.5 + (self.props.diversao < 40) * 1.5",
-              "when": "self.props.temBola && self.props.energia > 30"
+              "score": "(0.3 + trait('brincadeira') * 2) * (0.4 + clamp((85 - self.props.diversao) / 70, 0, 1) * 1.6) * target.props.peso + habit('brincar') * 0.8",
+              "when": "self.props.energia > 35 - trait('brincadeira') * 25 && !self.props.doente",
+              "targets": { "tag": "brinquedo", "when": "target.props.peso > 0" }
             },
             "emburrar": {
               "score": "1.5 * (1 - trait('paciencia'))",
               "when": "trait('paciencia') < 0.35 && self.props.diversao < 50"
+            },
+            "dormir": {
+              "when": "self.props.energia < 75 || self.props.noite",
+              "score": "(clamp((70 - self.props.energia) / 50, 0, 1) * 6 + self.props.noite * (self.props.energia < self.props.limiteSono) * 8) * (1.6 - trait('atividade') * 1.2) + habit('dormir')"
+            },
+            "comer": {
+              "when": "self.props.temRacao || !self.props.olhouTigela",
+              "score": "clamp((self.props.limiteFome + 15 - self.props.fome) / 40, 0, 1) * 7 * (0.4 + trait('apetite') * 1.2) + habit('comer') * 0.5"
+            },
+            "explorar": {
+              "targets": { "tag": "pontoCurioso" },
+              "cooldownMs": 8000,
+              "score": "0.2 + trait('curiosidade') * 2 - distance(self, target) / 2000 + habit('explorar') * 0.5"
+            },
+            "procurar": {
+              "score": "trait('sociabilidade') * (0.3 + clamp((75 - self.props.afeto) / 60, 0, 1) * 2.5) * (1.2 - trait('independencia')) + (self.props.fome < 30 && !self.props.temRacao) * trait('sociabilidade') * 2 + habit('procurar') * 0.8"
+            },
+            "descansar": {
+              "score": "0.5 + (1 - trait('atividade')) * 1.5 + clamp((60 - self.props.energia) / 60, 0, 1) * 1.5 + self.props.doente * 4 + habit('descansar') * 0.5"
             }
-          }
+          },
+          "noise": 1,
+          "inertia": 0,
+          "sharpness": 2
         },
         "Animator": {
           "initial": "idle",
@@ -229,12 +241,18 @@
             "queijo": { "min": -0.8, "max": 0.8 },
             "peixe": { "min": -0.8, "max": 0.8 },
             "cenoura": { "min": -0.8, "max": 0.8 },
-            "biscoito": { "min": -0.8, "max": 0.8 }
+            "biscoito": { "min": -0.8, "max": 0.8 },
+            "silencioso": { "min": -0.4, "max": 0.8, "traits": { "sensibilidade": 0.4 } },
+            "aconchego": { "min": -0.3, "max": 1, "traits": { "sociabilidade": 0.3, "independencia": -0.2 } },
+            "barulhento": { "min": -1.2, "max": 1.2, "traits": { "sensibilidade": -0.6, "atividade": 0.3 } },
+            "pelucia": { "min": -1.2, "max": 1.2 },
+            "chocalho": { "min": -1.2, "max": 1.2 }
           },
           "subjectWeight": 0.4,
           "tagBlend": 0.7
         },
-        "Persist": { "key": "petIndividuo" }
+        "Persist": { "key": "petIndividuo" },
+        "Routine": { "slots": 8, "halfLifeDays": 4, "minEvidence": 3 }
       }
     },
     {
@@ -285,7 +303,7 @@
       "transform": { "x": 14, "y": 503 },
       "components": {
         "Text": {
-          "text": "Clique no pet para fazer carinho\nClique na tigela, bola, luz e sujeira",
+          "text": "Clique no pet para fazer carinho\nClique na tigela, luz e brinquedos",
           "fontSize": 12,
           "font": "sans-serif",
           "color": "#e9e3ff",
@@ -392,7 +410,7 @@
       "tags": ["ui"],
       "transform": { "x": 480, "y": 290 },
       "components": {
-        "Sprite": { "width": 510, "height": 260, "color": "#2f3a55", "opacity": 0.95, "layer": 65 },
+        "Sprite": { "width": 640, "height": 260, "color": "#2f3a55", "opacity": 0.95, "layer": 65 },
         "Script": { "src": "scripts/loja.js" }
       }
     },
@@ -420,6 +438,47 @@
         "Sprite": { "width": 140, "color": "#7a5c16" },
         "Text": { "text": "Loja" },
         "Script": { "props": { "acao": "loja" } }
+      }
+    },
+    {
+      "id": "brinquedos",
+      "tags": ["sistema"],
+      "transform": { "x": 0, "y": 0 },
+      "components": { "Script": { "src": "scripts/brinquedos.js" } }
+    },
+    {
+      "id": "caixa",
+      "tags": ["ui"],
+      "transform": { "x": 480, "y": 392 },
+      "components": {
+        "Sprite": { "width": 470, "height": 196, "color": "#3a5533", "opacity": 0.92, "layer": 65 },
+        "Script": { "src": "scripts/caixa.js" }
+      }
+    },
+    {
+      "id": "caixaInfo",
+      "tags": ["ui"],
+      "transform": { "x": 480, "y": 478 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 13,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#fff3c4",
+          "screenSpace": false,
+          "layer": 67
+        }
+      }
+    },
+    {
+      "id": "botaoBrinquedos",
+      "prefab": "botao",
+      "transform": { "x": 880, "y": 128 },
+      "components": {
+        "Sprite": { "width": 140, "color": "#3f6b35" },
+        "Text": { "text": "Brinquedos" },
+        "Script": { "props": { "acao": "brinquedos" } }
       }
     }
   ]

@@ -21,6 +21,7 @@ import { aiOf, UtilityRunner } from './utility';
 import { NavRunner, snapshotNav } from './nav';
 import { affinityOf, IndividualRunner } from './individual';
 import { ItemCatalog } from './items';
+import { habitOf } from './routine';
 import { Economy } from './economy';
 import { cooldownsLeft, type TimerInfo } from './timers';
 import type { TweenInfo } from './tweens';
@@ -170,7 +171,7 @@ export interface EntitySnapshot {
   stateMs?: number;
   prevState?: string;
   /** UtilityAI: current choice and the scores of the last decision (null = option not available). */
-  ai?: { choice: string | null; scores: Record<string, number | null> };
+  ai?: { choice: string | null; target?: string; scores: Record<string, number | null>; targets?: Record<string, string | null> };
   /** Script props (per-entity values; scripts may change them). */
   props?: Record<string, VarValue>;
   /** Timers of the entity (self.after / every, "after" actions of its states). */
@@ -189,6 +190,8 @@ export interface EntitySnapshot {
   traits?: Record<string, number>;
   /** Preferences: affinity per subject (innate + learned, -1..1). */
   prefs?: Record<string, number>;
+  /** Routine: share of each activity at this time of day (only those > 0). */
+  habits?: Record<string, number>;
   /** AudioSource: clip, whether it plays (a loop sounding / a one-shot about to play), and volume / pan as heard now. */
   audio?: { clip: string; loop: boolean; playing: boolean; volume: number; pan: number };
   components?: Record<string, unknown>;
@@ -612,7 +615,7 @@ export class Game implements SlotHost {
       input: this.input.snapshot(),
       entityCount: w.entities.length,
       entities: list.map((e) => {
-        const snap = snapshotEntity(w, e, !!query.components);
+        const snap = snapshotEntity(w, e, !!query.components, this.clock.hour);
         const box = boxes.get(e);
         return box ? { ...snap, screen: box } : snap;
       }),
@@ -624,7 +627,7 @@ export class Game implements SlotHost {
   }
 }
 
-function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySnapshot {
+function snapshotEntity(w: World, e: Entity, withComponents: boolean, clockHour: number): EntitySnapshot {
   const s: EntitySnapshot = { id: e.id, name: e.name, tags: [...e.tags], x: round2(e.x), y: round2(e.y) };
   const b = e.components.Body;
   if (b && b.type !== 'static') {
@@ -652,7 +655,11 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
     if (fsm.previous !== null) s.prevState = fsm.previous;
   }
   const ai = aiOf(e);
-  if (ai) s.ai = { choice: ai.choice, scores: { ...ai.scores } };
+  if (ai) {
+    s.ai = { choice: ai.choice, scores: { ...ai.scores } };
+    if (ai.target !== null) s.ai.target = ai.target;
+    if (Object.keys(ai.targets).length) s.ai.targets = { ...ai.targets };
+  }
   const timers = w.timers.list(e);
   if (timers.length) s.timers = timers;
   const cds = cooldownsLeft(w, e);
@@ -667,6 +674,10 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
   const audio = e.components.AudioSource;
   if (audio) s.audio = { clip: audio.clip, loop: audio.loop, playing: audio.playing && e.active, ...audioMix(w, e) };
   if (e.components.Traits) s.traits = { ...e.components.Traits.values };
+  if (e.components.Routine) {
+    const habits = Object.fromEntries(Object.keys(e.components.Routine.values).map((a) => [a, habitOf(e, a, clockHour)]).filter(([, v]) => (v as number) > 0));
+    if (Object.keys(habits).length) s.habits = habits;
+  }
   if (e.components.Preferences) s.prefs = Object.fromEntries(Object.keys(e.components.Preferences.values).map((k) => [k, affinityOf(e, k)]));
   const props = e.components.Script?.props;
   if (props && Object.keys(props).length) s.props = { ...props };

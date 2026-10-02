@@ -1,4 +1,4 @@
-// Botão. props.acao: comida | loja | remedio | diario | velocidade | colecao | novoPet | voltar.
+// Botão. props.acao: comida | loja | brinquedos | remedio | diario | velocidade | colecao | novoPet | voltar.
 const SPEEDS = [1, 60, 600];
 const MOEDA = 'moedas';
 let confirmUntil = -1;
@@ -27,10 +27,14 @@ function onUpdate(self, game, dt) {
   }
 }
 
-/** Abre/fecha um painel de cartas (bandeja, loja) e fecha o outro. */
-function painel(game, id, other) {
-  const o = game.entity(other);
-  if (o && o.state.fechar) o.state.fechar();
+const PAINEIS = ['bandeja', 'loja', 'caixa'];
+
+/** Abre/fecha um painel de cartas (bandeja, loja, caixa de brinquedos) e fecha os outros. */
+function painel(game, id) {
+  for (const other of PAINEIS) {
+    const o = game.entity(other);
+    if (other !== id && o && o.state.fechar) o.state.fechar();
+  }
   const p = game.entity(id);
   if (p && p.state.toggle) p.state.toggle();
 }
@@ -62,10 +66,13 @@ function onClick(self, game) {
   game.playSound('sfx_clique');
   switch (self.props.acao) {
     case 'comida':
-      painel(game, 'bandeja', 'loja');
+      painel(game, 'bandeja');
       break;
     case 'loja':
-      painel(game, 'loja', 'bandeja');
+      painel(game, 'loja');
+      break;
+    case 'brinquedos':
+      painel(game, 'caixa');
       break;
     case 'remedio':
       if (api) api.remedio();

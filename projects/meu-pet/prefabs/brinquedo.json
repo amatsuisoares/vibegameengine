@@ -1,0 +1,15 @@
+{
+  "tags": ["brinquedo", "draggable"],
+  "components": {
+    "Text": {
+      "text": "",
+      "fontSize": 40,
+      "font": "sans-serif",
+      "align": "center",
+      "screenSpace": false,
+      "layer": 8
+    },
+    "Collider": { "width": 48, "height": 48, "isTrigger": true },
+    "Script": { "src": "scripts/brinquedo.js", "props": { "item": "" } }
+  }
+}

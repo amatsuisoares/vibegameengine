@@ -188,6 +188,7 @@ describe('UtilityAI', () => {
       intervalMs: 500,
       inertia: 0.1,
       noise: 0,
+      sharpness: 1,
     });
     const noMachine = parseProject(project([{ id: 'npc', components: { UtilityAI: { options: { eat: { score: 1, state: 'eating' } } } } }]));
     expect(noMachine.ok ? [] : noMachine.errors).toEqual(['scenes.main.entities(npc).components.UtilityAI.options.eat.state: the entity has no StateMachine']);

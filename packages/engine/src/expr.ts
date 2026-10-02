@@ -2,6 +2,7 @@ import type { Game } from './game';
 import { findPath, pathOptionsFor } from './nav';
 import { stackAt } from './mouse';
 import { affinityOf, evaluateItem, traitOf } from './individual';
+import { habitOf } from './routine';
 import { screenToWorld } from './systems/camera';
 
 /**
@@ -10,10 +11,10 @@ import { screenToWorld } from './systems/camera';
  * (never `eval`), so agent-written expressions cannot run arbitrary code.
  *
  *   literals     12  1.5  'text'  "text"  true  false  null
- *   names        status  frame  time  scene  vars  camera  clock  mouse  self (StateMachine/Interactable conditions)
+ *   names        status  frame  time  scene  vars  camera  clock  mouse  self (StateMachine/Interactable conditions)  target (UtilityAI targets)
  *   functions    entity(id) exists(id) hasSlot(name) count(tag) events(type) distance(a,b) pathDistance(a,b) abs(x) min(a,b) max(a,b) clamp(x,lo,hi)
  *                trait([entity,] axis) likes([entity,] subject or item id)   (one argument = self)   item(id)
- *                itemCount(id [, inventory]) currency([name])
+ *                itemCount(id [, inventory]) currency([name]) habit([entity,] activity)
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
  * Field access on null yields null (the assertion then fails and shows the null).
  */
@@ -151,6 +152,8 @@ export interface ExprScope {
   sinceFrame?: number;
   /** Entity id that `self` refers to (conditions of a StateMachine or an Interactable). */
   self?: string;
+  /** Entity id that `target` refers to (UtilityAI options with targets: the candidate). */
+  target?: string;
 }
 
 /** An entity id, or an entity value from entity(id) / self. */
@@ -197,11 +200,14 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
           const hovered = stackAt(game, p.x, p.y)[0];
           return { x: m.x, y: m.y, worldX: p.x, worldY: p.y, target: target?.id ?? null, hovered: hovered?.id ?? null, buttons: m.buttons };
         }
+        case 'target':
+          if (scope.target === undefined) throw new ExprError('"target" only exists in UtilityAI options with targets', src);
+          return entityValue(game, scope.target);
         case 'self':
           if (scope.self === undefined) throw new ExprError('"self" only exists in StateMachine and Interactable conditions', src);
           return entityValue(game, scope.self);
         default:
-          throw new ExprError(`Unknown name "${n.name}" (use status, frame, time, scene, vars, camera, clock, mouse, self or a function)`, src);
+          throw new ExprError(`Unknown name "${n.name}" (use status, frame, time, scene, vars, camera, clock, mouse, self, target or a function)`, src);
       }
     }
     case 'get': {
@@ -257,6 +263,15 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'currency':
           if (args.length > 1) throw new ExprError('currency() takes 0 or 1 argument', src);
           return game.economy.wallet.get(args[0] === undefined ? undefined : String(args[0]));
+        case 'habit': {
+          if (args.length !== 1 && args.length !== 2) throw new ExprError('habit() takes 1 or 2 arguments ([entity,] activity)', src);
+          const hid = args.length === 2 ? idOf(args[0]) : (scope.self ?? null);
+          if (hid === null) throw new ExprError("habit() with one argument needs \"self\"; pass the entity: habit('id', activity)", src);
+          const he = game.entity(hid);
+          if (!he || !he.components.Routine) return null;
+          game.individuals.ensure(he);
+          return habitOf(he, String(args[args.length - 1]), game.clock.hour);
+        }
         case 'trait':
         case 'likes': {
           if (args.length !== 1 && args.length !== 2) throw new ExprError(`${n.fn}() takes 1 or 2 arguments ([entity,] name)`, src);
@@ -289,7 +304,7 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'max':
           return Math.max(...args.map(Number));
         default:
-          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, item, itemCount, currency)`, src);
+          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, habit, item, itemCount, currency)`, src);
       }
     }
     case 'unary': {

@@ -162,3 +162,80 @@ describe('UtilityAI with a StateMachine and scripts', () => {
     expect(evaluateExpr('clamp(150, 0, 100) + clamp(-5, 0, 1)', { game: g }).value).toBe(100);
   });
 });
+
+describe('UtilityAI targets (smart objects)', () => {
+  /** A cat-like NPC choosing between toys by an expression over each candidate (nothing pet-specific in the engine). */
+  const toys: EntityInput[] = [
+    { id: 'yarn', tags: ['toy'], transform: { x: 300, y: 150 }, components: { Sprite: {}, Script: { src: 'scripts/needs.js', props: { fun: 3, noisy: false } } } },
+    { id: 'bell', tags: ['toy'], transform: { x: 120, y: 150 }, components: { Sprite: {}, Script: { src: 'scripts/needs.js', props: { fun: 5, noisy: true } } } },
+    { id: 'box', tags: ['toy'], enabled: false, transform: { x: 100, y: 150 }, components: { Sprite: {}, Script: { src: 'scripts/needs.js', props: { fun: 9, noisy: false } } } },
+  ];
+  const playAI = (score: string, when?: string): AI => ({ options: { play: { score, targets: { tag: 'toy', ...(when && { when }) } }, rest: { score: 1 } } });
+
+  it('scores each candidate with `target`, picks the best one, and shows it (choice, target, per-option best)', () => {
+    const g = game([creature(playAI('target.props.fun - distance(self, target) / 100')), ...toys]);
+    g.step(1);
+    // yarn: 3 - 1 = 2; bell: 5 - 0.8 = 4.2; box is disabled (never a candidate)
+    expect(snap(g).ai).toEqual({ choice: 'play', target: 'bell', scores: { play: 4.2, rest: 1 }, targets: { play: 'bell' } });
+    expect(g.events(0, 'ai_choice')[0]).toMatchObject({ entity: 'npc', choice: 'play', target: 'bell' });
+  });
+
+  it('targets.when filters candidates; a new target is a new decision; no candidate = option unavailable', () => {
+    const g = game(
+      [creature({ ...playAI('target.props.fun', '!target.props.noisy'), intervalMs: 100 }, {}, undefined, 'scripts/cat.js'), ...toys],
+      { 'scripts/cat.js': "function onDecision(self, d, game) { game.vars.log = (game.vars.log || '') + d.choice + ':' + d.target + ' '; }" },
+    );
+    g.step(1);
+    expect(snap(g).ai!.target).toBe('yarn'); // the bell is noisy
+    g.entity('box')!.enabled = true;
+    g.advance(200);
+    expect(snap(g).ai!.target).toBe('box');
+    expect(g.world.vars.log).toBe('play:yarn play:box ');
+    for (const t of ['yarn', 'box']) g.entity(t)!.enabled = false;
+    g.advance(200);
+    expect(snap(g).ai).toMatchObject({ choice: 'rest', scores: { play: null, rest: 1 }, targets: { play: null } });
+  });
+
+  it('an error in a target expression names the candidate; `target` outside targets is an error', () => {
+    const g = game([creature(playAI('target.props.fun * nope')), ...toys]);
+    g.step(1);
+    expect(g.events(0, 'ai_error')[0].message).toMatch(/Unknown name "nope"/);
+    const h = game([creature({ options: { x: { score: 'target.x' } } })]);
+    h.step(1);
+    expect(h.events(0, 'ai_error')[0].message).toMatch(/"target" only exists in UtilityAI options with targets/);
+  });
+});
+
+describe('UtilityAI sharpness', () => {
+  it('weighted with sharpness k picks in proportion to score^k: the strongest option dominates more', () => {
+    const share = (sharpness: number) => {
+      let a = 0;
+      for (let seed = 1; seed <= 400; seed++) {
+        const g = game([creature({ select: 'weighted', sharpness, options: { a: { score: 3 }, b: { score: 1 } } })], {}, seed);
+        g.step(1);
+        if (snap(g).ai!.choice === 'a') a++;
+      }
+      return a / 400;
+    };
+    expect(share(1)).toBeCloseTo(0.75, 1); // 3 / (3 + 1)
+    expect(share(2)).toBeCloseTo(0.9, 1); // 9 / (9 + 1)
+  });
+
+  it('weighted also draws the target (∝ score^k): the favorite wins most of the time, not always; targets still shows the best', () => {
+    const toys: EntityInput[] = [
+      { id: 'yarn', tags: ['toy'], transform: { x: 300, y: 150 }, components: { Sprite: {}, Script: { src: 'scripts/needs.js', props: { fun: 1 } } } },
+      { id: 'bell', tags: ['toy'], transform: { x: 120, y: 150 }, components: { Sprite: {}, Script: { src: 'scripts/needs.js', props: { fun: 2 } } } },
+      { id: 'rock', tags: ['toy'], transform: { x: 200, y: 150 }, components: { Sprite: {}, Script: { src: 'scripts/needs.js', props: { fun: 0 } } } },
+    ];
+    let bell = 0;
+    for (let seed = 1; seed <= 400; seed++) {
+      const g = game([creature({ select: 'weighted', sharpness: 2, options: { play: { score: 'target.props.fun', targets: { tag: 'toy' } } } }), ...toys], {}, seed);
+      g.step(1);
+      const ai = snap(g).ai!;
+      expect(ai.target).not.toBe('rock'); // score 0: never drawn
+      expect(ai.targets).toEqual({ play: 'bell' });
+      if (ai.target === 'bell') bell++;
+    }
+    expect(bell / 400).toBeCloseTo(0.8, 1); // 4 / (4 + 1)
+  });
+});

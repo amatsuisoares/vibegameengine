@@ -54,6 +54,28 @@ describe('mouse control and gestures', () => {
     expect(g.events(0, 'click')).toEqual([]); // the card is not clickable: a drag is not a click on it
   });
 
+  it('an entity drawn only by its Text is picked at its Text layer: an emoji in front of a sprite takes the click and the drag', () => {
+    const g = Game.fromRaw({
+      config: { name: 't', startScene: 'main', gravity: 0, width: 400, height: 300 },
+      scenes: {
+        main: {
+          id: 'main',
+          width: 400,
+          height: 300,
+          entities: [
+            { id: 'toy', tags: ['draggable', 'clickable'], transform: { x: 100, y: 100 }, components: { Text: { text: '🧸', layer: 8 }, Collider: { width: 40, height: 40, isTrigger: true } } },
+            { id: 'pet', tags: ['clickable'], transform: { x: 120, y: 100 }, components: { Sprite: { width: 120, height: 120, layer: 5 } } },
+          ],
+        },
+      },
+    });
+    g.perform([{ type: 'click', x: 100, y: 100 }, { type: 'wait', ms: 20 }]);
+    expect(g.events(0, 'click').map((e) => e.entity)).toEqual(['toy']);
+    expect(g.mouseTarget().under?.[0]).toBe('toy');
+    g.perform([{ type: 'drag', from: { x: 100, y: 100 }, to: { x: 250, y: 100 } }, { type: 'wait', ms: 20 }]);
+    expect(g.entity('toy')!.x).toBe(250);
+  });
+
   it('keeps the grab offset, reports drags of other things, and scripts see the drag in progress', () => {
     const g = table();
     // Grab the card 10 px right of its center and move by (+50, +20): it keeps the offset.

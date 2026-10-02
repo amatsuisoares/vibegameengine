@@ -4,5 +4,6 @@
   "icon": "⚽",
   "tags": ["ativo", "rola"],
   "consumable": false,
-  "props": { "artigo": "a" }
+  "props": { "artigo": "a", "diversao": 8, "lugar": 690 },
+  "prefab": "bola"
 }

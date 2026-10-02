@@ -167,6 +167,29 @@
       "text": "Hot reload (Manter estado) recria entidades criadas em jogo, mas não a memória dos scripts: UI/efeitos transitórios devem ser achados pela tag (game.find) e fechados no onStart; comida no chão some sozinha em 8 s. Origem: dois bugs da usuária (cenoura e carta de queijo congeladas) depois que o agente gravou scripts com o jogo aberto",
       "status": "open",
       "updatedAt": "2026-10-02T16:39:08.949Z"
+    },
+    {
+      "id": "f13",
+      "kind": "feature",
+      "text": "Comportamento pela UtilityAI (weighted, sharpness 2): dormir/comer/brincar(alvo brinquedo)/explorar(alvo canto)/procurar/passear/descansar/emburrar, nota = necessidade × personalidade × gosto + hábito; brinquedos pelúcia e chocalho na loja e no quarto; sono pelo jeito do pet; Routine registra decisões e horas de sono",
+      "status": "verified",
+      "evidence": "testes: conflito fome+cansaço+tédio (brincalhão brinca, preguiçoso dorme, guloso come); pets opostos com os mesmos brinquedos escolhem o que gostam; dia simulado: ativo 35% brincando, calmo 30% parado; playtest com screenshot dos brinquedos no quarto",
+      "updatedAt": "2026-10-02T16:54:43.814Z"
+    },
+    {
+      "id": "f14",
+      "kind": "feature",
+      "text": "Brinquedo favorito evidente no 1x (o que mais gosta entre os que você tem: corre até ele, brinca ~7 s pulando, ♥, segue a bola; reação na hora a brinquedo novo/mostrado/tirado da caixa); caixa de brinquedos (guardar/pôr no quarto qualquer um, a bola também); arrastar pelúcia e chocalho (arranjo em storage.quarto)",
+      "status": "verified",
+      "evidence": "teste: em 3 min reais a 1x o favorito tem >60% do tempo de brincadeira, observação favorito:* e ♥; teste da caixa (guardar a bola, compra aparece, arrastar a pelúcia, reabrir mantém); simulação 12 pets 5 min: 75–90% com o favorito; playtest com screenshots (loja, ♥, caixa, bola guardada/voltou, pelúcia arrastada)",
+      "updatedAt": "2026-10-02T19:40:00.549Z"
+    },
+    {
+      "id": "n9",
+      "kind": "note",
+      "text": "A experiência ideal é no 1x: a velocidade (60x/600x) é só para testes. Toda mudança precisa ser perceptível no 1x em poucos minutos; calibrar pelo que se vê a 1x, não por dias simulados. Origem: a usuária não percebeu preferência de brinquedo em 3 pets",
+      "status": "open",
+      "updatedAt": "2026-10-02T19:40:00.549Z"
     }
   ],
   "plans": []

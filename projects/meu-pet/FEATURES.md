@@ -121,43 +121,62 @@ gostarem (a surpresa a descobrir); a ração é quase sempre neutra.
 sensibilidade 0,7); o resto é sorteado e os gostos seguem esses eixos. Sinais já vistos, necessidades, idade e notas são
 mantidos.
 
-## 6. Comportamento autônomo
+## 6. Comportamento autônomo (V0.7: Utility AI com alvos + rotina)
 
-O pet escolhe a próxima atividade quando termina a atual. A atividade do momento é também o estado da
-`StateMachine` da entidade `pet` (idle, walk, yawn, sleep, eat, lookBowl, play, chase, toy, investigate, greet, sulk,
-happy, evolve): dá para ver `state`/`stateMs` no estado do jogo e os eventos `state_change`.
+O pet escolhe a próxima atividade quando termina a atual. **Todas** as opções concorrem na `UtilityAI` da entidade
+`pet` (`select: weighted`, `sharpness: 2`): a chance de cada uma é proporcional à nota², e cada nota é
+**necessidade × personalidade × gosto + hábito**. Não há prioridade fixa — com fome, cansado e entediado ao mesmo tempo,
+quem decide é o jeito do pet. A atividade do momento é também o estado da `StateMachine` (idle, walk, yawn, sleep, eat,
+lookBowl, play, chase, toy, investigate, greet, sulk, happy, evolve).
 
-Ordem da escolha:
+| Opção | O que faz | Nota (resumo) |
+|---|---|---|
+| dormir | boceja, vai para a cama, dorme | cansaço × (1,6 − 1,2·atividade); à noite, abaixo do limite de sono do pet (92 calmo → 68 ativo) |
+| comer | vai à tigela (vazia: olha para ela) | fome além do limite próprio × (0,4 + 1,2·apetite) |
+| brincar | **alvo:** um brinquedo do quarto (bola, pelúcia, chocalho) | (0,3 + 2·brincadeira) × tédio × peso do brinquedo (favorito 2,4 · gosta 1,3 · neutro 0,5 · não gosta 0); só com energia suficiente (brincalhões brincam mais cansados) |
+| explorar | **alvo:** janela, lâmpada, planta ou cama | 0,2 + 2·curiosidade − distância; pausa de 8 s depois |
+| procurar | vem até você | sociabilidade × falta de afeto × (1,2 − independência); com fome e tigela vazia, mais |
+| passear | anda até um ponto qualquer | 0,4 + 1,5·atividade |
+| descansar | fica parado (2–6 s; mais para os calmos) | 0,5 + 1,5·(1 − atividade) + cansaço; doente, muito mais |
+| emburrar | fica emburrado | só impacientes (< 0,35) e entediados |
 
-1. **Sono** se `energia < 25` ou (noite 22h–7h e `energia < 85`): boceja (estica), anda até a cama e dorme.
-   À noite só acorda de manhã: depois das 7h, com energia ≥ 95, ou antes das 9h com energia ≥ 60. De dia acorda com
-   energia ≥ 95.
-2. **Comida** se `fome < 45`: vai até a tigela; com ração, come (3 s, +35 de fome por porção); sem ração, fica
-   olhando a tigela vazia ("?"). Para não ficar preso, só volta a olhar a tigela vazia depois de 20 s; no intervalo,
-   metade das vezes vem até o jogador.
-3. Caso contrário, sorteio ponderado — feito pela `UtilityAI` da entidade `pet` (`select: weighted`; os pesos são
-   expressões sobre as necessidades e os traços que o `pet.js` coloca em `self.props`; as notas de cada opção aparecem
-   no estado do jogo em `ai.scores`):
+Todas somam `habit('opção')` (rotina, abaixo). Medido em simulação (30 sorteios, pet com fome, cansado e entediado): o
+brincalhão vai **brincar** (20/30), o preguiçoso **dormir** (19/30), o guloso **comer** (25/30). Num dia inteiro sozinho, um
+pet ativo passa ~35% do tempo brincando e ~45% dormindo; um calmo ~30% parado e ~49% dormindo; um apegado vem até você
+~13% do tempo.
 
-| Atividade | Peso (expressão da `UtilityAI`; `trait()` 0..1, `likes()` −1..1) |
-|---|---|
-| passear (anda até um ponto aleatório) | 1 + atividade × 2 + curiosidade |
-| ficar parado (2–6 s, mais para os calmos) | 0,6 + (1 − atividade) × 3 + doente × 6 |
-| investigar janela/lâmpada/planta/cama | 0,2 + curiosidade × 3 |
-| vir até o jogador (centro do quarto) | 0,2 + sociabilidade × 2,5 × (1,2 − independência) + (afeto < 40) × 2 × sociabilidade |
-| ir até a bola e empurrar (sozinho) | 0,3 + brincadeira × 2,5 + max(0, gosto pela bola) × 1,5 + (diversão < 40) × 1,5; só com energia > 30 |
-| ficar emburrado | 1,5 × (1 − paciência), só com paciência < 0,35 e diversão < 50 |
+**Brinquedos** (itens não consumíveis, categoria `brinquedo`, prefab no catálogo): a **bola** vem com o quarto (entra no
+inventário na primeira vez); a **pelúcia** 🧸 (macia, silenciosa, aconchego; diverte e dá um pouco de afeto) e o
+**chocalho** 🔔 (barulhento, ativo; diverte mais) são comprados na loja (12 e 10 moedas, uma vez) e aparecem no quarto.
 
-Velocidade base 90 px/s × 0,7–1,3 pela atividade (doente ×0,5, energia < 25 ×0,7).
-Comida: vai à tigela quando a fome passa de um limite próprio (45 ± apetite ± gosto pela ração, entre 30 e 60).
+**Brinquedo favorito** — tem que dar para ver no 1×: é o que o pet mais gosta entre os que você tem (todo pet que gosta
+de algum tem um). Na nota de brincar (UtilityAI, `target.props.peso`, que o pet atualiza) o favorito pesa 2,4, um que ele
+gosta 1,3, um neutro 0,5 e um que não gosta 0 (nunca escolhe sozinho); o alvo é sorteado ∝ nota² — medido em 5 minutos
+reais: **75–90% do tempo de brincadeira é com o favorito**, os outros ainda aparecem. Com o favorito ele vai correndo,
+brinca ~7 s pulando alto e mexendo nele sem parar (a bola ele empurra e corre atrás), mostra ♥ (♥ também para a pelúcia,
+♪ para os outros) e "brincou um tempão com a pelúcia. Parece ser o brinquedo preferido."; com um que só gosta, ~4 s de
+pulinhos; com um neutro, ~2 s e "mexeu um pouco no chocalho e logo perdeu o interesse.".
 
-**Animações** (os sprites só têm a pose parada): a alternância dos 2 quadros de idle é um clipe do `Animator` (quadros
-da forma atual, mais lento doente ou dormindo); o resto é procedural: respiração (escala),
-pulinhos ao andar, achatar ao dormir, balançar ao comer, pular de alegria, bocejo (estica e encolhe), inclinar a cabeça
-ao investigar, postura caída emburrado, tremor doente, pulsar ao evoluir. Vira para o lado em que anda.
+**Reação na hora** quando um brinquedo aparece (comprado ou tirado da caixa) ou você clica nele: favorito → ♥ e vai correndo
+("foi correndo ver a pelúcia e parece adorar!" / "se animou na hora com a bola!"); gosta/neutro → vai brincar; não gosta →
+cheira, "…" e se afasta ("cheirou o chocalho e se afastou. Não parece ter gostado."); muito sensível com o chocalho → "!"
+e foge ("se assustou com o barulho do chocalho"). Sem energia ou doente: só olha.
 
-**Emotes** (efeitos, não falas; sobem, balançam e somem com tweens da engine): `z` dormindo, `♥` carinho e petisco, `♪` brincadeira e felicidade, `?` tigela vazia,
-`~` doente.
+**Caixa de brinquedos** (botão **Brinquedos**, `scripts/caixa.js`): uma carta por brinquedo que você tem; clicar guarda
+(sai do quarto, continua seu) ou põe de volta. **Arrastar** a pelúcia e o chocalho muda o lugar deles (tag `draggable`;
+o clique só conta ao soltar sem arrastar; ao soltar volta para o chão). Arranjo salvo em `storage.quarto`
+(`{bolaDada, brinquedos: {id: {guardado, x}}}`, `scripts/brinquedos.js`).
+
+**Sono pelo jeito do pet:** à noite vai dormir abaixo do seu limite de energia (o ativo aguenta mais) e de manhã levanta
+mais cedo se for ativo (menos descansado) e mais tarde se for calmo.
+
+**Rotina** (`Routine`, 8 faixas de 3 h, meia-vida de 4 dias, salva com o indivíduo): cada decisão e cada hora de sono são
+registradas na faixa do dia em que acontecem. A rotina vira um viés (`habit`) nas notas, então o pet tende a repetir o
+que costuma fazer àquela hora — e muda devagar se a vida dele mudar. Os hábitos estáveis (`patterns`) vão alimentar o
+diário (fase 7).
+
+Velocidade base 90 px/s × 0,7–1,3 pela atividade (doente ×0,5, energia < 25 ×0,7). As observações ("parece estar com
+fome") só contam o que se vê; quem decide é a IA.
 
 ## 7. Interações do jogador (mouse)
 
@@ -221,7 +240,7 @@ O botão **Loja · N 🪙** mostra o saldo; cada ganho sobe dele como "+N 🪙".
 
 Preços: cenoura e biscoito 2, maçã e banana 3, leite 4, queijo 6, peixe 8. A ração da tigela é grátis (cuidado básico
 não é pago). A ideia é comprar algo novo para experimentar a cada dia ou dois, sem planilha: descobrir gostos é o que
-mais rende. Brinquedos e móveis entram na loja quando tiverem efeito no comportamento (fases 5 e 8).
+mais rende. Brinquedos: pelúcia (12) e chocalho (10), uma vez cada (seção 6). Móveis, camas e lâmpadas entram com o ambiente (fase 8).
 
 ## 8. Sistema de observação
 
@@ -243,7 +262,7 @@ Checagem automática a cada segundo (em ordem de prioridade):
 | acordado e tudo > 80 | "{n} parece muito feliz!" | 180 | ♪ e pulinhos |
 
 Mensagens de eventos: "{n} chegou! Observe com atenção." · "{n} adormeceu." · "{n} acordou." · "{n} comeu da
-tigela." · "{n} está olhando para a tigela vazia." · "{n} está olhando para o brinquedo." · "{n} parece estar
+tigela." · "{n} está olhando para a tigela vazia." · "{n} parece estar
 procurando alguma coisa." · "{n} ficou animado!" · "{n} parece gostar do carinho." / "parece adorar o carinho." ·
 "{n} não parece gostar disso agora." · "{n} não parece muito interessado." · "{n} parece ter gostado do petisco." ·
 "{n} parece estar se sentindo melhor." · "{n} parece mais à vontade com o quarto limpo." · "{n} cresceu!" ·

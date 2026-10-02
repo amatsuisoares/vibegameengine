@@ -1,0 +1,10 @@
+{
+  "name": "Chocalho",
+  "category": "brinquedo",
+  "icon": "🔔",
+  "tags": ["barulhento", "ativo"],
+  "consumable": false,
+  "price": 10,
+  "description": "Faz barulho quando mexe: anima uns, incomoda outros.",
+  "props": { "artigo": "o", "diversao": 14, "lugar": 740 }
+}

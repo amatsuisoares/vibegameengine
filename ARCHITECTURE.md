@@ -105,7 +105,8 @@ playbooks passando. É memória operacional: a engine não planeja.
 | `AudioSource` | som da entidade: `clip`, `volume`, `loop`, `playing`, `spatial`, `falloff` (loop contínuo ou som único repetível; posicional) |
 | `Traits` | personalidade: eixos 0..1 fixos ou sorteados pela seed; estáveis |
 | `Preferences` | gostos por assunto (item, tag, contexto): inato (pode depender dos traços) + aprendido devagar; níveis love..hate |
-| `Persist` | guarda `Traits`/`Preferences` no `game.storage` entre sessões e cenas |
+| `Routine` | hábitos por hora do dia aprendidos do que a entidade faz (com esquecimento); `habit()` e `patterns()` |
+| `Persist` | guarda `Traits`/`Preferences`/`Routine` no `game.storage` entre sessões e cenas |
 | `Script` | comportamento em JavaScript (`scripts/*.js`): `onStart/onUpdate/onCollision` com API restrita |
 | `Mover` | segue waypoints (vaivém ou loop, pausa); com Body kinematic vira plataforma móvel/elevador |
 
@@ -261,6 +262,14 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   criado mais tarde na mesma sessão (o `Rng` do mundo recomeça a cada cena) e sem mexer em `game.random()`.
   `evaluate(assunto, tags)` combina a afinidade do assunto com a média das tags; `learn` move só a parte aprendida,
   com limite. Expressões: `trait()` e `likes()`.
+- **Alvos na Utility AI** (V0.7): uma opção com `targets {tag, when?}` é avaliada uma vez por candidato (entidades ativas com a
+  tag, menos a própria), com `target` no escopo da expressão (`ExprScope.target`); o melhor candidato dá a nota da opção.
+  `AiState` guarda `target` e `targets`; uma decisão nova é escolha **ou** alvo diferente. `weighted` usa
+  nota^`sharpness` nas opções e também no alvo da opção escolhida (o melhor candidato ganha quase sempre, não sempre;
+  `targets` continua mostrando o melhor). Custo: opções × candidatos por decisão (dezenas).
+- **Rotina** (V0.7, `engine/src/routine.ts`): pesos por atividade × faixa do dia em `Routine.values`, com decaimento
+  exponencial aplicado no próximo `record` (`updatedAt`); `habit`/`peak`/`patterns` só leem. Persistida pelo
+  `IndividualRunner` junto com traços e gostos.
 - **Itens** (V0.7, `engine/src/items.ts`): `Project.items` (de `items/<id>.json`) vira um `ItemCatalog` só de leitura no
   `Game`. `Game.useItem(item, alvo, por?)` emite `item_used` e chama `ScriptRunner.itemUsed` → hook `onItem` do alvo,
   devolvendo o retorno do hook (clonado como JSON). A engine não interpreta o item: o alvo decide, normalmente pelo

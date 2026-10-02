@@ -22,7 +22,8 @@
     { "id": "sfx_bola", "type": "audio", "path": "sfx/sfx_bola.wav" },
     { "id": "sfx_limpar", "type": "audio", "path": "sfx/sfx_limpar.wav" },
     { "id": "sfx_clique", "type": "audio", "path": "sfx/sfx_clique.wav" },
-    { "id": "sfx_evolucao", "type": "audio", "path": "sfx/sfx_evolucao.wav" }
+    { "id": "sfx_evolucao", "type": "audio", "path": "sfx/sfx_evolucao.wav" },
+    { "id": "sfx_guizo", "type": "audio", "path": "sfx/sfx_guizo.wav" }
   ],
   "gravity": 0,
   "pixelArt": false

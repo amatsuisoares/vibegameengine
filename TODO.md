@@ -280,7 +280,20 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
 - [x] Bug (teste da usuária): carta da bandeja ("🧀 ×1 Queijo") ficava congelada depois de um hot reload com o painel
   aberto: as entidades criadas voltavam, mas a lista de cartas do script não. Bandeja e loja acham as cartas pela tag
   e começam fechadas; a carta clicada se remove; lição no guia do agente e no AGENT_TOOLS (436 testes)
-- [ ] **Fase 5 — Utility AI com alvos + rotina**
+- [x] **Fase 5 — Utility AI com alvos + rotina**: opções com `targets {tag, when?}` ("smart objects": nota por candidato com
+  `target` nas expressões, o melhor vira `self.ai.target`), `sharpness` no `weighted`; componente `Routine` (hábitos por
+  faixa do dia com meia-vida, `record/habit/peak/patterns`, `habit()` nas expressões, salvo pelo `Persist`)
+- [x] meu-pet: decisão inteira na UtilityAI (sem prioridades fixas; conflito de necessidades decidido pela personalidade,
+  medido em simulação); brinquedos como alvos (pelúcia e chocalho na loja, colocados no quarto, escolhidos pelo gosto);
+  cantos do quarto como alvos de exploração; sono e despertar pelo jeito do pet; rotina registrada; 445 testes + 8
+  playbooks
+- [x] Ajuste após teste no 1× (a velocidade é só para testes): **brinquedo favorito evidente** (o que ele mais gosta
+  entre os que você tem: ~75–90% do tempo de brincadeira, brincadeira longa pulando, ♥, corre até ele, segue a bola;
+  observação "parece ser o brinquedo preferido"); reação na hora a brinquedo novo, mostrado ou tirado da caixa (do que
+  não gosta, cheira e se afasta; o sensível se assusta com o chocalho); **caixa de brinquedos** (guardar/pôr no quarto
+  qualquer um, a bola também, que passou a ser item do inventário); **arrastar** pelúcia e chocalho (lugar salvo).
+  Engine: no `weighted` o alvo também é sorteado (∝ nota^sharpness); clique/arrasto escolhem a entidade de cima pela
+  camada do `Sprite` **ou** do `Text` (um emoji na frente do pet não era clicável)
 - [ ] **Fase 6 — Memória + observações (`Notifier`)**
 - [ ] **Fase 7 — Diário individual** (`Knowledge`, `Journal`, `Text.maxWidth`)
 - [ ] **Fase 8 — Ambiente + sono** (`Ambient`, `env()`)
