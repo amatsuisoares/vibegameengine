@@ -475,11 +475,13 @@ reproduzir a run no Chromium para o screenshot.
 | `restart_game` | — | recomeça com os **arquivos atuais** (mesma cena/seed) — use depois de editar |
 | `stop_game` | — | encerra a run |
 | `press_key` / `release_key` | `key` | tecla fica pressionada até soltar; não avança o tempo |
-| `move_mouse` / `click_mouse` | `x, y` / `x?, y?, entity?, button?` | coordenadas do viewport, ou `entity`: clica no centro da entidade na tela (erro se não existe ou está fora da tela); o clique avança 1 frame |
+| `move_mouse` / `click_mouse` | `x?, y?, entity?` / `x?, y?, entity?, button?, double?` | coordenadas do viewport, ou `entity`: mira o centro da entidade na tela (erro se não existe ou está fora da tela); o clique avança 1 frame; `double` = duplo clique |
+| `press_mouse` / `release_mouse` | `x?, y?, entity?, button?` | aperta / solta um botão (movendo antes, se dado); não avança o tempo |
+| `drag_mouse` | `from, to` (`{x, y}` ou `{entity}`), `ms?` (300), `button?` | arrasta: aperta em `from`, anda quadro a quadro até `to`, solta (ver [Controle do mouse](#controle-do-mouse)) |
 | `wait` | `ms` (máx. 60000) | avança o tempo simulado |
 | `wait_until` | `expr, maxMs?` | avança até a expressão valer (ou timeout / fim de jogo); `ok`, `waitedMs` |
 | `advance_clock` | `hours?, minutes?, ms?` | pula o relógio do calendário (sem simular os frames) e avança 1 frame — como fechar o jogo por um tempo |
-| `perform_inputs` | `steps` | sequência `keyDown/keyUp/tap/hold/wait/mouseMove/mouseDown/mouseUp/click/type` (`type`: texto digitado; `\b` = Backspace, `\n` = Enter; `click` aceita `entity`) |
+| `perform_inputs` | `steps` | sequência `keyDown/keyUp/tap/hold/wait/mouseMove/mouseDown/mouseUp/click/doubleClick/drag/type` (`type`: texto digitado; `\b` = Backspace, `\n` = Enter; `mouseMove`, `click` e `doubleClick` aceitam `entity`) |
 | `observe` | `screenshot?, annotate?, entities?, components?` | tudo do momento numa chamada (ver [Observação](#observação-unificada-observe)) |
 | `get_mouse_target` | — | o que está sob o mouse e o que um clique ali atingiria (ver [Percepção do mouse](#percepção-do-mouse-get_mouse_target)) |
 | `inspect_game_state` | `ids?, tags?, components?, storage?, onScreen?` | estado completo (vars, câmera, relógio, entidades com posição, velocidade, vida, `interactable`...); `storage` inclui os dados salvos |
@@ -540,8 +542,28 @@ clique: `Interactable` com `click`, script com `onClick` ou tag `clickable`).
 - `nearest`: quando nada clicável está sob o mouse, o alvo clicável mais próximo na tela, com `distance` em px ("errou a
   cama por 23 px").
 - `lastClick`: o último clique esquerdo (também em espaço vazio: `entity: null`), mesmo depois de trocar de cena.
+- `drag`: o arrasto em andamento (`entity`, `startX/Y`, `x/y` no mundo).
 - Em expressões/asserções: `mouse` (`x`, `y`, `worldX`, `worldY`, `target`, `hovered`, `buttons`), ex.
   `mouse.target == 'cama'`. Em scripts: `game.input.hovered`.
+
+### Controle do mouse
+
+Implementado na V0.4. Tudo passa pelo input virtual: os gestos viram as mesmas `GameOp` primitivas (`mouseMove`,
+`mouseDown`, `mouseUp`, `step`), então replay, screenshot e modo seguir reproduzem tudo exatamente. Nada chega ao
+mouse do sistema operacional.
+
+- **Passos** (em `perform_inputs`, `run_test`, `verify_game` e playbooks): `mouseMove {x, y | entity}`,
+  `mouseDown`/`mouseUp`, `click {x, y | entity}`, `doubleClick {x, y | entity}` (dois cliques com 1 frame entre eles) e
+  `drag {from, to, ms?}` (aperta, move a cada frame em linha reta, solta).
+- **O que a engine percebe** (`InteractionRunner`):
+  - **Duplo clique:** segundo clique em até 300 ms e 6 px do anterior; o evento `click` vem com `clicks: 2`
+    (`lastClick.clicks` também). Scripts: `game.input.doubleClicked` (verdadeiro no frame do segundo clique).
+  - **Arrasto:** botão esquerdo segurado e o mouse andou mais de 4 px. Eventos `drag_start {entity, x, y}` e
+    `drag_end {entity, x, y, drop}` (`entity` = o que foi pego: um alvo de clique ou uma entidade com tag `draggable`;
+    `drop` = a entidade desenhada sob o mouse ao soltar). Scripts: `game.input.drag` (`entity`, `startX/Y`, `x/y`).
+  - **Tag `draggable`:** a entidade segue o mouse enquanto é arrastada (mantendo o ponto onde foi pega) — sem código.
+- **O clique acontece ao apertar**, não ao soltar: começar um arrasto sobre uma entidade clicável também a clica (no
+  meu-pet, arrastar a bola a joga). Para algo só arrastável, use a tag `draggable` sem `Interactable`/`onClick`.
 
 ### Expressões
 

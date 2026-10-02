@@ -147,6 +147,19 @@ describe('take_screenshot (Chromium)', () => {
     expect(pngSize(r.images![0].path)).toEqual({ width: 800, height: 450 });
   });
 
+  it('replays drags and double clicks in the browser exactly (a draggable coin moved by the mouse)', async () => {
+    const t = setup();
+    hosts.push(t.host);
+    await t.ok('modify_game_object', { scene: 'level1', id: 'coin1', patch: { tags: ['coin', 'draggable', 'clickable'] } });
+    await t.ok('run_game');
+    await t.ok('click_mouse', { entity: 'coin1', double: true });
+    await t.ok('drag_mouse', { from: { entity: 'coin1' }, to: { x: 250, y: 200 }, ms: 400 });
+    const shot = await t.ok<Shot>('take_screenshot', { annotate: true });
+    expect(shot.warning).toBeUndefined();
+    mkdirSync(RUNS_DIR, { recursive: true });
+    copyFileSync(t.store.path(shot.path), `${RUNS_DIR}/drag-coin-debug.png`);
+  });
+
   it('reports missing assets when editing and when rendering', async () => {
     const t = setup();
     hosts.push(t.host);

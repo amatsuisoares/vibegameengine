@@ -324,6 +324,10 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
   (`stackAt`, mesma ordem do clique), o alvo do clique (`InteractionRunner.clickTargetAt`, a regra do clique real) e,
   sem efeitos, se um `Interactable` aceitaria (`clickInfo`, que reusa o `check` das tentativas). O último clique fica em
   `Game.lastClick` (sobrevive a trocas de cena). Expressões ganham `mouse`; scripts, `game.input.hovered`.
+- **Controle do mouse** (V0.4): passos `doubleClick` e `drag` (e `mouseMove {entity}`) expandem para as ops
+  primitivas de sempre (`expandInputSteps`; `Game.expand` resolve entidades em pontos da tela). Os gestos são
+  percebidos no início do frame por `InteractionRunner.gestures()`: duplo clique (≤ 18 frames, ≤ 6 px), arrasto
+  (> 4 px com o botão segurado) → `drag_start`/`drag_end`, e entidades com tag `draggable` seguem o mouse.
 - **Diagnóstico** (V0.3, `server/src/runtime/diagnosis.ts`): `diagnose(game, project, scripts, falhas, erros)` extrai
   das checagens que falharam as entidades, variáveis e eventos citados (parse leve das expressões ou campos das
   asserções), junta evidências do `World`, dos eventos, das regras/scripts/`Collectible` que escrevem as variáveis e da
@@ -344,7 +348,7 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 
 ```
 Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
-                                   tools/list  → 3 tools de workspace + 56 do ToolRegistry (com annotations)
+                                   tools/list  → 3 tools de workspace + 59 do ToolRegistry (com annotations)
                                    tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
                                                  → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```

@@ -158,7 +158,7 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
 - [x] 321 testes unitários + 16 e2e
 - [x] **V0.3 concluída**: `verify_game`, asserções estruturadas, playbooks, relatório de diagnóstico
 
-## V0.4 — Percepção do agente (em andamento)
+## ✅ V0.4 — Percepção do agente (concluída)
 - [x] **Observação unificada**: tool `observe` (jogo, players, entidades na tela com caixa no viewport, input com mouse
   em tela e mundo, câmera, eventos e console novos, screenshot), `getState({onScreen})` / `Game.screenBoxOf`,
   `inspect_game_state {onScreen}`
@@ -169,7 +169,20 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
   `hovered`/`target` no `observe`; `mouse` nas expressões; `game.input.hovered` nos scripts
 - [x] meu-pet: mouse sobre a tigela (com o pet atrás) → clique vai para a tigela; espaço vazio → alvo mais próximo
 - [x] 328 testes unitários + 17 e2e
-- [ ] Controle do mouse (mover, clicar, pressionar, soltar, arrastar, duplo clique), sempre pelo input virtual
+- [x] **Controle do mouse**: passos `doubleClick`, `drag {from, to}` e `mouseMove {entity}` (só ops primitivas: replay
+  exato); tools `move_mouse {entity}`, `click_mouse {double}`, `press_mouse`, `release_mouse`, `drag_mouse`; a engine
+  percebe duplo clique (`click.clicks: 2`) e arrasto (`drag_start`/`drag_end {entity, drop}`), tag `draggable` segue
+  o mouse; scripts `game.input.doubleClicked` / `game.input.drag`
+- [x] meu-pet: duplo clique no pet e arrasto da bola verificados (`verify_game`); arrasto replicado no Chromium
+- [x] 333 testes unitários + 18 e2e
+- [x] **V0.4 concluída**: observação unificada, percepção do mouse, controle do mouse
+
+## V0.5 — Editor amigável (próxima)
+Complementa o Claude Code (fluxo IA-first continua), sem virar um editor tipo Unity.
+- [ ] Hierarquia (cena → entidades; selecionar)
+- [ ] Inspector (componentes e propriedades da entidade selecionada; edição segura pelo `ProjectStore`)
+- [ ] Viewport (seleção, posição, bounding box, câmera, gizmos básicos)
+- [ ] Asset browser (imagens, spritesheets, áudio, prefabs, scripts)
 
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.

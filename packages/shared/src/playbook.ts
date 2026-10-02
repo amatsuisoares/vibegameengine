@@ -20,13 +20,22 @@ export const ExprSchema = z
     "Expression over the game state, e.g. \"entity('player').x > 300 && vars.coins >= 1\". Names: status, frame, time, scene, vars, camera, clock (clock.hour, clock.now), mouse (x, y, worldX, worldY, target, hovered). Functions: entity(id) (x, y, vx, vy, grounded, health, state, stateMs, ai, props, anim, nav, timers, tweens, interactable...), exists(id), count(tag), events(type), distance(a, b), pathDistance(a, b) (null = unreachable), abs, min, max, clamp(x, lo, hi).",
   );
 
+const EntityRef = z.string().describe('Entity id: aims at the center of the entity on screen, wherever it is.');
+const pointOk = (p: { x?: number; y?: number; entity?: string }) => p.entity !== undefined || (p.x !== undefined && p.y !== undefined);
+const MousePoint = z
+  .object({ x: z.number().optional(), y: z.number().optional(), entity: EntityRef.optional() })
+  .refine(pointOk, 'give x and y, or entity')
+  .describe('A viewport point {x, y} or {entity}.');
+
 export const InputStepSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('keyDown'), key: Key }),
   z.object({ type: z.literal('keyUp'), key: Key }),
   z.object({ type: z.literal('tap'), key: Key, ms: Ms(10_000).optional().describe('Hold duration (default 50).') }),
   z.object({ type: z.literal('hold'), key: Key, ms: Ms(MAX_WAIT_MS) }),
   z.object({ type: z.literal('wait'), ms: Ms(MAX_WAIT_MS) }),
-  z.object({ type: z.literal('mouseMove'), x: z.number(), y: z.number() }),
+  z
+    .object({ type: z.literal('mouseMove'), x: z.number().optional(), y: z.number().optional(), entity: EntityRef.optional() })
+    .refine(pointOk, 'give x and y, or entity'),
   z.object({ type: z.literal('mouseDown'), button: Button.optional() }),
   z.object({ type: z.literal('mouseUp'), button: Button.optional() }),
   z.object({
@@ -36,6 +45,20 @@ export const InputStepSchema = z.discriminatedUnion('type', [
     entity: z.string().optional().describe('Click the center of this entity (instead of x/y), wherever it is on screen.'),
     button: Button.optional(),
   }),
+  z.object({
+    type: z.literal('doubleClick'),
+    x: z.number().optional(),
+    y: z.number().optional(),
+    entity: EntityRef.optional(),
+    button: Button.optional(),
+  }).describe('Two clicks in a row (the game sees clicks: 2 on the click event).'),
+  z.object({
+    type: z.literal('drag'),
+    from: MousePoint,
+    to: MousePoint,
+    ms: Ms(10_000).optional().describe('Duration of the motion (default 300).'),
+    button: Button.optional(),
+  }).describe('Press at "from", move frame by frame to "to", release (drag_start / drag_end events; "draggable" entities follow).'),
   z.object({ type: z.literal('type'), text: z.string().min(1).describe('Characters typed (e.g. a name); "\\b" = Backspace, "\\n" = Enter. Advances 1 frame.') }),
 ]);
 

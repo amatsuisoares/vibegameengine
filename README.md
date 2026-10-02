@@ -10,8 +10,9 @@ Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa,
 > em alcance, entrada numa área, scripts), **máquinas de estado** (`StateMachine`), **Utility AI** (`UtilityAI`), **animação por estado** (`Animator`), **timers**, **tweens**, **pathfinding** (`NavAgent`) e **partículas** (`ParticleEmitter`). **V0.3 concluída** (QA do agente): `verify_game` (cenário → relatório PASS/FAIL + screenshots),
 > **asserções estruturadas** (`entityExists`, `state`, `variable`, `eventOccurred`... com valor esperado, encontrado e
 > evidência), **playbooks** de regressão (`playbooks/<id>.json`, `run_playbooks`) e **relatório de diagnóstico**
-> (evidências + sistemas prováveis quando algo falha). Em andamento: **V0.4** (percepção do agente) — prontos: `observe` (estado + entidades na tela + input + eventos +
-> screenshot numa chamada) e percepção do mouse (`get_mouse_target`: o que está sob o mouse e o que o clique atingiria).
+> (evidências + sistemas prováveis quando algo falha). **V0.4 concluída** (percepção do agente): `observe` (estado + entidades na tela + input + eventos + screenshot numa
+> chamada), percepção do mouse (`get_mouse_target`: o que está sob o mouse e o que o clique atingiria) e controle do
+> mouse (duplo clique, arrastar, pressionar/soltar; tag `draggable`).
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos

@@ -1,6 +1,6 @@
 import type { Entity } from './entity';
 import type { Game, ScreenBox } from './game';
-import { hitBox, isDrawn, type ClickInfo } from './interact';
+import { hitBox, isDrawn, type ClickInfo, type DragInfo } from './interact';
 import { round2 } from './math';
 import { screenToWorld } from './systems/camera';
 
@@ -30,6 +30,8 @@ export interface LastClick {
   world: { x: number; y: number };
   /** Entity the click reached (null = nothing clickable there). */
   entity: string | null;
+  /** 2 for the second click of a double click. */
+  clicks?: number;
 }
 
 export interface MouseTarget {
@@ -47,6 +49,8 @@ export interface MouseTarget {
   /** When nothing clickable is under the mouse: the closest clickable entity on screen. */
   nearest?: MouseEntity;
   lastClick?: LastClick;
+  /** The drag in progress (left button held and moved). */
+  drag?: DragInfo;
 }
 
 /** Topmost first: higher Sprite layer, then later in the scene (same order a click uses). */
@@ -85,6 +89,7 @@ export function mouseTarget(game: Game): MouseTarget {
   });
 
   const stack = stackAt(game, p.x, p.y);
+  const drag = game.interactions.dragInfo();
   const target = game.interactions.clickTargetAt(p.x, p.y);
   const hovered = stack[0] ?? null;
   let nearest: MouseEntity | undefined;
@@ -105,5 +110,6 @@ export function mouseTarget(game: Game): MouseTarget {
     under: stack.slice(0, 8).map((e) => e.id),
     ...(nearest && { nearest }),
     ...(game.lastClick && { lastClick: game.lastClick }),
+    ...(drag && { drag }),
   };
 }

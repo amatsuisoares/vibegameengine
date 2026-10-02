@@ -121,6 +121,22 @@ const usable = (e: Entity, via: 'click' | 'key' | 'enter') => {
 
 const cooldownFrames = (ms: number) => Math.max(0, Math.round(ms / 1000 / FIXED_DT));
 
+/** A second press within this time and distance of the first is a double click. */
+const DOUBLE_CLICK_FRAMES = 18; // 300 ms
+const DOUBLE_CLICK_PX = 6;
+/** Moving this far (viewport px) with the left button held starts a drag. */
+const DRAG_PX = 4;
+
+/** The drag in progress (left button held and moved), in world coordinates. */
+export interface DragInfo {
+  /** Entity grabbed at the press (a click target or a "draggable"), or null. */
+  entity: string | null;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+}
+
 /** Runs the interactions of one world. Created per scene load (like the rules and scripts). */
 export class InteractionRunner {
   /** Actor|target pairs within range of an "enter" interactable at the end of the previous frame. */
@@ -128,6 +144,13 @@ export class InteractionRunner {
   private readonly compiled = new Map<string, (scope: ExprScope) => unknown>();
   private readonly reported = new Set<string>();
   private depth = 0;
+  /** Left press being held: where (viewport and world), what it grabbed, and the grab offset. */
+  private press: { at: { x: number; y: number }; world: { x: number; y: number }; entity: Entity | null; offset: { x: number; y: number } } | null = null;
+  private drag: DragInfo | null = null;
+  /** Previous left press, for double clicks. */
+  private lastPress: { frame: number; x: number; y: number; clicks: number } | null = null;
+  /** True during the frame of the second press of a double click. */
+  doubleClicked = false;
 
   constructor(
     private readonly world: World,
@@ -138,6 +161,7 @@ export class InteractionRunner {
   /** Input stage (start of the frame): the left click and the interaction keys. */
   input() {
     if (this.world.status !== 'running') return;
+    this.gestures();
     this.click();
     if (this.world.status !== 'running') return;
     const input = this.world.input;
@@ -155,11 +179,68 @@ export class InteractionRunner {
     if (!at) return;
     const pos = screenToWorld(w, at.x, at.y);
     const target = this.clickTargetAt(pos.x, pos.y);
-    this.game.lastClick = { frame: w.frame, x: at.x, y: at.y, world: { x: round2(pos.x), y: round2(pos.y) }, entity: target?.id ?? null };
+    const clicks = this.doubleClicked ? 2 : 1;
+    this.game.lastClick = { frame: w.frame, x: at.x, y: at.y, world: { x: round2(pos.x), y: round2(pos.y) }, entity: target?.id ?? null, ...(clicks > 1 && { clicks }) };
     if (!target) return;
-    w.emit('click', { entity: target.id, x: Math.round(pos.x), y: Math.round(pos.y) });
+    w.emit('click', { entity: target.id, x: Math.round(pos.x), y: Math.round(pos.y), ...(clicks > 1 && { clicks }) });
     this.hooks.click(target, pos);
     if (usable(target, 'click') && w.status === 'running') this.attempt(target, undefined, 'click');
+  }
+
+  /** The drag in progress, or null. */
+  dragInfo(): DragInfo | null {
+    return this.drag && { ...this.drag };
+  }
+
+  /**
+   * Mouse gestures, from the virtual input at the start of the frame: double clicks (a second
+   * press close in time and space), and drags (left button held and moved): "drag_start" /
+   * "drag_end" events with the grabbed entity and where it was dropped. Entities tagged
+   * "draggable" follow the mouse while dragged.
+   */
+  private gestures() {
+    const w = this.world;
+    const input = w.input;
+    const at = input.leftPressPosition();
+    this.doubleClicked = false;
+    if (at) {
+      const prev = this.lastPress;
+      const double = !!prev && prev.clicks === 1 && w.frame - prev.frame <= DOUBLE_CLICK_FRAMES && Math.hypot(at.x - prev.x, at.y - prev.y) <= DOUBLE_CLICK_PX;
+      this.doubleClicked = double;
+      this.lastPress = { frame: w.frame, x: at.x, y: at.y, clicks: double ? 2 : 1 };
+      const world = screenToWorld(w, at.x, at.y);
+      const entity = topmostAt(w, world.x, world.y, (e) => this.takesClicks(e) || e.hasTag('draggable'));
+      this.press = { at, world, entity, offset: entity ? { x: entity.x - world.x, y: entity.y - world.y } : { x: 0, y: 0 } };
+      this.drag = null;
+      return;
+    }
+    const press = this.press;
+    if (!press) return;
+    const m = input.mouse;
+    const pos = screenToWorld(w, m.x, m.y);
+    const grabbed = press.entity && !press.entity.destroyed ? press.entity : null;
+    if (input.isMouseDown('left')) {
+      if (!this.drag && Math.hypot(m.x - press.at.x, m.y - press.at.y) > DRAG_PX) {
+        this.drag = { entity: grabbed?.id ?? null, startX: round2(press.world.x), startY: round2(press.world.y), x: round2(pos.x), y: round2(pos.y) };
+        w.emit('drag_start', { entity: this.drag.entity, x: Math.round(press.world.x), y: Math.round(press.world.y) });
+      }
+      if (this.drag) {
+        this.drag.x = round2(pos.x);
+        this.drag.y = round2(pos.y);
+        if (grabbed?.hasTag('draggable')) {
+          grabbed.x = pos.x + press.offset.x;
+          grabbed.y = pos.y + press.offset.y;
+        }
+      }
+      return;
+    }
+    // Released.
+    if (this.drag) {
+      const drop = topmostAt(w, pos.x, pos.y, (e) => e !== grabbed && isDrawn(e));
+      w.emit('drag_end', { entity: this.drag.entity, x: Math.round(pos.x), y: Math.round(pos.y), drop: drop?.id ?? null });
+    }
+    this.press = null;
+    this.drag = null;
   }
 
   /** Whether an entity takes left clicks (Interactable with click, a script onClick or the "clickable" tag). */

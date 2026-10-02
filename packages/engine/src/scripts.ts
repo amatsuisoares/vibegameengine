@@ -251,6 +251,10 @@ export interface ScriptGame {
     mousePressed(button?: 'left' | 'right' | 'middle'): boolean;
     /** What a left click at the mouse would reach now (Interactable click, onClick or "clickable"), or null. For hover effects. */
     readonly hovered: ScriptEntity | null;
+    /** True during the frame of the second press of a double click. */
+    readonly doubleClicked: boolean;
+    /** The drag in progress (left button held and moved): grabbed entity id (or null), start and current world point. */
+    readonly drag: { entity: string | null; startX: number; startY: number; x: number; y: number } | null;
     /** Text typed since the previous frame, in order; "\b" = Backspace, "\n" = Enter (e.g. for a name field). */
     readonly text: string;
   };
@@ -351,6 +355,12 @@ class ScriptApi {
           const p = screenToWorld(w, input.mouse.x, input.mouse.y);
           const e = host.interactions.clickTargetAt(p.x, p.y);
           return e ? wrap(e) : null;
+        },
+        get doubleClicked() {
+          return host.interactions.doubleClicked;
+        },
+        get drag() {
+          return host.interactions.dragInfo();
         },
         get text() {
           return input.typed();

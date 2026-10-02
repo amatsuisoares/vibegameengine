@@ -59,7 +59,13 @@ export const MAX_SCENARIO_MS = 300_000;
 
 /** Simulated ms of input steps (a click on an entity takes the same time as one at x/y). */
 export function inputMs(steps: InputStep[]) {
-  const timed = steps.map((s) => (s.type === 'click' ? { ...s, entity: undefined } : s));
+  // Entities only change where the mouse goes, not how long a step takes.
+  const P = { x: 0, y: 0, entity: undefined };
+  const timed = steps.map((s): InputStep => {
+    if (s.type === 'click' || s.type === 'doubleClick' || s.type === 'mouseMove') return { ...s, ...(s.entity !== undefined && P) };
+    if (s.type === 'drag') return { ...s, from: P, to: P };
+    return s;
+  });
   return expandInputSteps(timed).reduce((ms, op) => ms + (op.op === 'step' ? (op.frames * 1000) / 60 : 0), 0);
 }
 

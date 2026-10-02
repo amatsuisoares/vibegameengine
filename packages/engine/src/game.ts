@@ -46,11 +46,23 @@ export type InputStep =
   | { type: 'tap'; key: string; ms?: number }
   | { type: 'hold'; key: string; ms: number }
   | { type: 'wait'; ms: number }
-  | { type: 'mouseMove'; x: number; y: number }
+  | { type: 'mouseMove'; x?: number; y?: number; entity?: string }
   | { type: 'mouseDown'; button?: MouseButton }
   | { type: 'mouseUp'; button?: MouseButton }
   | { type: 'click'; x?: number; y?: number; entity?: string; button?: MouseButton }
+  | { type: 'doubleClick'; x?: number; y?: number; entity?: string; button?: MouseButton }
+  | { type: 'drag'; from: MousePoint; to: MousePoint; ms?: number; button?: MouseButton }
   | { type: 'type'; text: string };
+
+/** A viewport point, or the center of an entity on screen (resolved by Game.expand). */
+export type MousePoint = { x?: number; y?: number; entity?: string };
+
+/** Viewport point of a resolved MousePoint (entities must be resolved first). */
+function pointOf(p: MousePoint, what: string): { x: number; y: number } {
+  if (p.entity !== undefined) throw new Error(`${what} on entity "${p.entity}" needs a running game (Game.expand)`);
+  if (p.x === undefined || p.y === undefined) throw new Error(`${what} needs x and y, or an entity`);
+  return { x: p.x, y: p.y };
+}
 
 /** Primitive, replayable operation. Every way of driving a Game reduces to a sequence of these. */
 export type GameOp =
@@ -86,9 +98,11 @@ export function expandInputSteps(steps: InputStep[]): GameOp[] {
       case 'wait':
         ops.push({ op: 'step', frames: msToFrames(s.ms) });
         break;
-      case 'mouseMove':
-        ops.push({ op: 'mouseMove', x: s.x, y: s.y });
+      case 'mouseMove': {
+        const p = pointOf(s, 'mouseMove');
+        ops.push({ op: 'mouseMove', x: p.x, y: p.y });
         break;
+      }
       case 'mouseDown':
       case 'mouseUp':
         ops.push({ op: s.type, button: s.button });
@@ -98,6 +112,26 @@ export function expandInputSteps(steps: InputStep[]): GameOp[] {
         if (s.x !== undefined && s.y !== undefined) ops.push({ op: 'mouseMove', x: s.x, y: s.y });
         ops.push({ op: 'mouseDown', button: s.button }, { op: 'step', frames: 1 }, { op: 'mouseUp', button: s.button });
         break;
+      case 'doubleClick': {
+        if (s.entity !== undefined) pointOf(s, 'doubleClick');
+        if (s.x !== undefined && s.y !== undefined) ops.push({ op: 'mouseMove', x: s.x, y: s.y });
+        const press = [{ op: 'mouseDown', button: s.button }, { op: 'step', frames: 1 }, { op: 'mouseUp', button: s.button }] as const;
+        ops.push(...press, { op: 'step', frames: 1 }, ...press);
+        break;
+      }
+      case 'drag': {
+        // Press at `from`, move frame by frame to `to` (so the game sees the motion), release.
+        const a = pointOf(s.from, 'drag from');
+        const b = pointOf(s.to, 'drag to');
+        const n = Math.max(2, msToFrames(s.ms ?? 300));
+        ops.push({ op: 'mouseMove', x: a.x, y: a.y }, { op: 'mouseDown', button: s.button }, { op: 'step', frames: 1 });
+        for (let i = 1; i <= n; i++) {
+          const t = i / n;
+          ops.push({ op: 'mouseMove', x: round2(a.x + (b.x - a.x) * t), y: round2(a.y + (b.y - a.y) * t) }, { op: 'step', frames: 1 });
+        }
+        ops.push({ op: 'mouseUp', button: s.button }, { op: 'step', frames: 1 });
+        break;
+      }
       case 'type':
         ops.push({ op: 'text', text: s.text }, { op: 'step', frames: 1 });
         break;
@@ -349,10 +383,11 @@ export class Game {
 
   /** Ops for one input step in the current state (a click on an entity aims at where it is now). */
   expand(step: InputStep): GameOp[] {
-    if (step.type === 'click' && step.entity !== undefined) {
-      const { x, y } = this.screenPointOf(step.entity);
-      return expandInputSteps([{ type: 'click', x, y, button: step.button }]);
+    const at = (p: MousePoint): MousePoint => (p.entity !== undefined ? this.screenPointOf(p.entity) : p);
+    if ((step.type === 'click' || step.type === 'doubleClick' || step.type === 'mouseMove') && step.entity !== undefined) {
+      return expandInputSteps([{ ...step, ...this.screenPointOf(step.entity), entity: undefined }]);
     }
+    if (step.type === 'drag') return expandInputSteps([{ ...step, from: at(step.from), to: at(step.to) }]);
     return expandInputSteps([step]);
   }
 

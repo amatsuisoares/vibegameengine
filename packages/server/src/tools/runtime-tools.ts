@@ -109,11 +109,16 @@ export const runtimeTools = [
   defineTool({
     name: 'move_mouse',
     changesRun: true,
-    description: 'Moves the virtual mouse to viewport coordinates (pixels, origin top-left of the game view).',
-    input: z.object({ x: z.number(), y: z.number() }),
-    run: (ctx, { x, y }) => {
-      session(ctx).apply({ op: 'mouseMove', x, y });
-      return { mouse: { x, y } };
+    description: 'Moves the virtual mouse to viewport coordinates (pixels, origin top-left of the game view), or over an entity (entity: id). Time does not advance.',
+    input: z.object({
+      x: z.number().optional(),
+      y: z.number().optional(),
+      entity: z.string().optional().describe('Move over the center of this entity on screen. Use instead of x/y.'),
+    }),
+    run: (ctx, input) => {
+      if (input.entity === undefined && (input.x === undefined || input.y === undefined)) throw new ToolError('Give x and y, or entity');
+      session(ctx).perform([{ type: 'mouseMove', ...input }]);
+      return { mouse: session(ctx).game.input.snapshot().mouse };
     },
   }),
 
@@ -121,15 +126,60 @@ export const runtimeTools = [
     name: 'click_mouse',
     changesRun: true,
     description:
-      'Clicks (press, 1 frame, release), optionally moving to viewport coordinates first, or to the center of an entity (entity: id) — like a player clicking it. The "click" event says what was hit.',
+      'Clicks (press, 1 frame, release), optionally moving to viewport coordinates first, or to the center of an entity (entity: id) — like a player clicking it. double=true double-clicks (the click event gets clicks: 2). The "click" event says what was hit.',
     input: z.object({
       x: z.number().optional(),
       y: z.number().optional(),
       entity: z.string().optional().describe('Entity to click (its Collider/Sprite center on screen). Use instead of x/y.'),
       button: Button.optional(),
+      double: z.boolean().optional().describe('Double click.'),
     }),
-    run: (ctx, input) => {
-      session(ctx).perform([{ type: 'click', ...input }]);
+    run: (ctx, { double, ...input }) => {
+      session(ctx).perform([{ type: double ? 'doubleClick' : 'click', ...input }]);
+      return observe(ctx);
+    },
+  }),
+
+  defineTool({
+    name: 'press_mouse',
+    changesRun: true,
+    description: 'Presses and holds a mouse button (optionally moving to x/y or an entity first). It stays down until release_mouse; time does not advance (call wait). For drags, prefer drag_mouse.',
+    input: z.object({ x: z.number().optional(), y: z.number().optional(), entity: z.string().optional(), button: Button.optional() }),
+    run: (ctx, { button, ...at }) => {
+      if (at.entity !== undefined || (at.x !== undefined && at.y !== undefined)) session(ctx).perform([{ type: 'mouseMove', ...at }]);
+      session(ctx).apply({ op: 'mouseDown', button });
+      return { mouse: session(ctx).game.input.snapshot().mouse };
+    },
+  }),
+
+  defineTool({
+    name: 'release_mouse',
+    changesRun: true,
+    description: 'Releases a mouse button held with press_mouse (optionally moving to x/y or an entity first). Time does not advance.',
+    input: z.object({ x: z.number().optional(), y: z.number().optional(), entity: z.string().optional(), button: Button.optional() }),
+    run: (ctx, { button, ...at }) => {
+      if (at.entity !== undefined || (at.x !== undefined && at.y !== undefined)) session(ctx).perform([{ type: 'mouseMove', ...at }]);
+      session(ctx).apply({ op: 'mouseUp', button });
+      return { mouse: session(ctx).game.input.snapshot().mouse };
+    },
+  }),
+
+  defineTool({
+    name: 'drag_mouse',
+    changesRun: true,
+    description:
+      'Drags with the virtual mouse: press at "from", move frame by frame to "to" over ms (default 300), release. Points are {x, y} or {entity}. The game sees drag_start / drag_end {entity, drop} events; entities tagged "draggable" follow the mouse. Returns what happened.',
+    input: z.object({
+      from: z.object({ x: z.number().optional(), y: z.number().optional(), entity: z.string().optional() }),
+      to: z.object({ x: z.number().optional(), y: z.number().optional(), entity: z.string().optional() }),
+      ms: Ms(10_000).optional(),
+      button: Button.optional(),
+    }),
+    run: (ctx, step) => {
+      for (const [k, p] of [['from', step.from], ['to', step.to]] as const) {
+        if (p.entity === undefined && (p.x === undefined || p.y === undefined)) throw new ToolError(`${k}: give x and y, or entity`);
+      }
+      session(ctx).perform([{ type: 'drag', ...step }]);
       return observe(ctx);
     },
   }),
