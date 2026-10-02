@@ -13,10 +13,12 @@ Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa,
 > (evidências + sistemas prováveis quando algo falha). **V0.4 concluída** (percepção do agente): `observe` (estado + entidades na tela + input + eventos + screenshot numa
 > chamada), percepção do mouse (`get_mouse_target`: o que está sob o mouse e o que o clique atingiria) e controle do
 > mouse (duplo clique, arrastar, pressionar/soltar; tag `draggable`).
-> Em andamento: **V0.5** (editor amigável) — prontos a **hierarquia** (cenas e entidades na página do jogo; a entidade
-> selecionada é lida pelo agente com `get_selection`) e o **inspector** (componentes da entidade selecionada, editados
-> pelo `ProjectStore` com histórico e undo) e o **viewport** (modo edição: câmera própria com zoom e pan, clicar
-> seleciona, arrastar move a entidade gravando na cena, gizmos de limites, câmera do jogo e posição).
+> **V0.5 concluída** (editor amigável): a **hierarquia** (cenas e entidades na página do jogo; a entidade
+> selecionada é lida pelo agente com `get_selection`), o **inspector** (componentes da entidade selecionada, editados
+> pelo `ProjectStore` com histórico e undo), o **viewport** (modo edição: câmera própria com zoom e pan, clicar
+> seleciona, arrastar move a entidade gravando na cena, gizmos de limites, câmera do jogo e posição) e o **asset browser**
+> (imagens, spritesheets, áudio, prefabs e scripts, com onde cada um é usado; usar na seleção, colocar prefab na cena;
+> o agente vê o mesmo catálogo em `list_assets`).
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos

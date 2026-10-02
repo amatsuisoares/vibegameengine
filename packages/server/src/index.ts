@@ -13,3 +13,4 @@ export * from './mcp/server';
 export * from './mcp/workspace';
 export * from './runtime/scenario';
 export * from './inspector';
+export * from './asset-catalog';

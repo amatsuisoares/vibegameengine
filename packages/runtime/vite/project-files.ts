@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { applyInspectorEdit, inspectEntity, InspectorEditSchema, ProjectStore, removeFile, ToolError, writeFileAtomic, type RawProjectData } from '@vibe/server';
+import { applyInspectorEdit, buildAssetCatalog, inspectEntity, InspectorEditSchema, placePrefab, ProjectStore, removeFile, ToolError, writeFileAtomic, type RawProjectData } from '@vibe/server';
 import { EDITOR_SELECTION_FILE, EditorSelectionSchema, LIVE_RUN_FILE } from '@vibe/shared';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -249,6 +249,38 @@ export async function handleInspectRequest(projectsRoot: string, method: string,
     } catch (err) {
       return fail(err);
     }
+  }
+  return jsonResult(405, { error: `Method ${method} not allowed` });
+}
+
+/**
+ * Asset browser of the editor panels:
+ *   GET  /api/projects/<name>/assets                                     -> AssetCatalog
+ *   POST /api/projects/<name>/assets { action: "place", prefab, scene, x, y } -> PlacePrefabResult (a user edit)
+ * Returns null for any other URL.
+ */
+export async function handleAssetsRequest(projectsRoot: string, method: string, url: string, body = ''): Promise<HttpResult | null> {
+  const m = /^\/api\/projects\/([^/]+)\/assets$/.exec(decodeURIComponent(new URL(url, 'http://x').pathname));
+  if (!m) return null;
+  const name = m[1];
+  if (!PROJECT_NAME.test(name) || !existsSync(join(projectsRoot, name, 'project.json'))) {
+    return jsonResult(404, { error: `Project "${name}" not found` });
+  }
+  const store = new ProjectStore(join(projectsRoot, name));
+  if (method === 'GET') return jsonResult(200, buildAssetCatalog(store));
+  if (method === 'POST') {
+    let input: { action?: unknown; prefab?: unknown; scene?: unknown; x?: unknown; y?: unknown };
+    try {
+      input = JSON.parse(body);
+    } catch {
+      return jsonResult(400, { error: 'Body must be JSON' });
+    }
+    const { action, prefab, scene, x, y } = input ?? {};
+    if (action !== 'place' || typeof prefab !== 'string' || typeof scene !== 'string' || !Number.isFinite(x) || !Number.isFinite(y)) {
+      return jsonResult(400, { error: 'Expected { action: "place", prefab, scene, x, y }' });
+    }
+    // Like inspector edits, a rejected placement is an answer (ok: false), not a failed request.
+    return jsonResult(200, await placePrefab(store, scene, prefab, x as number, y as number));
   }
   return jsonResult(405, { error: `Method ${method} not allowed` });
 }

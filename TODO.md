@@ -177,7 +177,7 @@ ficam no projeto. O `meu-pet` valida os sistemas (sem nada específico dele na e
 - [x] 333 testes unitários + 18 e2e
 - [x] **V0.4 concluída**: observação unificada, percepção do mouse, controle do mouse
 
-## V0.5 — Editor amigável (em andamento)
+## ✅ V0.5 — Editor amigável (concluída)
 Complementa o Claude Code (fluxo IA-first continua), sem virar um editor tipo Unity.
 - [x] **Hierarquia**: painel na página do jogo (cenas → entidades, ao vivo na cena atual: criadas, destruídas e
   desativadas marcadas; ícone por tipo; filtro por id/tag/componente/prefab); seleção com contorno no canvas, gravada
@@ -192,8 +192,16 @@ Complementa o Claude Code (fluxo IA-first continua), sem virar um editor tipo Un
   de `get_selection`), arrastar/setas movem (prévia sem tocar a simulação; grava `move` como `user`, uma entrada
   no histórico), gizmos: limites da cena, quadro da câmera do jogo, contorno, cruz da posição com coordenadas e Δ
 - [x] meu-pet: playbooks passando; entidades da cena inicial selecionáveis pelo clique
-- [x] 366 testes unitários + 22 e2e
-- [ ] Asset browser (imagens, spritesheets, áudio, prefabs, scripts)
+- [x] **Asset browser**: painel com abas Imagens, Áudio, Prefabs, Scripts e Não declarados, filtro e miniaturas.
+  - Mostra dimensões, grade de quadros da spritesheet, duração e eventos do áudio (com player), prefabs (prévia,
+    componentes, instâncias, spawns) e código dos scripts (leitura).
+  - Diz onde cada item é usado e mostra avisos (arquivo ausente, quadros que não fecham, não declarados, "não usado").
+  - Ações do usuário: usar a imagem no `Sprite.asset` da seleção e colocar prefab na cena (`create_game_object` como
+    `user`).
+  - Tool `list_assets` com o mesmo catálogo para o agente (filtros `kind`, `id`, `unused`).
+- [x] meu-pet: `list_assets` mostra os 18 assets com dimensões e usos (cenas, prefabs, linhas de script); playbooks
+  passando
+- [x] 373 testes unitários + 23 e2e
 
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.

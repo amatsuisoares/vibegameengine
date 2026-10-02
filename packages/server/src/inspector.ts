@@ -247,3 +247,33 @@ function safeInspect(store: ProjectStore, scene: string, id: string): Inspection
     return undefined;
   }
 }
+
+export type PlacePrefabResult = { ok: true; id: string } | { ok: false; error: string; details?: string[] };
+
+/**
+ * Asset browser: puts an instance of a prefab in a scene at (x, y), as the user, with the first
+ * free id "<prefab>N" (create_game_object: validated, recorded in the history, undoable).
+ */
+export async function placePrefab(store: ProjectStore, scene: string, prefab: string, x: number, y: number): Promise<PlacePrefabResult> {
+  let taken: Set<string>;
+  try {
+    const raw = store.rawProject();
+    if (!raw.prefabs[prefab]) return { ok: false, error: `Prefab "${prefab}" does not exist` };
+    const data = raw.scenes[scene];
+    if (!data) return { ok: false, error: `Scene "${scene}" does not exist` };
+    const list = Array.isArray(obj(data).entities) ? (obj(data).entities as unknown[]) : [];
+    taken = new Set(list.map((e) => String(obj(e).id)));
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  let n = 1;
+  while (taken.has(`${prefab}${n}`)) n++;
+  const id = `${prefab}${n}`;
+  const at = (v: number) => Math.round(v);
+  const r = await createEditingTools().call(
+    'create_game_object',
+    { scene, entity: { id, prefab, transform: { x: at(x), y: at(y) } }, reason: `Asset browser: place prefab ${prefab} as ${id} at (${at(x)}, ${at(y)})` },
+    { store, author: 'user' },
+  );
+  return r.ok ? { ok: true, id } : { ok: false, error: r.error, ...(r.details && { details: r.details }) };
+}

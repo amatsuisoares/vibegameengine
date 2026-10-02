@@ -11,11 +11,13 @@ import {
   loadHtmlImage,
   Runtime,
   SoundPlayer,
+  viewToWorld,
   type AudioBackend,
   type VibeApi,
 } from '@vibe/runtime';
 import { parseProject, type LiveRun, type Project } from '@vibe/shared';
 import { HierarchyPanel, type PanelSelection } from './hierarchy-panel';
+import { AssetPanel } from './asset-panel';
 import { InspectorPanel } from './inspector-panel';
 import { ViewportController } from './viewport-controller';
 
@@ -331,12 +333,71 @@ async function main() {
     const select = (sel: PanelSelection | null) => {
       outline(sel);
       void inspector.show(sel);
+      assets.selectionChanged();
       const req = sel
         ? fetch(selectionUrl, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, ...sel, at: Date.now() }) })
         : fetch(selectionUrl, { method: 'DELETE' });
       req.catch((err) => appendLog('warn', `Could not save the selection: ${err instanceof Error ? err.message : String(err)}`));
     };
     const panel = new HierarchyPanel(panelEl, select);
+    const selectEntity = (scene: string, entity: string) => {
+      panel.setSelection({ scene, entity });
+      select({ scene, entity });
+    };
+    const post = async (url: string, body: unknown) => {
+      try {
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const result = await res.json();
+        return result.ok ? { result, error: null } : { result, error: [result.error, ...(result.details ?? [])].join('\n') };
+      } catch (err) {
+        return { result: null, error: err instanceof Error ? err.message : String(err) };
+      }
+    };
+    // Asset browser: off by default (it takes room under the game).
+    const assetsEl = $<HTMLElement>('assets');
+    const assetsBtn = $<HTMLButtonElement>('toggleAssets');
+    assetsBtn.hidden = false;
+    const assets = new AssetPanel(assetsEl, {
+      project,
+      pixelArt: () => runtime.project.config.pixelArt,
+      scriptSource: (path) => runtime.project.scripts[path],
+      selectedEntity: () => (panel.selected?.entity ? { scene: panel.selected.scene, entity: panel.selected.entity } : null),
+      useOnSelection: async (asset) => {
+        const sel = panel.selected;
+        if (!sel?.entity) return 'Nothing selected';
+        const edit = { action: 'set', section: 'Sprite', key: 'asset', value: asset };
+        return (await post(`/api/projects/${encodeURIComponent(project)}/inspect`, { scene: sel.scene, id: sel.entity, edit })).error;
+      },
+      place: async (prefab) => {
+        // At the center of what is shown: the editor view in edit mode, else the game camera.
+        const { width, height } = runtime.project.config;
+        const view = runtime.editor?.view ?? runtime.game.world.camera;
+        const at = viewToWorld(view, width / 2, height / 2);
+        const scene = runtime.game.world.scene.id;
+        const { result, error } = await post(`/api/projects/${encodeURIComponent(project)}/assets`, { action: 'place', prefab, scene, ...at });
+        if (!error) selectEntity(scene, result.id);
+        return error;
+      },
+      selectEntity,
+    });
+    const showAssets = (on: boolean) => {
+      assetsEl.hidden = !on;
+      assetsBtn.classList.toggle('active', on);
+      if (on) void assets.refresh();
+    };
+    assetsBtn.onclick = () => {
+      showAssets(assetsEl.hidden);
+      try {
+        localStorage.setItem('vibe:assets', assetsEl.hidden ? '0' : '1');
+      } catch {
+        // Remembered for this page only.
+      }
+    };
+    try {
+      showAssets(localStorage.getItem('vibe:assets') === '1');
+    } catch {
+      showAssets(false);
+    }
     if (playing) setupViewport(project, (entity) => {
       const sel = entity ? { scene: runtime.game.world.scene.id, entity } : null;
       panel.setSelection(sel);
@@ -395,7 +456,10 @@ async function main() {
     import.meta.hot?.on('vibe:project-changed', (data: { name: string }) => {
       if (data.name !== project) return;
       clearTimeout(inspectTimer);
-      inspectTimer = setTimeout(() => void inspector.refresh(), 120);
+      inspectTimer = setTimeout(() => {
+        void inspector.refresh();
+        if (!assetsEl.hidden) void assets.refresh();
+      }, 120);
     });
     setInterval(refresh, 250);
     // The previous selection (it survives reloads, like the agent's view of it).

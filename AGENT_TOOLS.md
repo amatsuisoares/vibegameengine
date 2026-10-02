@@ -376,6 +376,7 @@ Implementado na Etapa 8 (`tools/asset-tools.ts`, `sfx.ts`, `engine/src/sound.ts`
 |---|---|---|
 | `import_asset` | `source, id, type?, path?, frameWidth?, frameHeight?, replace?` | copia de um caminho absoluto (png/jpg/gif/webp/svg, wav/mp3/ogg; máx. 20 MB) para `assets/` e declara em `project.json` |
 | `create_sound` | `id, preset, pitch?, duration?, volume?, seed?, replace?` | gera um efeito retrô em `assets/sfx/<id>.wav` (presets: coin, jump, hit, powerup, explosion, blip, laser, win, lose) |
+| `list_assets` | `kind?, id?, unused?` | catálogo (o mesmo do asset browser): assets declarados com tamanho do arquivo, dimensões da imagem, quadros da spritesheet (colunas × linhas), duração do áudio (WAV) e eventos que o tocam; arquivos em `assets/` não declarados; prefabs (componentes, sprite, instâncias); scripts. Cada item diz onde é usado (arquivo + caminho JSON, ou linha do script). `kind`: image, spritesheet, audio, prefab, script, undeclared; `unused: true` = o que nada usa |
 
 - O arquivo binário não entra no histórico; a declaração em `project.json` sim (e é validada: se for recusada, o
   arquivo copiado é removido).
@@ -801,6 +802,28 @@ Implementado na V0.5. Botão **Editar** na barra (só na página jogada, não em
   durante o jogo não estão no arquivo e não podem ser movidas.
 - **Gizmos:** limites da cena (`cena <id> L×A`), o quadro da câmera do jogo, o contorno da seleção, a cruz da posição
   (`x`, `y`) com as coordenadas e, ao arrastar, o deslocamento `Δ`, e o zoom atual.
+
+### Editor: asset browser
+
+Implementado na V0.5. Botão **Assets** na barra: painel embaixo do jogo, com abas **Imagens** (imagens e
+spritesheets), **Áudio**, **Prefabs**, **Scripts** e, se houver, **Não declarados**, e um filtro. Os dados vêm do mesmo
+catálogo de `list_assets`, relido quando os arquivos do projeto mudam.
+
+- **Imagens:** miniatura, tamanho em px, quadros da spritesheet (a prévia mostra a grade com o índice de cada quadro).
+  Avisos para arquivo ausente, extensão errada e imagem que não é um número inteiro de quadros.
+- **Áudio:** duração (WAV), eventos de `config.sounds` que o tocam e um player para ouvir.
+- **Prefabs:** prévia (o primeiro quadro do sprite, ou a forma e a cor), componentes, tags, instâncias (clicar
+  seleciona a entidade) e spawns em regras e scripts.
+- **Scripts:** número de linhas, quem roda o script (`Script.src`) e o código, só para leitura.
+- **Usado em:** cada item lista onde é citado: arquivo + caminho JSON (`entities.pet.components.Sprite.asset`) ou linha
+  de script (o id entre aspas). O que nada usa aparece como "não usado".
+- **Ações (edições do usuário, com histórico e undo):**
+  - **Usar em `<entidade>`** define o `Sprite.asset` da entidade selecionada (mesma edição do inspector, motivo
+    `Inspector: Sprite.asset of coin1 = "hero"`).
+  - **Colocar na cena** cria uma instância do prefab no centro da vista, que é a câmera de edição no modo Editar ou a
+    do jogo fora dele. O id é o primeiro livre `<prefab>N` e o motivo é
+    `Asset browser: place prefab moeda as moeda1 at (400, 225)`. A nova entidade fica selecionada.
+- Importar arquivos continua com o agente (`import_asset`, `create_sound`).
 
 ## Runtime no browser (`window.__vibe`)
 

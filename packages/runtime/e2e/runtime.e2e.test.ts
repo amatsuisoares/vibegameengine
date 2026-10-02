@@ -369,5 +369,57 @@ describe('runtime page (Chromium)', () => {
     expect(errors).toEqual([]);
     await page.close();
   });
+
+  it('browses assets, uses one on the selection and places a prefab, through the store', async () => {
+    cpSync(repo('test-fixtures/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
+    rmSync(`${TMP_PROJECT}/prefabs`, { recursive: true, force: true });
+    rmSync(`${TMP_PROJECT}/.vibe/selection.json`, { force: true });
+    const store = new ProjectStore(TMP_PROJECT);
+    const made = await createEditingTools().call('create_prefab', { id: 'moeda', from: { scene: 'level1', id: 'coin2' }, link: true }, { store, author: 'agent' });
+    expect(made.ok).toBe(true);
+    const { page, errors } = await open('project=e2e-tmp');
+    const panel = page.locator('#assets');
+    await page.locator('#toggleAssets').click();
+
+    // Images: thumbnails of the project files, with size and frames.
+    const hero = panel.locator('[data-key="asset:hero"]');
+    await hero.waitFor({ timeout: 10_000 });
+    await expect.poll(() => hero.textContent()).toContain('4×1 quadros');
+    await expect.poll(() => hero.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+
+    // Use it on the selected entity: a user edit of Sprite.asset.
+    await page.locator('#hierarchy [data-entity="coin1"]').click();
+    await hero.click();
+    const use = panel.locator('[data-action="use"]');
+    await expect.poll(() => use.textContent()).toContain('coin1');
+    await expect.poll(() => panel.locator('.asset-frame').count()).toBe(4);
+    await use.click();
+    const sceneFile = `${TMP_PROJECT}/scenes/level1.json`;
+    const entity = (id: string) => JSON.parse(readFileSync(sceneFile, 'utf8')).entities.find((e: { id: string }) => e.id === id);
+    await expect.poll(() => entity('coin1').components.Sprite.asset, { timeout: 5000 }).toBe('hero');
+    const last = () => JSON.parse(readFileSync(`${TMP_PROJECT}/.vibe/history.jsonl`, 'utf8').trim().split('\n').at(-1)!);
+    expect(last()).toMatchObject({ author: 'user', reason: 'Inspector: Sprite.asset of coin1 = "hero"' });
+
+    // Audio: length, the events that play it, a player.
+    await panel.locator('[data-tab="audio"]').click();
+    const coinSound = panel.locator('[data-key="asset:sfx_coin"]');
+    await expect.poll(() => coinSound.textContent()).toContain('collect');
+    await coinSound.click();
+    await panel.locator('.assets-detail audio').waitFor();
+
+    // Prefabs: place an instance in the scene (selected afterwards).
+    await panel.locator('[data-tab="prefabs"]').click();
+    await panel.locator('[data-key="prefab:moeda"]').click();
+    await panel.locator('[data-action="place"]').click();
+    await expect.poll(() => entity('moeda1')?.prefab, { timeout: 5000 }).toBe('moeda');
+    expect(last()).toMatchObject({ author: 'user', reason: expect.stringMatching(/^Asset browser: place prefab moeda as moeda1/) });
+    await page.waitForFunction(() => window.__vibe!.getState({ ids: ['moeda1'] }).entities.length === 1, undefined, { timeout: 10_000 });
+    await expect.poll(() => JSON.parse(readFileSync(`${TMP_PROJECT}/.vibe/selection.json`, 'utf8')).entity).toBe('moeda1');
+    // The catalog follows the change: two instances now.
+    await expect.poll(() => panel.locator('[data-key="prefab:moeda"]').textContent(), { timeout: 10_000 }).toContain('2 na cena');
+    await page.screenshot({ path: `${RUNS_DIR}/assets.png` });
+    expect(errors).toEqual([]);
+    await page.close();
+  });
 });
 

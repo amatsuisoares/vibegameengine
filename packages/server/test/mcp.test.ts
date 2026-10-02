@@ -44,7 +44,7 @@ describe('MCP server', () => {
     expect(client.getInstructions()).toContain('VibeGameEngine');
     const { tools } = await client.listTools();
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-    expect(tools.length).toBe(63);
+    expect(tools.length).toBe(64);
     for (const name of ['list_projects', 'create_project', 'get_project_summary', 'create_game_object', 'run_game', 'take_screenshot', 'run_test', 'verify_game', 'run_playbooks', 'save_playbook', 'observe', 'get_mouse_target', 'drag_mouse', 'press_mouse', 'release_mouse', 'undo']) {
       expect(byName[name], name).toBeDefined();
     }

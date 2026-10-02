@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite';
-import { handleInspectRequest, handleProjectRequest, handleSaveRequest, handleSelectionRequest, liveRunOfFile, projectOfFile } from './project-files';
+import { handleAssetsRequest, handleInspectRequest, handleProjectRequest, handleSaveRequest, handleSelectionRequest, liveRunOfFile, projectOfFile } from './project-files';
 
 /**
  * Serves project data to the runtime page and tells it when project files change,
@@ -24,7 +24,9 @@ export function vibeProjects(projectsRoot: string): Plugin {
             ? handleSelectionRequest
             : /\/inspect(\?|$)/.test(req.url)
               ? handleInspectRequest
-              : null;
+              : /^\/api\/projects\/[^/]+\/assets(\?|$)/.test(req.url)
+                ? handleAssetsRequest
+                : null;
         if (handler && req.url.startsWith('/api/projects/')) {
           const chunks: Buffer[] = [];
           req.on('data', (c: Buffer) => chunks.push(c));

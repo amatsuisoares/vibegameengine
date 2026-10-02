@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import { basename, dirname, extname, isAbsolute } from 'node:path';
 import { IdSchema, type Asset } from '@vibe/shared';
 import { z } from 'zod';
+import { buildAssetCatalog, type AssetUse } from '../asset-catalog';
 import { normalizeRel, ToolError, type ProjectStore } from '../project-store';
 import { SFX_PRESETS, sfxWav } from '../sfx';
 import { defineTool } from './registry';
@@ -10,6 +11,11 @@ import { changeInfo } from './scene-tools';
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
 const AUDIO_EXT = new Set(['.wav', '.mp3', '.ogg']);
 const MAX_BYTES = 20 * 1024 * 1024;
+/** list_assets shows at most this many uses per item (the total is given). */
+const MAX_USES = 20;
+
+const capUses = <T extends { uses: AssetUse[] }>(e: T) =>
+  e.uses.length > MAX_USES ? { ...e, uses: e.uses.slice(0, MAX_USES), usesTotal: e.uses.length } : e;
 
 type Raw = Record<string, unknown>;
 
@@ -60,6 +66,34 @@ function addAsset(store: ProjectStore, meta: Parameters<ProjectStore['edit']>[0]
 }
 
 export const assetTools = [
+  defineTool({
+    name: 'list_assets',
+    description:
+      'Asset catalog (the same the asset browser of the game page shows): declared assets with file size, image size, spritesheet frames (columns × rows), audio length and the events that play them; files in assets/ not declared in project.json; prefabs (components, sprite, instances); scripts. Each item lists where it is used (file + JSON path, or script line). Filter by kind, id, or unused: true to find what nothing uses.',
+    input: z.object({
+      kind: z.enum(['image', 'spritesheet', 'audio', 'prefab', 'script', 'undeclared']).optional().describe('Only this kind.'),
+      id: z.string().optional().describe('Only the asset / prefab with this id, or the script with this path.'),
+      unused: z.boolean().optional().describe('Only items nothing references (instances count as uses of a prefab).'),
+    }),
+    run: ({ store }, { kind, id, unused }) => {
+      const cat = buildAssetCatalog(store);
+      const keep = (itemId: string, used: boolean) => (id === undefined || itemId === id) && (!unused || !used);
+      const assets = cat.assets.filter((a) => (!kind || kind === a.type) && keep(a.id, a.uses.length > 0 || !!a.events));
+      const prefabs = cat.prefabs.filter((p) => (!kind || kind === 'prefab') && keep(p.id, p.uses.length + p.instances.length > 0));
+      const scripts = cat.scripts.filter((s) => (!kind || kind === 'script') && keep(s.path, s.uses.length > 0));
+      const undeclared = !kind || kind === 'undeclared' ? (id === undefined ? cat.undeclared : cat.undeclared.filter((f) => f.path === id)) : [];
+      const warnings = assets.flatMap((a) => a.warnings.map((w) => `${a.id}: ${w}`));
+      return {
+        counts: { assets: assets.length, prefabs: prefabs.length, scripts: scripts.length, undeclared: undeclared.length },
+        ...(warnings.length && { warnings }),
+        ...(assets.length && { assets: assets.map(capUses) }),
+        ...(undeclared.length && { undeclared, note: 'Undeclared files are not usable by id: declare them in config.assets (modify_project_config) or delete them.' }),
+        ...(prefabs.length && { prefabs: prefabs.map(capUses) }),
+        ...(scripts.length && { scripts: scripts.map(capUses) }),
+      };
+    },
+  }),
+
   defineTool({
     name: 'import_asset',
     description:

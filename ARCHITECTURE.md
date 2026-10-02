@@ -261,6 +261,14 @@ app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶
   selecionada). O movimento é a edição `move { dx, dy }` do inspector (mesma rota, `modify_game_object` como `user`),
   e o hot reload mostra a posição nova. No modo edição o jogo fica pausado, sem input (como em "Seguir agente"), e
   reinicia na cena editada.
+- **Asset browser** (V0.5, `server/src/asset-catalog.ts` + `app/asset-panel.ts`): `buildAssetCatalog(store)` lê os
+  assets declarados e os arquivos. As dimensões saem do cabeçalho (`imageSize`: PNG, GIF, JPEG, WebP, SVG), e a
+  duração do WAV de `wavSeconds`. O catálogo aponta arquivos ausentes, quadros que não fecham e arquivos não
+  declarados, e diz onde cada item é usado. Para isso percorre as strings do JSON de config, cenas e prefabs (ignorando
+  `id`, `name`, `tags`; prefabs só na chave `prefab`, scripts na `src`) e procura o id entre aspas nos scripts. O mesmo
+  catálogo vai ao agente (`list_assets`) e à página (`GET /api/projects/<p>/assets`). A página só mostra e chama
+  edições do usuário: `Sprite.asset` pela rota do inspector e `placePrefab` (`POST .../assets`,
+  `create_game_object` como `user`).
 
 - **Renderização em duas fases.** `buildDrawList(world)` é pura: converte entidades em comandos em
   coordenadas de tela (câmera, zoom, escala, rotação, flip), descarta o que está fora da tela e ordena por
@@ -372,7 +380,7 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 
 ```
 Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
-                                   tools/list  → 3 tools de workspace + 60 do ToolRegistry (com annotations)
+                                   tools/list  → 3 tools de workspace + 61 do ToolRegistry (com annotations)
                                    tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
                                                  → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```

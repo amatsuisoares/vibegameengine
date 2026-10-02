@@ -2,7 +2,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { handleInspectRequest } from '../vite/project-files';
+import { handleAssetsRequest, handleInspectRequest } from '../vite/project-files';
 import { FIXTURES_ROOT } from './helpers';
 
 let root: string;
@@ -59,5 +59,24 @@ describe('inspector route', () => {
     expect((await handleInspectRequest(dir, 'GET', '/api/projects/nope/inspect?scene=a&id=b'))!.status).toBe(404);
     expect((await handleInspectRequest(dir, 'DELETE', '/api/projects/game/inspect'))!.status).toBe(405);
     expect(await handleInspectRequest(dir, 'GET', '/api/projects/game/save')).toBeNull();
+  });
+});
+
+describe('assets route', () => {
+  it('serves the asset catalog and places prefabs as the user', async () => {
+    const dir = copy();
+    const get = await handleAssetsRequest(dir, 'GET', '/api/projects/game/assets');
+    expect(get!.status).toBe(200);
+    expect(body(get).assets.find((a: { id: string }) => a.id === 'hero')).toMatchObject({ width: 96, frames: { count: 4 } });
+
+    const post = (b: unknown) => handleAssetsRequest(dir, 'POST', '/api/projects/game/assets', typeof b === 'string' ? b : JSON.stringify(b));
+    const rejected = await post({ action: 'place', prefab: 'nope', scene: 'level1', x: 1, y: 2 });
+    expect(rejected!.status).toBe(200);
+    expect(body(rejected)).toMatchObject({ ok: false, error: 'Prefab "nope" does not exist' });
+    expect((await post('nope'))!.status).toBe(400);
+    expect((await post({ action: 'place', prefab: 'x', scene: 'level1', x: 'a', y: 0 }))!.status).toBe(400);
+    expect((await handleAssetsRequest(dir, 'DELETE', '/api/projects/game/assets'))!.status).toBe(405);
+    expect((await handleAssetsRequest(dir, 'GET', '/api/projects/nope/assets'))!.status).toBe(404);
+    expect(await handleAssetsRequest(dir, 'GET', '/api/projects/game/inspect')).toBeNull();
   });
 });
