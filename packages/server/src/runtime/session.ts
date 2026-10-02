@@ -10,6 +10,7 @@ import {
   type GameOp,
   type InputStep,
   type LogEntry,
+  type SaveSlot,
 } from '@vibe/engine';
 import type { Project } from '@vibe/shared';
 import { ToolError } from '../project-store';
@@ -27,6 +28,8 @@ export interface SessionOptions {
   clock?: ClockOptions;
   /** Saved data (game.storage) the run starts with. */
   storage?: Record<string, unknown>;
+  /** Save slots the run starts with. */
+  slots?: Record<string, SaveSlot>;
 }
 
 /** What changed since the previous observation; returned after every action so the agent sees effects. */
@@ -66,7 +69,7 @@ export class GameSession {
     readonly options: SessionOptions,
     readonly fingerprint: string,
   ) {
-    this.game = new Game(project, { seed: options.seed, scene: options.scene, clock: options.clock, storage: options.storage });
+    this.game = new Game(project, { seed: options.seed, scene: options.scene, clock: options.clock, storage: options.storage, slots: options.slots });
     this.obsSeq = this.game.console.lastSeq;
   }
 

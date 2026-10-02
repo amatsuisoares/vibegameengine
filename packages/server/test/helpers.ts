@@ -54,7 +54,7 @@ export class FakeScreenshotter extends Screenshotter {
   readonly requests: ShotRequest[] = [];
   override async shoot(req: ShotRequest): Promise<ShotResult> {
     this.requests.push({ ...req, ops: [...req.ops] });
-    const game = Game.fromRaw(req.raw as Parameters<typeof Game.fromRaw>[0], { seed: req.seed, scene: req.scene, clock: req.clock, storage: req.storage });
+    const game = Game.fromRaw(req.raw as Parameters<typeof Game.fromRaw>[0], { seed: req.seed, scene: req.scene, clock: req.clock, storage: req.storage, slots: req.slots as never });
     for (const op of req.ops) game.apply(op);
     return { png: Buffer.from('PNG fake'), state: game.getState(), warnings: [] };
   }

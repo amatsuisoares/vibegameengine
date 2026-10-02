@@ -46,6 +46,12 @@ export class GameStorage {
     this.onChange?.(this.snapshot());
   }
 
+  /** Replaces all the data (loading a save slot). */
+  replace(data: Record<string, unknown>) {
+    this.data = structuredClone(data);
+    this.onChange?.(this.snapshot());
+  }
+
   keys(): string[] {
     return Object.keys(this.data);
   }

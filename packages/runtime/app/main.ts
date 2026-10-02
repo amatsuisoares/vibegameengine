@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { audioVoices, captureHotState, describeHotRestore, Input, restoreHotState, type ClockOptions, type GameOp, type LogEntry } from '@vibe/engine';
+import { audioVoices, captureHotState, describeHotRestore, Input, restoreHotState, type ClockOptions, type GameOp, type LogEntry, type SaveSlot } from '@vibe/engine';
 import {
   AssetStore,
   attachDomInput,
@@ -27,7 +27,7 @@ declare global {
     /** Set when the project could not be loaded, so an external host can report why. */
     __vibeError?: string[];
     /** Set by a host (screenshots) before the page loads: the run's clock and saved data. */
-    __vibeRun?: { clock?: ClockOptions; storage?: Record<string, unknown> };
+    __vibeRun?: { clock?: ClockOptions; storage?: Record<string, unknown>; slots?: Record<string, SaveSlot> };
     /** Follow mode: which agent run is mirrored and how far the replay got. */
     __vibeLive?: () => { runId: string | null; active: boolean; received: number; backlog: number; runFrame?: number };
   }
@@ -202,21 +202,51 @@ async function main() {
     }
     pendingWrite ??= setTimeout(() => flushSave(), 500);
   };
+  // Save slots (game.saveSlot): on disk only (.vibe/slots.json), written soon after each change.
+  const slotsUrl = `/api/projects/${encodeURIComponent(name)}/slots`;
+  let slots: Record<string, SaveSlot> = {};
+  if (playing) {
+    try {
+      const fromDisk = await fetchJson(slotsUrl);
+      if (isObject(fromDisk)) slots = fromDisk as Record<string, SaveSlot>;
+    } catch {
+      appendLog('warn', 'Could not read the save slots; starting without them');
+    }
+  }
+  let pendingSlots: ReturnType<typeof setTimeout> | undefined;
+  const flushSlots = (keepalive = false) => {
+    clearTimeout(pendingSlots);
+    pendingSlots = undefined;
+    fetch(slotsUrl, { method: 'PUT', body: JSON.stringify(slots), headers: { 'Content-Type': 'application/json' }, keepalive }).catch((err) =>
+      appendLog('warn', `Could not save the save slots to disk: ${err instanceof Error ? err.message : String(err)}`),
+    );
+  };
+  const writeSlots = (data: Record<string, SaveSlot>) => {
+    slots = data;
+    pendingSlots ??= setTimeout(() => flushSlots(), 300);
+  };
   // Closing the panel or the browser: write whatever is pending.
-  addEventListener('pagehide', () => pendingWrite !== undefined && flushSave(true));
+  addEventListener('pagehide', () => {
+    if (pendingWrite !== undefined) flushSave(true);
+    if (pendingSlots !== undefined) flushSlots(true);
+  });
   const realClock = (): ClockOptions => ({ start: Date.now(), utcOffsetMinutes: -new Date().getTimezoneOffset() });
   /** Viewport edit mode: the game is paused, gets no input and (re)starts in the scene being edited. */
   let editing = false;
   let editScene: string | undefined;
   let viewport: ViewportController | undefined;
   /** Starts the played game again from the real date and the latest save. */
-  const playStart = () => ({ seed, scene: editScene ?? scene, clock: realClock(), storage: save });
+  const playStart = () => ({ seed, scene: editScene ?? scene, clock: realClock(), storage: save, slots });
   clearSaveBtn.hidden = !playing;
   clearSaveBtn.onclick = async () => {
-    if (!confirm('Apagar os dados salvos deste jogo?')) return;
+    if (!confirm('Apagar os dados salvos e os slots de save deste jogo?')) return;
     clearTimeout(pendingWrite);
     pendingWrite = undefined;
+    clearTimeout(pendingSlots);
+    pendingSlots = undefined;
     save = {};
+    slots = {};
+    await fetch(slotsUrl, { method: 'DELETE' }).catch(() => undefined);
     try {
       localStorage.removeItem(saveKey);
     } catch {
@@ -234,8 +264,9 @@ async function main() {
     assets: loaded.assets,
     seed,
     scene,
-    ...(playing ? { clock: realClock(), storage: save } : (window.__vibeRun ?? {})),
+    ...(playing ? { clock: realClock(), storage: save, slots } : (window.__vibeRun ?? {})),
     onStorageChange: playing ? writeSave : undefined,
+    onSlotsChange: playing ? writeSlots : undefined,
     realtimeClock: playing,
     debug: params.get('debug') === '1',
     paused: follow || params.get('paused') === '1',
@@ -555,7 +586,13 @@ async function main() {
         return;
       }
       if (seq !== liveSeq) return;
-      runtime.setProject(next.project, next.assets, { seed: run.seed, scene: run.scene, clock: run.clock, storage: run.storage });
+      runtime.setProject(next.project, next.assets, {
+        seed: run.seed,
+        scene: run.scene,
+        clock: run.clock,
+        storage: run.storage,
+        slots: run.slots as Record<string, SaveSlot> | undefined,
+      });
       setupSound(next.project);
       logAssetErrors(next.assetErrors);
       canvas.classList.toggle('pixelated', next.project.config.pixelArt);

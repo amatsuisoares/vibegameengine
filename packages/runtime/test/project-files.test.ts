@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseProject } from '@vibe/shared';
@@ -96,6 +96,15 @@ describe('dev server routes', () => {
       expect(handleSaveRequest(root, 'GET', '/api/projects/game')).toBeNull();
       // Saves are runtime data: they do not count as project edits (no hot reload).
       expect(projectOfFile(root, join(root, 'game', '.vibe', 'save.json'))).toBeNull();
+
+      // Save slots live next to it, in their own file (and may be larger).
+      const slots = (method: string, body?: string) => handleSaveRequest(root, method, '/api/projects/game/slots', body)!;
+      expect(slots('PUT', JSON.stringify({ s1: { big: 'x'.repeat(1_100_000) } })).status).toBe(204);
+      expect(existsSync(join(root, 'game', '.vibe', 'slots.json'))).toBe(true);
+      expect(Object.keys(JSON.parse(String(slots('GET').body)))).toEqual(['s1']);
+      expect(JSON.parse(String(call('GET').body))).toBeNull();
+      expect(slots('DELETE').status).toBe(204);
+      expect(JSON.parse(String(slots('GET').body))).toBeNull();
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

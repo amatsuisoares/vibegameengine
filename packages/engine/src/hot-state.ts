@@ -186,16 +186,24 @@ function apply(e: Entity, v: EntityView) {
   e.components = v.components as Entity['components'];
 }
 
-function restoreFsm(e: Entity, fsm: FsmState | undefined) {
+function restoreFsm(e: Entity, fsm: FsmState | undefined, shift = 0) {
   const sm = e.components.StateMachine;
-  if (fsm && sm && fsm.state in sm.states) e.fsm = { ...fsm };
+  if (fsm && sm && fsm.state in sm.states) e.fsm = { ...fsm, since: fsm.since < 0 ? fsm.since : fsm.since + shift };
 }
 
 /**
  * Restores a captured state into a game freshly built from the new project files (before its
  * first step). Returns what was kept, edited, added, removed and dropped.
  */
-export function restoreHotState(game: Game, state: HotState): HotRestoreReport {
+export interface RestoreOptions {
+  /**
+   * Keep the game's clock going forward instead of going back to the captured frame (loading a
+   * save slot): times measured in frames (state machine entry, rule start) are shifted to match.
+   */
+  keepTime?: { frame: number; time: number };
+}
+
+export function restoreHotState(game: Game, state: HotState, options: RestoreOptions = {}): HotRestoreReport {
   const report: HotRestoreReport = { scene: state.scene, kept: 0, edited: [], added: [], removed: [], destroyed: [], spawned: 0, droppedSpawned: [] };
   if (!game.project.scenes[state.scene]) {
     report.sceneMissing = state.scene;
@@ -204,12 +212,13 @@ export function restoreHotState(game: Game, state: HotState): HotRestoreReport {
   }
   if (game.world.scene.id !== state.scene) game.loadScene(state.scene, {});
   const w = game.world;
-  w.frame = state.frame;
-  w.time = state.time;
+  const shift = options.keepTime ? options.keepTime.frame - state.frame : 0;
+  w.frame = options.keepTime?.frame ?? state.frame;
+  w.time = options.keepTime?.time ?? state.time;
   w.rng.position = state.rng;
   Object.assign(w.camera, state.camera);
   w.cameraInitialized = true;
-  game.rules.loadState(state.rules);
+  game.rules.loadState({ ...state.rules, startFrame: state.rules.startFrame + shift });
   w.vars = merge3(state.authoredVars, w.scene.vars ?? {}, state.vars) as Record<string, VarValue>;
   // Variables the files define but the running game did not have yet.
   for (const [k, v] of Object.entries(w.scene.vars ?? {})) if (!(k in w.vars)) w.vars[k] = structuredClone(v);
@@ -227,7 +236,7 @@ export function restoreHotState(game: Game, state: HotState): HotRestoreReport {
       const data = nextData.get(e.id);
       const next = data ? viewOfData(data) : viewOfEntity(e);
       apply(e, merge3(s.authored, next, s.live) as EntityView);
-      restoreFsm(e, s.fsm);
+      restoreFsm(e, s.fsm, shift);
       report.kept++;
       if (!deepEqual(s.authored, next)) report.edited.push(e.id);
     }
@@ -253,7 +262,7 @@ export function restoreHotState(game: Game, state: HotState): HotRestoreReport {
     }
     const e = w.add(new Entity({ id: s.id, ...(s.prefab && { prefab: s.prefab }), tags: [], enabled: true, transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 }, components: {} } as EntityData));
     apply(e, view);
-    restoreFsm(e, s.fsm);
+    restoreFsm(e, s.fsm, shift);
     report.spawned++;
   }
   return report;

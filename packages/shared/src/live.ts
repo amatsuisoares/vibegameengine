@@ -15,6 +15,8 @@ export interface LiveRun {
   /** Clock options and saved data the run started with (see GameClock / GameStorage). */
   clock?: { start?: number | string; utcOffsetMinutes?: number; speed?: number };
   storage?: Record<string, unknown>;
+  /** Save slots the run started with. */
+  slots?: Record<string, unknown>;
   /** Frame of the headless run after the last action (the page should reach it). */
   frame?: number;
   status?: string;

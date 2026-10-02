@@ -3,6 +3,8 @@ import { GameConsole, type LogEntry } from './console';
 import { GameClock, type ClockOptions } from './clock';
 import { Input, type MouseButton } from './input';
 import { GameStorage } from './storage';
+import { captureHotState, restoreHotState } from './hot-state';
+import { checkSlotName, GameSaves, type SaveSlot, type SlotHost, type SlotInfo } from './saves';
 import { round2 } from './math';
 import { Rng } from './rng';
 import { animationSystem, animFrameIndex } from './systems/animation';
@@ -38,6 +40,10 @@ export interface GameOptions {
   storage?: Record<string, unknown>;
   /** Called after every change to game.storage (e.g. to persist it in the browser). */
   onStorageChange?: (data: Record<string, unknown>) => void;
+  /** Save slots the game starts with (saveSlot / loadSlot). */
+  slots?: Record<string, SaveSlot>;
+  /** Called after every change to the save slots. */
+  onSlotsChange?: (slots: Record<string, SaveSlot>) => void;
 }
 
 /** One scripted input action. Time is simulated: `wait` advances fixed frames, not wall-clock time. */
@@ -196,6 +202,8 @@ export interface GameState {
   clock: ReturnType<GameClock['snapshot']>;
   /** Saved data (only when requested with `storage: true`). */
   storage?: Record<string, unknown>;
+  /** Save slots (name, label, game time saved, scene), when there are any. */
+  slots?: SlotInfo[];
 }
 
 /** An entity's box in viewport pixels (top-left, size). */
@@ -225,13 +233,17 @@ export const msToFrames = (ms: number) => Math.max(0, Math.round((ms / 1000) / F
  * Headless-capable game instance. Owns the simulation; rendering is done by
  * whoever reads `world` (browser renderer, screenshot tool) and never affects state.
  */
-export class Game {
+export class Game implements SlotHost {
   readonly project: Project;
   readonly input: Input;
   readonly console: GameConsole;
   world!: World;
   readonly clock: GameClock;
   readonly storage: GameStorage;
+  /** Save slots (named snapshots of the game + its storage). */
+  readonly saves: GameSaves;
+  /** Slot to load at the end of the current frame. */
+  private pendingSlot: string | null = null;
   private readonly seed: number;
   private readonly scripts: ScriptLibrary;
   private scriptRunner!: ScriptRunner;
@@ -257,6 +269,7 @@ export class Game {
     this.console = new GameConsole(1000, options.onLog);
     this.clock = new GameClock(options.clock);
     this.storage = new GameStorage(options.storage, options.onStorageChange);
+    this.saves = new GameSaves(options.slots, options.onSlotsChange);
     this.scripts = new ScriptLibrary(project.scripts ?? {});
     this.loadScene(options.scene ?? project.config.startScene, {});
   }
@@ -283,6 +296,7 @@ export class Game {
     const vars = { score: 0, ...structuredClone(scene.vars), ...carryVars };
     this.world = new World(this.project.config, structuredClone(scene), this.input, this.console, new Rng(this.seed), vars);
     this.world.prefabs = this.project.prefabs ?? {};
+    this.world.slots = this;
     this.world.particles.reseed(this.seed);
     this.world.frame = prevFrame;
     this.world.time = prevTime;
@@ -303,6 +317,55 @@ export class Game {
     cameraSystem(this.world);
   }
 
+  /**
+   * Saves the game in a slot: its running state (scene, positions, variables, entities...) and a
+   * copy of game.storage. Overwrites a slot with the same name. Emits "slot_saved".
+   */
+  saveSlot(name: string, label?: string) {
+    const n = checkSlotName(name);
+    if (label !== undefined && typeof label !== 'string') throw new Error('saveSlot(name, label): label must be a string');
+    const state = captureHotState(this);
+    // Only the prefabs of spawned entities are needed to restore them.
+    const used = new Set(state.entities.filter((e) => !e.authored && e.prefab).map((e) => e.prefab!));
+    state.prefabs = Object.fromEntries(Object.entries(state.prefabs).filter(([id]) => used.has(id)));
+    this.saves.put(n, { version: 1, ...(label && { label }), savedAt: this.clock.now, scene: this.world.scene.id, storage: this.storage.snapshot(), state });
+    this.world.emit('slot_saved', { slot: n });
+  }
+
+  /** Loads a slot at the end of the current frame (like loadScene). False when there is no such slot. */
+  loadSlot(name: string): boolean {
+    const n = checkSlotName(name);
+    if (!this.saves.get(n)) return false;
+    this.pendingSlot = n;
+    return true;
+  }
+
+  deleteSlot(name: string): boolean {
+    const deleted = this.saves.delete(name);
+    if (deleted) this.world.emit('slot_deleted', { slot: name });
+    return deleted;
+  }
+
+  listSlots(): SlotInfo[] {
+    return this.saves.list();
+  }
+
+  /**
+   * Restores a slot now: storage replaced, the scene rebuilt from the current files and the saved
+   * state restored into it (file edits made since the save win, as in a hot reload). Game time
+   * keeps going forward: the frame counter does not jump back.
+   */
+  private applySlot(name: string) {
+    const slot = this.saves.get(name)!;
+    const now = { frame: this.world.frame, time: this.world.time };
+    this.storage.replace(slot.storage);
+    const scene = this.project.scenes[slot.scene] ? slot.scene : this.world.scene.id;
+    this.loadScene(scene, {});
+    const report = restoreHotState(this, slot.state, { keepTime: now });
+    this.world.emit('slot_loaded', { slot: name, scene: this.world.scene.id });
+    this.console.log(`Slot "${name}" loaded (${report.kept} entities${report.sceneMissing ? `; scene "${report.sceneMissing}" no longer exists` : ''})`, 'engine');
+  }
+
   /** The current scene's rule runner (its memory is kept by a hot reload). */
   get rules(): RuleRunner {
     return this.ruleRunner;
@@ -315,6 +378,8 @@ export class Game {
     this.world = undefined as unknown as World;
     this.clock.reset();
     this.storage.reset();
+    this.saves.reset();
+    this.pendingSlot = null;
     this.console.log('Game restarted', 'engine');
     this.loadScene(this.options.scene ?? this.project.config.startScene, {});
   }
@@ -382,6 +447,11 @@ export class Game {
       const next = w.pendingScene;
       w.pendingScene = null;
       this.loadScene(next);
+    }
+    if (this.pendingSlot) {
+      const name = this.pendingSlot;
+      this.pendingSlot = null;
+      this.applySlot(name);
     }
   }
 
@@ -514,6 +584,7 @@ export class Game {
       }),
       clock: this.clock.snapshot(),
       ...(query.storage && { storage: this.storage.snapshot() }),
+      ...(this.saves.list().length && { slots: this.saves.list() }),
     };
   }
 }

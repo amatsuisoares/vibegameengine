@@ -122,32 +122,35 @@ export function handleProjectRequest(projectsRoot: string, url: string): HttpRes
   return null;
 }
 
-/** Where a played game keeps its saved data (game.storage) on disk. */
+/** Where a played game keeps its saved data (game.storage) and its save slots on disk. */
 export const SAVE_FILE = '.vibe/save.json';
+export const SLOTS_FILE = '.vibe/slots.json';
 export const MAX_SAVE_BYTES = 1024 * 1024;
+const MAX_SLOTS_FILE_BYTES = 3 * 1024 * 1024;
 
 /**
- * Saved data of a played game, kept on disk so it survives closing the browser (the
- * VS Code Simple Browser does not keep localStorage between sessions):
- *   GET    /api/projects/<name>/save -> the saved object, or null
- *   PUT    /api/projects/<name>/save -> stores a JSON object (204)
- *   DELETE /api/projects/<name>/save -> removes it (204)
+ * Saved data and save slots of a played game, kept on disk so they survive closing the browser
+ * (the VS Code Simple Browser does not keep localStorage between sessions):
+ *   GET    /api/projects/<name>/save|slots -> the saved object, or null
+ *   PUT    /api/projects/<name>/save|slots -> stores a JSON object (204)
+ *   DELETE /api/projects/<name>/save|slots -> removes it (204)
  * Returns null for any other URL.
  */
 export function handleSaveRequest(projectsRoot: string, method: string, url: string, body = ''): HttpResult | null {
-  const m = /^\/api\/projects\/([^/]+)\/save$/.exec(decodeURIComponent(new URL(url, 'http://x').pathname));
+  const m = /^\/api\/projects\/([^/]+)\/(save|slots)$/.exec(decodeURIComponent(new URL(url, 'http://x').pathname));
   if (!m) return null;
   const name = m[1];
+  const max = m[2] === 'save' ? MAX_SAVE_BYTES : MAX_SLOTS_FILE_BYTES;
   if (!PROJECT_NAME.test(name) || !existsSync(join(projectsRoot, name, 'project.json'))) {
     return jsonResult(404, { error: `Project "${name}" not found` });
   }
-  const file = join(projectsRoot, name, SAVE_FILE);
+  const file = join(projectsRoot, name, m[2] === 'save' ? SAVE_FILE : SLOTS_FILE);
   if (method === 'GET') {
     if (!existsSync(file)) return jsonResult(200, null);
     return { status: 200, type: 'application/json; charset=utf-8', body: readFileSync(file, 'utf8') };
   }
   if (method === 'PUT' || method === 'POST') {
-    if (body.length > MAX_SAVE_BYTES) return jsonResult(413, { error: `Save is too large (max ${MAX_SAVE_BYTES} bytes)` });
+    if (body.length > max) return jsonResult(413, { error: `Save is too large (max ${max} bytes)` });
     let data: unknown;
     try {
       data = JSON.parse(body);

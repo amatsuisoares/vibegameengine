@@ -235,6 +235,47 @@ describe('runtime page (Chromium)', () => {
     await page.close();
   });
 
+  it('saves slots to disk from the played game and loads them back', async () => {
+    cpSync(repo('test-fixtures/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
+    rmSync(`${TMP_PROJECT}/.vibe/slots.json`, { force: true });
+    const store = new ProjectStore(TMP_PROJECT);
+    const tools = createEditingTools();
+    // A save point at the start; collecting the first coin goes back to it (load).
+    for (const rule of [
+      { id: 'savePoint', when: { start: true }, do: [{ action: 'saveSlot', slot: 'inicio', label: 'Começo' }] },
+      { id: 'back', when: { expr: 'vars.coins >= 1' }, do: [{ action: 'loadSlot', slot: 'inicio' }] },
+    ]) {
+      expect((await tools.call('set_rule', { scene: 'level1', rule }, { store, author: 'agent' })).ok).toBe(true);
+    }
+    const { page, errors } = await open('project=e2e-tmp');
+    const slotsFile = `${TMP_PROJECT}/.vibe/slots.json`;
+    await expect.poll(() => existsSync(slotsFile), { timeout: 10_000 }).toBe(true);
+    const onDisk = JSON.parse(readFileSync(slotsFile, 'utf8'));
+    expect(onDisk.inicio).toMatchObject({ version: 1, label: 'Começo', scene: 'level1' });
+
+    const result = await vibe(page, (v) => {
+      v.pause();
+      const start = v.getState({ ids: ['player'] }).entities[0].x;
+      v.apply([{ op: 'keyDown', key: 'ArrowRight' }]);
+      let loaded = false;
+      for (let i = 0; i < 400 && !loaded; i++) {
+        v.step(1);
+        loaded = v.events(0, 'slot_loaded').length > 0;
+      }
+      v.apply([{ op: 'keyUp', key: 'ArrowRight' }]);
+      const s = v.getState({ ids: ['player', 'coin1'] });
+      return { loaded, start, x: s.entities[0].x, coins: s.vars.coins, ids: s.entities.map((e) => e.id), slots: s.slots };
+    });
+    // Back at the save point: the coin is there again and the counter is 0.
+    expect(result).toMatchObject({ loaded: true, coins: 0, ids: ['player', 'coin1'] });
+    expect(result.x).toBeLessThan(result.start + 10);
+    expect(result.slots).toEqual([expect.objectContaining({ name: 'inicio', label: 'Começo' })]);
+    expect(errors).toEqual([]);
+    await page.close();
+    // The rules are only for this test.
+    for (const id of ['savePoint', 'back']) await tools.call('delete_rule', { scene: 'level1', id }, { store, author: 'agent' });
+  });
+
   it('hot-reloads when project files change and reports invalid edits', async () => {
     const { page } = await open('project=e2e-tmp&paused=1');
     const sceneFile = `${TMP_PROJECT}/scenes/level1.json`;

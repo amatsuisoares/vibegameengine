@@ -181,6 +181,15 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   (`GET/PUT/DELETE /api/projects/<p>/save` → `.vibe/save.json`, gravação adiada 0,5 s e garantida no `pagehide`), com
   cópia no `localStorage`; se frames forem pulados (aba em segundo plano), soma o tempo perdido com `advanceClock`
   (`realtimeClock`).
+- **Save slots** (V0.6, `engine/src/saves.ts`):
+  - Formato: `GameSaves` guarda `SaveSlot { version, label?, savedAt, scene, storage, state }`, onde `state` é o
+    `captureHotState` só com os prefabs das entidades criadas em jogo.
+  - Carregar: `Game.loadSlot` só marca o pedido; no fim do frame, `applySlot` substitui o storage
+    (`GameStorage.replace`), refaz a cena e chama `restoreHotState(..., { keepTime })`. O frame continua avançando, e
+    os tempos medidos em frames (entrada na FSM, início das regras) são deslocados.
+  - Hosts: como o `storage`, vem de `GameOptions.slots` e as mudanças saem por `onSlotsChange`. A página grava em
+    `.vibe/slots.json` (`/api/projects/<p>/slots`). As runs do agente, o screenshot e o modo seguir recebem os mesmos
+    slots (determinismo). `restart` volta aos slots iniciais.
 - **Mouse e texto:** o clique esquerdo vai para a entidade de cima sob o ponto onde o botão desceu (posição guardada no
   pressionamento, não a atual) e gera o evento `click`. Texto digitado chega como op `text` (com `\b`/`\n` em ordem).
 - **Clique em entidade:** `Game.expand({type: 'click', entity})` mira o centro da caixa da entidade na tela no momento

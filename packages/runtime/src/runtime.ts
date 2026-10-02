@@ -1,4 +1,4 @@
-import { FIXED_DT, Game, type ClockOptions, type GameEvent, type LogEntry, type World } from '@vibe/engine';
+import { FIXED_DT, Game, type ClockOptions, type GameEvent, type LogEntry, type SaveSlot, type World } from '@vibe/engine';
 import type { Project } from '@vibe/shared';
 import { FixedLoop } from './loop';
 import { buildDrawList, paint, paintDebug, paintSelection, paintStatusOverlay, type AssetResolver } from './render';
@@ -20,6 +20,7 @@ export interface StartOptions {
   scene?: string;
   clock?: ClockOptions;
   storage?: Record<string, unknown>;
+  slots?: Record<string, SaveSlot>;
 }
 
 /** Real-time gaps longer than this (ms) are treated as skipped frames and added to the game clock. */
@@ -51,6 +52,9 @@ export interface RuntimeOptions {
   clock?: ClockOptions;
   storage?: Record<string, unknown>;
   onStorageChange?: (data: Record<string, unknown>) => void;
+  /** Save slots of the game and where their changes go (see GameSaves). */
+  slots?: Record<string, SaveSlot>;
+  onSlotsChange?: (slots: Record<string, SaveSlot>) => void;
   /**
    * Keep the game clock in step with the real clock: when frames are skipped (background tab,
    * sleep), the missing time is added with an advanceClock op instead of being lost.
@@ -95,7 +99,7 @@ export class Runtime {
     this.debug = options.debug ?? false;
     this._paused = options.paused ?? false;
     this.scheduler = options.scheduler ?? animationFrames;
-    this.startAt = { seed: options.seed, scene: options.scene, clock: options.clock, storage: options.storage };
+    this.startAt = { seed: options.seed, scene: options.scene, clock: options.clock, storage: options.storage, slots: options.slots };
     this.loop = new FixedLoop((frames) => this.game.step(frames));
     this.setProject(project, options.assets);
   }
@@ -111,7 +115,12 @@ export class Runtime {
     this.canvas.width = project.config.width;
     this.canvas.height = project.config.height;
     this.reportedAssetErrors.clear();
-    this.game = new Game(project, { ...this.startAt, onLog: this.options.onLog, onStorageChange: this.options.onStorageChange });
+    this.game = new Game(project, {
+      ...this.startAt,
+      onLog: this.options.onLog,
+      onStorageChange: this.options.onStorageChange,
+      onSlotsChange: this.options.onSlotsChange,
+    });
     this.loop.reset();
     this.render();
   }

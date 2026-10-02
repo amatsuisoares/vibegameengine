@@ -50,7 +50,7 @@ export class RuntimeHost {
     return new GameSession(
       raw,
       status.project,
-      { seed: options.seed ?? 1, scene: options.scene, clock: options.clock, storage: options.storage },
+      { seed: options.seed ?? 1, scene: options.scene, clock: options.clock, storage: options.storage, slots: options.slots },
       fingerprint(raw),
     );
   }
@@ -77,6 +77,7 @@ export class RuntimeHost {
           ...(s.options.scene && { scene: s.options.scene }),
           ...(s.options.clock && { clock: s.options.clock }),
           ...(s.options.storage && { storage: s.options.storage }),
+          ...(s.options.slots && { slots: s.options.slots }),
           frame: s.game.frame,
           status: s.game.status,
           raw: s.raw,
@@ -121,6 +122,7 @@ export class RuntimeHost {
       scene: s.options.scene,
       clock: s.options.clock,
       storage: s.options.storage,
+      slots: s.options.slots,
       ops: s.ops,
       annotate,
     });

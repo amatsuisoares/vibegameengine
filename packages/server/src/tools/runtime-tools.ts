@@ -1,4 +1,4 @@
-import { msToFrames, screenToWorld } from '@vibe/engine';
+import { msToFrames, screenToWorld, type SaveSlot } from '@vibe/engine';
 import {
   AdvanceClockStepSchema,
   AssertStepSchema,
@@ -6,6 +6,7 @@ import {
   ExprSchema,
   InputStepSchema,
   MAX_WAIT_MS,
+  SlotsInputSchema,
   StorageInputSchema,
   WaitUntilStepSchema,
 } from '@vibe/shared';
@@ -22,6 +23,7 @@ const Ms = (max: number) => z.number().min(0).max(max);
 const Expr = ExprSchema;
 const ClockInput = ClockInputSchema;
 const StorageInput = StorageInputSchema;
+const SlotsInput = SlotsInputSchema;
 const TestStepSchema = z.union([InputStepSchema, WaitUntilStepSchema, AssertStepSchema, AdvanceClockStepSchema]);
 
 export function host(ctx: ToolContext): RuntimeHost {
@@ -55,9 +57,10 @@ export const runtimeTools = [
       seed: z.number().int().optional().describe('Random seed (default 1).'),
       clock: ClockInput.optional(),
       storage: StorageInput.optional(),
+      slots: SlotsInput.optional(),
     }),
-    run: (ctx, { scene, seed, clock, storage }) => {
-      const s = host(ctx).run({ scene, seed, clock, storage });
+    run: (ctx, { scene, seed, clock, storage, slots }) => {
+      const s = host(ctx).run({ scene, seed, clock, storage, slots: slots as Record<string, SaveSlot> | undefined });
       const cfg = s.project.config;
       return observe(ctx, { runId: s.id, viewport: { width: cfg.width, height: cfg.height }, entityCount: s.game.world.entities.length });
     },
@@ -399,9 +402,10 @@ export const runtimeTools = [
       seed: z.number().int().optional(),
       clock: ClockInput.optional(),
       storage: StorageInput.optional(),
+      slots: SlotsInput.optional(),
     }),
-    run: async (ctx, { steps, assertions, scene, seed, clock, storage }) => {
-      const s = host(ctx).newSession({ scene, seed, clock, storage });
+    run: async (ctx, { steps, assertions, scene, seed, clock, storage, slots }) => {
+      const s = host(ctx).newSession({ scene, seed, clock, storage, slots: slots as Record<string, SaveSlot> | undefined });
       const game = s.game;
       const { checks } = await runScenario(s, steps, assertions.map((expr) => ({ expr })));
       const final = game.getState({ tags: ['player'] });

@@ -17,7 +17,7 @@ export const ExprSchema = z
   .string()
   .min(1)
   .describe(
-    "Expression over the game state, e.g. \"entity('player').x > 300 && vars.coins >= 1\". Names: status, frame, time, scene, vars, camera, clock (clock.hour, clock.now), mouse (x, y, worldX, worldY, target, hovered). Functions: entity(id) (x, y, vx, vy, grounded, health, state, stateMs, ai, props, anim, nav, timers, tweens, interactable...), exists(id), count(tag), events(type), distance(a, b), pathDistance(a, b) (null = unreachable), abs, min, max, clamp(x, lo, hi).",
+    "Expression over the game state, e.g. \"entity('player').x > 300 && vars.coins >= 1\". Names: status, frame, time, scene, vars, camera, clock (clock.hour, clock.now), mouse (x, y, worldX, worldY, target, hovered). Functions: entity(id) (x, y, vx, vy, grounded, health, state, stateMs, ai, props, anim, nav, timers, tweens, interactable, audio...), exists(id), hasSlot(name), count(tag), events(type), distance(a, b), pathDistance(a, b) (null = unreachable), abs, min, max, clamp(x, lo, hi).",
   );
 
 const EntityRef = z.string().describe('Entity id: aims at the center of the entity on screen, wherever it is.');
@@ -70,6 +70,17 @@ export const ClockInputSchema = z
   })
   .describe('Calendar clock of the run (game.clock in scripts, clock in expressions).');
 export const StorageInputSchema = z.record(z.string(), z.unknown()).describe('Saved data the game starts with (game.storage), e.g. a save from a previous session.');
+/** One save slot as the engine stores it (saveSlot): checked loosely, the engine restores what it can. */
+export const SaveSlotInputSchema = z.looseObject({
+  version: z.literal(1),
+  savedAt: z.number(),
+  scene: z.string(),
+  storage: z.record(z.string(), z.unknown()),
+  state: z.record(z.string(), z.unknown()),
+});
+export const SlotsInputSchema = z
+  .record(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/), SaveSlotInputSchema)
+  .describe('Save slots the game starts with (as saved by game.saveSlot / the saveSlot action), by name.');
 
 /** Expression-only check steps (run_test). */
 export const WaitUntilStepSchema = z.object({ type: z.literal('waitUntil'), expr: ExprSchema, maxMs: Ms(MAX_WAIT_MS).optional().describe('Default 5000.') });
@@ -125,6 +136,7 @@ export const PlaybookSchema = z.object({
   seed: z.number().int().optional(),
   clock: ClockInputSchema.optional(),
   storage: StorageInputSchema.optional(),
+  slots: SlotsInputSchema.optional(),
 });
 
 export type Playbook = z.output<typeof PlaybookSchema>;

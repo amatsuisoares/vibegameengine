@@ -11,6 +11,7 @@ import { aiOf, type UtilityRunner } from './utility';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
 import type { GameStorage } from './storage';
+import type { SlotHost, SlotInfo } from './saves';
 import { screenToWorld } from './systems/camera';
 import { applyDamage } from './systems/interactions';
 import { FIXED_DT, type GameEvent, type World } from './world';
@@ -47,7 +48,7 @@ export interface ScriptHooks {
 const HOOKS = ['onStart', 'onUpdate', 'onCollision', 'onClick', 'onEvent', 'onInteract', 'onStateChange', 'onDecision'] as const;
 
 /** What scripts reach beyond the world: the calendar clock, the saved data, interactions and state machines. */
-export interface ScriptHost {
+export interface ScriptHost extends SlotHost {
   clock: GameClock;
   storage: GameStorage;
   readonly interactions: InteractionRunner;
@@ -262,6 +263,13 @@ export interface ScriptGame {
   readonly clock: { readonly now: number; readonly hour: number; readonly iso: string; speed: number };
   /** Saved data that survives closing the game (JSON values). */
   readonly storage: { get(key: string): unknown; set(key: string, value: unknown): void; remove(key: string): void; keys(): string[] };
+  /** Saves the whole game (state + storage) in a named slot (overwrites it). */
+  saveSlot(name: string, label?: string): void;
+  /** Loads a slot at the end of this frame; false when it does not exist. */
+  loadSlot(name: string): boolean;
+  deleteSlot(name: string): boolean;
+  /** Slots: name, label, savedAt (game clock ms), scene. */
+  listSlots(): SlotInfo[];
   /** Topmost entity whose box contains the world point (x, y), or null. */
   entityAt(x: number, y: number): ScriptEntity | null;
   /** Custom gameplay event: shows up in read_events / events('type'). */
@@ -389,6 +397,10 @@ class ScriptApi {
         remove: (k) => storage.remove(k),
         keys: () => storage.keys(),
       },
+      saveSlot: (name, label) => host.saveSlot(name, label),
+      loadSlot: (name) => host.loadSlot(name),
+      deleteSlot: (name) => host.deleteSlot(name),
+      listSlots: () => host.listSlots(),
       entityAt: (x, y) => {
         const e = topmostAt(w, x, y, () => true);
         return e ? this.entity(e) : null;

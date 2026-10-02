@@ -47,6 +47,9 @@ export const TweenFields = {
   repeat: z.number().int().min(-1).default(0).describe('Extra passes (or round trips with yoyo); -1 = forever.'),
 };
 
+/** Save slot name (saveSlot / loadSlot / deleteSlot). */
+const SlotName = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/, '1-40 letters, digits, "_" or "-"');
+
 /** Actions that run at once (also the ones an "after" action can delay). */
 const immediateActions = [
   z.strictObject({ action: z.literal('setVar'), var: z.string().min(1), value: Value }),
@@ -75,6 +78,9 @@ const immediateActions = [
     count: z.number().int().min(1).max(500).optional().describe("Particles (default: the emitter's burst, or 10)."),
   }),
   z.strictObject({ action: z.literal('playSound'), asset: z.string().min(1), volume: z.number().min(0).max(1).default(1) }),
+  z.strictObject({ action: z.literal('saveSlot'), slot: SlotName, label: z.string().optional().describe('Shown in slot lists, e.g. "Fase 2".') }),
+  z.strictObject({ action: z.literal('loadSlot'), slot: SlotName.describe('Loaded at the end of the frame; nothing happens (a log line) if it does not exist.') }),
+  z.strictObject({ action: z.literal('deleteSlot'), slot: SlotName }),
   z.strictObject({
     action: z.literal('spawn'),
     prefab: z.string().min(1),

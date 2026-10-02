@@ -10,7 +10,7 @@ import { screenToWorld } from './systems/camera';
  *
  *   literals     12  1.5  'text'  "text"  true  false  null
  *   names        status  frame  time  scene  vars  camera  clock  mouse  self (StateMachine/Interactable conditions)
- *   functions    entity(id) exists(id) count(tag) events(type) distance(a,b) pathDistance(a,b) abs(x) min(a,b) max(a,b) clamp(x,lo,hi)
+ *   functions    entity(id) exists(id) hasSlot(name) count(tag) events(type) distance(a,b) pathDistance(a,b) abs(x) min(a,b) max(a,b) clamp(x,lo,hi)
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
  * Field access on null yields null (the assertion then fails and shows the null).
  */
@@ -218,6 +218,9 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'exists':
           arity(1);
           return typeof args[0] === 'string' && game.entity(args[0]) !== undefined;
+        case 'hasSlot':
+          arity(1);
+          return typeof args[0] === 'string' && game.listSlots().some((s) => s.name === args[0]);
         case 'count':
           arity(1);
           return game.world.withTag(String(args[0])).length;
@@ -255,7 +258,7 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'max':
           return Math.max(...args.map(Number));
         default:
-          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, count, events, distance, pathDistance, abs, min, max, clamp)`, src);
+          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp)`, src);
       }
     }
     case 'unary': {

@@ -100,7 +100,8 @@ script: `quando → se → faça`, guardada em `rules` da cena e avaliada todo f
 Ações: `setVar {var, value}`, `addVar {var, amount}`, `emit {event, data?}`, `win`, `lose`, `loadScene {scene}`,
 `destroy {target}`, `setEnabled {target, enabled}`, `setText {target, text}`, `damage {target, amount}`,
 `heal {target, amount}`, `move {target, x?, y?}`, `modify {target, component, set}`, `log {message}`,
-`playSound {asset, volume?}`, `spawn {prefab, x?, y?, at?, id?}`, `after {ms, do: [ações], id?}` (roda as ações
+`playSound {asset, volume?}`, `spawn {prefab, x?, y?, at?, id?}`, `saveSlot {slot, label?}`, `loadSlot {slot}`,
+`deleteSlot {slot}` (slots de save; ver [Save slots](#save-slots)), `after {ms, do: [ações], id?}` (roda as ações
 depois de um tempo; ver [Timers](#timers)), `cancelTimer {id}`, `tween {target, prop, to, ms, from?, ease?, yoyo?,
 repeat?}` (ver [Tweens](#tweens)), `burst {target, count?}` (rajada de partículas; ver [Partículas](#partículas-particleemitter)).
 `target` é um id, `"$by"` (quem entrou na zona, ou o `by`/`entity` do evento) ou `"$entity"` (a zona, ou o `entity`
@@ -453,6 +454,31 @@ function onCollision(self, other, game) {
   sessões), com cópia no `localStorage`; sobrevivem a fechar o jogo e o VS Code; botão **Apagar save** na barra. Nas
   runs começam de `run_game.storage`. Para tempo
   offline: salve `clock.now` e, no `onStart`, compare com o relógio atual.
+
+#### Save slots
+
+Implementado na V0.6. São opcionais: um jogo que não salva slot funciona como antes.
+
+- **Conteúdo:** um slot é uma fotografia nomeada do jogo. Guarda o estado em andamento (cena, posições, variáveis,
+  vida, `props`, estado da máquina de estados, entidades destruídas ou criadas, memória das regras) e uma cópia do
+  `game.storage`.
+- **Scripts:**
+  - `game.saveSlot(nome, label?)` salva e sobrescreve um slot com o mesmo nome;
+  - `game.loadSlot(nome)` carrega no fim do frame e devolve `false` se o slot não existe;
+  - `game.deleteSlot(nome)`;
+  - `game.listSlots()` devolve `[{name, label?, savedAt, scene}]`, com `savedAt` em ms do relógio do jogo.
+- **Regras e expressões:** ações `saveSlot`, `loadSlot` e `deleteSlot`, e a expressão `hasSlot('nome')`. Exemplo de
+  "continuar": `{"when": {"start": true}, "if": "hasSlot('auto')", "do": [{"action": "loadSlot", "slot": "auto"}]}`.
+- **Carregar:**
+  - Repõe o `storage` e restaura o estado sobre a cena atual dos arquivos. O que foi editado nos arquivos depois do
+    save vale a edição, como no hot reload.
+  - O frame não volta: o tempo de jogo segue.
+  - Timers, tweens e o `self.state` dos scripts recomeçam; o `onStart` roda de novo.
+- **Eventos:** `slot_saved`, `slot_loaded` e `slot_deleted`. `inspect_game_state` lista `slots`.
+- **Limites:** nomes de 1 a 40 letras, dígitos, `_` ou `-`; até 20 slots e 2 MB.
+- **Onde ficam:** no browser jogado, em `projects/<nome>/.vibe/slots.json`; o botão **Apagar save** também os apaga.
+  Nas runs do agente, começam de `run_game.slots`, `run_test.slots` ou `verify_game.slots`, e o screenshot e o modo
+  seguir usam os mesmos.
 - Entidades com a tag `clickable` (sem script) também recebem clique: gera o evento `click {entity}` para regras.
 - `game.interact(alvo, ator?)` e `game.nearbyInteractables(ator)`: ver [Interações](#interações-interactable).
 - `self.fsm` (`state, previous, time, is(...), go(estado)`): ver [Máquinas de estado](#máquinas-de-estado-statemachine).
@@ -485,7 +511,7 @@ reproduzir a run no Chromium para o screenshot.
 
 | Tool | Parâmetros | Retorno / observação |
 |---|---|---|
-| `run_game` | `scene?, seed?, clock?, storage?` | nova run com o projeto atual (substitui a anterior); `clock` = `{start, utcOffsetMinutes, speed}`, `storage` = dados salvos iniciais |
+| `run_game` | `scene?, seed?, clock?, storage?, slots?` | nova run com o projeto atual (substitui a anterior); `clock` = `{start, utcOffsetMinutes, speed}`, `storage` = dados salvos iniciais, `slots` = slots de save iniciais (como `game.saveSlot` grava) |
 | `restart_game` | — | recomeça com os **arquivos atuais** (mesma cena/seed) — use depois de editar |
 | `stop_game` | — | encerra a run |
 | `press_key` / `release_key` | `key` | tecla fica pressionada até soltar; não avança o tempo |

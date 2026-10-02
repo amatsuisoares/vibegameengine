@@ -18,7 +18,7 @@ export function vibeProjects(projectsRoot: string): Plugin {
       };
       server.middlewares.use((req, res, next) => {
         if (!req.url) return next();
-        const handler = /\/save(\?|$)/.test(req.url)
+        const handler = /\/(save|slots)(\?|$)/.test(req.url)
           ? handleSaveRequest
           : /\/selection(\?|$)/.test(req.url)
             ? handleSelectionRequest

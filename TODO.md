@@ -232,7 +232,14 @@ Um sistema por vez; só depois que os anteriores estão funcionando.
   - Snapshot `audio`, validação do `clip`, campo de asset no inspector.
 - [x] meu-pet: playbooks passando
 - [x] 395 testes unitários + 25 e2e
-- [ ] Save slots (`saveSlot` / `loadSlot` / `deleteSlot` / `listSlots`, opcional por jogo)
+- [x] **Save slots** (opcionais): `saveSlot` / `loadSlot` / `deleteSlot` / `listSlots`.
+  - Disponíveis em scripts, como ações de regra e na expressão `hasSlot()`.
+  - Um slot é o estado em andamento (a mesma captura do hot reload) mais o `game.storage`.
+  - Carregar acontece no fim do frame, com o tempo seguindo, e as edições feitas nos arquivos depois do save valem.
+  - A página grava em `.vibe/slots.json`; as runs do agente aceitam `slots`; `restart` volta aos iniciais.
+  - Limites: 20 slots e 2 MB.
+- [x] meu-pet: salvar e carregar slot sem erro em `inicio` e `quarto` (6 KB e 29 KB); playbooks passando
+- [x] 402 testes unitários + 26 e2e
 - [ ] Agent Planning (objetivo → tarefas → verificação, como memória operacional do agente)
 
 ## ~~Etapa 9 — Teste final~~ — descartada

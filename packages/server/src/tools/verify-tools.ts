@@ -1,3 +1,4 @@
+import type { SaveSlot } from '@vibe/engine';
 import { IdSchema, PlaybookSchema, playbookFile, type Playbook } from '@vibe/shared';
 import { z } from 'zod';
 import { ToolError, type ChangeMeta } from '../project-store';
@@ -43,7 +44,7 @@ export function reportLine(c: Check) {
 /** Plays and checks one scenario on a fresh game; the report plus the screenshots taken. */
 export async function verifyScenario(ctx: ToolContext, p: Playbook) {
   const h = host(ctx);
-  const s = h.newSession({ scene: p.scene, seed: p.seed, clock: p.clock, storage: p.storage });
+  const s = h.newSession({ scene: p.scene, seed: p.seed, clock: p.clock, storage: p.storage, slots: p.slots as Record<string, SaveSlot> | undefined });
   const game = s.game;
   const shoot = (label?: string, annotate?: boolean) => h.screenshotOf(s, annotate, label);
   const shotSteps = p.steps.filter((st) => st.type === 'screenshot').length + (p.screenshot ? 1 : 0);

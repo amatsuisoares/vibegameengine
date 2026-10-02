@@ -78,6 +78,15 @@ export function runAction(w: World, a: RuleAction, target: (ref: string) => Enti
     case 'playSound':
       emitSound(w, a.asset, a.volume, origin.source);
       return;
+    case 'saveSlot':
+      w.slots?.saveSlot(a.slot, a.label);
+      return;
+    case 'loadSlot':
+      if (!w.slots?.loadSlot(a.slot)) w.console.warn(`loadSlot: slot "${a.slot}" does not exist (${origin.label})`, origin.source);
+      return;
+    case 'deleteSlot':
+      w.slots?.deleteSlot(a.slot);
+      return;
     case 'after': {
       const owner = origin.kind === 'state' ? w.get(origin.data.entity) : undefined;
       const id = w.timers.schedule({
