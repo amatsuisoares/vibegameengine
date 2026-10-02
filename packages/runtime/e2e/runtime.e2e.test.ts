@@ -249,5 +249,53 @@ describe('runtime page (Chromium)', () => {
     await page.locator('#hierarchy [data-entity="player"]').click();
     await page.close();
   });
+
+  it('edits the selected entity in the inspector, through the store', async () => {
+    cpSync(repo('test-fixtures/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
+    rmSync(`${TMP_PROJECT}/.vibe/selection.json`, { force: true });
+    const { page, errors } = await open('project=e2e-tmp');
+    await page.locator('#hierarchy [data-entity="coin1"]').click();
+    const inspector = page.locator('#inspector');
+    const width = inspector.locator('[data-section="Sprite"] [data-key="width"] input');
+    await width.waitFor({ timeout: 10_000 });
+    expect(await width.inputValue()).toBe('16');
+    // Live values of the running game.
+    await expect.poll(() => inspector.locator('.inspector-live dt').allTextContents()).toContain('x');
+
+    // A valid edit: written to the scene file (as the user) and the game reloads with it.
+    await width.fill('40');
+    await width.press('Enter');
+    const sceneFile = `${TMP_PROJECT}/scenes/level1.json`;
+    const coin = () => JSON.parse(readFileSync(sceneFile, 'utf8')).entities.find((e: { id: string }) => e.id === 'coin1');
+    await expect.poll(() => coin().components.Sprite.width, { timeout: 5000 }).toBe(40);
+    await page.waitForFunction(
+      () => (window.__vibe!.getState({ ids: ['coin1'], components: true }).entities[0] as { components?: { Sprite?: { width?: number } } }).components?.Sprite?.width === 40,
+      undefined,
+      { timeout: 10_000 },
+    );
+    const history = readFileSync(`${TMP_PROJECT}/.vibe/history.jsonl`, 'utf8').trim().split('\n');
+    expect(JSON.parse(history.at(-1)!)).toMatchObject({ author: 'user', reason: 'Inspector: Sprite.width of coin1 = 40' });
+
+    // An invalid edit is rejected: nothing written, the reason is shown, the field goes back.
+    await width.fill('-3');
+    await width.press('Enter');
+    await expect.poll(() => inspector.locator('.inspector-message').textContent()).toMatch(/Sprite\.width/);
+    expect(coin().components.Sprite.width).toBe(40);
+    await expect.poll(() => width.inputValue()).toBe('40');
+
+    // Enum field and reset to the default.
+    await inspector.locator('[data-section="Sprite"] [data-key="shape"] select').selectOption('circle');
+    await expect.poll(() => coin().components.Sprite.shape, { timeout: 5000 }).toBe('circle');
+    await inspector.locator('[data-section="Sprite"] [data-key="shape"] .reset').click();
+    await expect.poll(() => coin().components.Sprite.shape, { timeout: 5000 }).toBeUndefined();
+
+    // Edits by someone else (the agent) show up in the open inspector.
+    const store = new ProjectStore(TMP_PROJECT);
+    await createEditingTools().call('modify_component', { scene: 'level1', id: 'coin1', type: 'Sprite', patch: { height: 30 } }, { store, author: 'agent' });
+    await expect.poll(() => inspector.locator('[data-section="Sprite"] [data-key="height"] input').inputValue(), { timeout: 10_000 }).toBe('30');
+    await page.screenshot({ path: `${RUNS_DIR}/inspector.png` });
+    expect(errors).toEqual([]);
+    await page.close();
+  });
 });
 

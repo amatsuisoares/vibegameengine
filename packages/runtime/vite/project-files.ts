@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { ProjectStore, removeFile, ToolError, writeFileAtomic, type RawProjectData } from '@vibe/server';
+import { applyInspectorEdit, inspectEntity, InspectorEditSchema, ProjectStore, removeFile, ToolError, writeFileAtomic, type RawProjectData } from '@vibe/server';
 import { EDITOR_SELECTION_FILE, EditorSelectionSchema, LIVE_RUN_FILE } from '@vibe/shared';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -199,6 +199,56 @@ export function handleSelectionRequest(projectsRoot: string, method: string, url
   if (method === 'DELETE') {
     removeFile(file);
     return { status: 204, type: 'text/plain', body: '' };
+  }
+  return jsonResult(405, { error: `Method ${method} not allowed` });
+}
+
+/**
+ * Inspector of the editor panels (edits go through the editing tools as the user: validated,
+ * recorded in the history, undoable):
+ *   GET  /api/projects/<name>/inspect?scene=<id>&id=<entity> -> Inspection | 404 { error }
+ *   POST /api/projects/<name>/inspect { scene, id, edit }    -> InspectorEditResult ({ ok: false, error } when rejected)
+ * Returns null for any other URL.
+ */
+export async function handleInspectRequest(projectsRoot: string, method: string, url: string, body = ''): Promise<HttpResult | null> {
+  const u = new URL(url, 'http://x');
+  const m = /^\/api\/projects\/([^/]+)\/inspect$/.exec(decodeURIComponent(u.pathname));
+  if (!m) return null;
+  const name = m[1];
+  if (!PROJECT_NAME.test(name) || !existsSync(join(projectsRoot, name, 'project.json'))) {
+    return jsonResult(404, { error: `Project "${name}" not found` });
+  }
+  const store = new ProjectStore(join(projectsRoot, name));
+  const fail = (err: unknown) =>
+    err instanceof ToolError ? jsonResult(404, { error: err.message, details: err.details }) : jsonResult(500, { error: err instanceof Error ? err.message : String(err) });
+  if (method === 'GET') {
+    const scene = u.searchParams.get('scene');
+    const id = u.searchParams.get('id');
+    if (!scene || !id) return jsonResult(400, { error: 'scene and id are required' });
+    try {
+      return jsonResult(200, inspectEntity(store, scene, id));
+    } catch (err) {
+      return fail(err);
+    }
+  }
+  if (method === 'POST') {
+    let input: { scene?: unknown; id?: unknown; edit?: unknown };
+    try {
+      input = JSON.parse(body);
+    } catch {
+      return jsonResult(400, { error: 'Body must be JSON' });
+    }
+    const edit = InspectorEditSchema.safeParse(input?.edit);
+    if (typeof input?.scene !== 'string' || typeof input?.id !== 'string' || !edit.success) {
+      return jsonResult(400, { error: 'Expected { scene, id, edit: { action, ... } }' });
+    }
+    try {
+      const result = await applyInspectorEdit(store, input.scene, input.id, edit.data);
+      // A rejected edit is an answer, not a failed request: the body says ok: false and why.
+      return jsonResult(200, result);
+    } catch (err) {
+      return fail(err);
+    }
   }
   return jsonResult(405, { error: `Method ${method} not allowed` });
 }

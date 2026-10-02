@@ -764,6 +764,25 @@ dispara hot reload, e sobrevive a recarregar a página.
 
 Use quando o usuário disser "isso", "esse", "o selecionado": selecionar no painel + "deixa maior" basta.
 
+### Editor: inspector
+
+Implementado na V0.5. Painel **Inspector** (botão na barra), à direita: a entidade selecionada na hierarquia, com
+seções *Entidade* (`name`, `tags`, `enabled`), *Transform* e uma por componente. Os campos saem do schema de cada
+componente: número (com mínimo/máximo), checkbox, lista de opções (enums, como `Sprite.shape`), asset (os do projeto),
+cor (seletor + texto), caixas para listas de opções (`Interactable.via`), texto separado por vírgulas para listas
+(`tags`) e JSON para estruturas (`StateMachine.states`, `Animator.animations`, `Script.props`).
+
+- **Edição segura:** cada mudança vira um `modify_game_object` feito **pelo usuário** (autor `user` no histórico, com
+  motivo `Inspector: Sprite.width of coin1 = 40`). Passa pela validação do `ProjectStore`: valor inválido não grava
+  nada e o painel mostra o erro. Depois o jogo recarrega (hot reload), como em qualquer edição.
+- **Padrões e prefabs:** rótulo apagado = valor padrão; em itálico = vem do prefab. `↺` remove o valor do arquivo
+  (volta ao padrão ou ao valor do prefab). Componentes que só o prefab tem não podem ser removidos da instância.
+- **Adicionar / remover componente:** seletor no fim do painel e `✕` no título da seção.
+- **Ao vivo:** se a entidade está na cena que roda, valores do jogo (`x`, `y`, `vx`, `vy`, `state`, `health`, `props`...).
+  Entidades criadas durante o jogo só têm essa parte (não estão no arquivo da cena).
+- Edições do agente aparecem no inspector aberto. O agente vê as do usuário em `get_history` e pode desfazê-las com
+  `undo` (o histórico é compartilhado entre o servidor MCP e o dev server).
+
 ## Runtime no browser (`window.__vibe`)
 
 Implementado na Etapa 2. É a superfície que o RuntimeHost (Etapa 4) vai usar via Playwright

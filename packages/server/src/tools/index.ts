@@ -10,7 +10,7 @@ import { sceneTools } from './scene-tools';
 import { verifyTools } from './verify-tools';
 
 export * from './registry';
-export { changeInfo, entitySummary } from './scene-tools';
+export { changeInfo, entitySummary, gameObjectOf } from './scene-tools';
 
 /** Project-editing tools (stage 3) and the project memory. */
 export function createEditingTools() {

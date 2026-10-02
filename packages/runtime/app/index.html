@@ -10,6 +10,7 @@
     <header class="toolbar">
       <select id="project" title="Projeto"></select>
       <button id="toggleHierarchy" hidden title="Mostra / esconde a hierarquia (cenas e entidades)">Hierarquia</button>
+      <button id="toggleInspector" hidden title="Mostra / esconde o inspector (componentes da entidade selecionada)">Inspector</button>
       <button id="restart" title="Reiniciar (R após fim de jogo)">Restart</button>
       <button id="pause">Pause</button>
       <button id="step" title="Avança 1 frame (pausado)">Step</button>
@@ -24,6 +25,7 @@
       <main class="stage">
         <canvas id="game" tabindex="0"></canvas>
       </main>
+      <aside class="inspector" id="inspector" aria-label="Inspector" hidden></aside>
     </div>
     <section class="console" id="console" aria-label="Console"></section>
     <script type="module" src="./main.ts"></script>

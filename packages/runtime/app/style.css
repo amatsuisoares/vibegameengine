@@ -197,6 +197,178 @@ body {
   font-weight: normal;
 }
 
+.inspector {
+  width: 300px;
+  flex: none;
+  overflow-y: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  padding: 8px;
+}
+
+.inspector[hidden] {
+  display: none;
+}
+
+.inspector-head {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 6px;
+}
+
+.inspector-head strong {
+  font-size: 15px;
+}
+
+.muted,
+.inspector-note {
+  color: var(--muted);
+}
+
+.inspector-message {
+  white-space: pre-wrap;
+  color: var(--error);
+  border: 1px solid var(--error);
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin-bottom: 6px;
+  font: 12px/1.4 ui-monospace, monospace;
+}
+
+.inspector-message[hidden] {
+  display: none;
+}
+
+.inspector-section {
+  border-top: 1px solid var(--border);
+  padding: 4px 0;
+}
+
+.inspector-section > summary {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.inspector-section .remove {
+  margin-left: auto;
+}
+
+.inspector-field {
+  display: grid;
+  grid-template-columns: 100px 1fr 22px;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.inspector-field > label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.inspector-field.set > label {
+  color: var(--text);
+}
+
+.inspector-field.prefab > label {
+  font-style: italic;
+}
+
+.inspector input[type='text'],
+.inspector input[type='number'],
+.inspector select,
+.inspector textarea {
+  width: 100%;
+  min-width: 0;
+  background: #242833;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font: inherit;
+}
+
+.inspector textarea {
+  font: 11px/1.4 ui-monospace, monospace;
+  resize: vertical;
+}
+
+.inspector button {
+  background: none;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  padding: 0 4px;
+}
+
+.inspector button:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.inspector .flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inspector .color {
+  display: flex;
+  gap: 4px;
+}
+
+.inspector .color input[type='color'] {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.inspector-add {
+  margin-top: 8px;
+}
+
+.inspector-live {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.inspector-live[hidden] {
+  display: none;
+}
+
+.inspector-live h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+
+.inspector-live dl {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 2px 6px;
+  margin: 0;
+  font: 11px/1.4 ui-monospace, monospace;
+}
+
+.inspector-live dt {
+  color: var(--muted);
+}
+
+.inspector-live dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .stage {
   flex: 1;
   min-width: 0;

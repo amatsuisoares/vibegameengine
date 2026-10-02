@@ -182,8 +182,12 @@ Complementa o Claude Code (fluxo IA-first continua), sem virar um editor tipo Un
 - [x] **Hierarquia**: painel na página do jogo (cenas → entidades, ao vivo na cena atual: criadas, destruídas e
   desativadas marcadas; ícone por tipo; filtro por id/tag/componente/prefab); seleção com contorno no canvas, gravada
   em `.vibe/selection.json` e lida pelo agente com `get_selection` ("deixa isso maior"); páginas de host sem painel
-- [x] 348 testes unitários + 20 e2e
-- [ ] Inspector (componentes e propriedades da entidade selecionada; edição segura pelo `ProjectStore`)
+- [x] **Inspector**: painel com a entidade selecionada (Entidade, Transform, um bloco por componente), campos tipados
+  a partir do schema (número com limites, checkbox, enum, asset, cor, listas, JSON), padrão/prefab indicados, `↺`
+  volta ao padrão, adicionar/remover componente, valores ao vivo; edições pelo `ProjectStore` como `user`
+  (`modify_game_object`, histórico, undo), inválidas rejeitadas sem gravar; histórico compartilhado entre processos
+- [x] meu-pet: as 48 entidades abrem no inspector sem erro
+- [x] 359 testes unitários + 21 e2e
 - [ ] Viewport (seleção, posição, bounding box, câmera, gizmos básicos)
 - [ ] Asset browser (imagens, spritesheets, áudio, prefabs, scripts)
 

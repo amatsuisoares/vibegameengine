@@ -16,6 +16,7 @@ import {
 } from '@vibe/runtime';
 import { parseProject, type LiveRun, type Project } from '@vibe/shared';
 import { HierarchyPanel, type PanelSelection } from './hierarchy-panel';
+import { InspectorPanel } from './inspector-panel';
 
 declare global {
   interface Window {
@@ -312,14 +313,25 @@ async function main() {
       runtime.selected = next;
       runtime.render();
     };
+    const inspectorEl = $<HTMLElement>('inspector');
+    const inspectorBtn = $<HTMLButtonElement>('toggleInspector');
+    inspectorBtn.hidden = false;
+    const inspector = new InspectorPanel(inspectorEl, {
+      project,
+      live: (scene, id) =>
+        scene === runtime.game.world.scene.id ? ((runtime.game.getState({ ids: [id] }).entities[0] as unknown as Record<string, unknown> | undefined) ?? null) : null,
+      log: (level, message) => appendLog(level, message),
+    });
     const panel = new HierarchyPanel(panelEl, (sel) => {
       outline(sel);
+      void inspector.show(sel);
       const req = sel
         ? fetch(selectionUrl, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, ...sel, at: Date.now() }) })
         : fetch(selectionUrl, { method: 'DELETE' });
       req.catch((err) => appendLog('warn', `Could not save the selection: ${err instanceof Error ? err.message : String(err)}`));
     });
     const refresh = () => {
+      if (!inspectorEl.hidden) inspector.updateLive();
       if (panelEl.hidden) return;
       panel.update(buildHierarchy(runtime.game, runtime.project));
       // The scene may have changed: only an entity of the current scene is outlined.
@@ -348,6 +360,31 @@ async function main() {
       }
     };
     show(readShown());
+    // Inspector: on by default; it follows the hierarchy's selection.
+    const showInspector = (on: boolean) => {
+      inspectorEl.hidden = !on;
+      inspectorBtn.classList.toggle('active', on);
+    };
+    inspectorBtn.onclick = () => {
+      showInspector(inspectorEl.hidden);
+      try {
+        localStorage.setItem('vibe:inspector', inspectorEl.hidden ? '0' : '1');
+      } catch {
+        // Remembered for this page only.
+      }
+    };
+    try {
+      showInspector(localStorage.getItem('vibe:inspector') !== '0');
+    } catch {
+      showInspector(true);
+    }
+    // Any change to the project files (an inspector edit, the agent, an editor): show the new values.
+    let inspectTimer: ReturnType<typeof setTimeout> | undefined;
+    import.meta.hot?.on('vibe:project-changed', (data: { name: string }) => {
+      if (data.name !== project) return;
+      clearTimeout(inspectTimer);
+      inspectTimer = setTimeout(() => void inspector.refresh(), 120);
+    });
     setInterval(refresh, 250);
     // The previous selection (it survives reloads, like the agent's view of it).
     fetchJson(selectionUrl)
@@ -355,6 +392,7 @@ async function main() {
         if (!saved || panel.selected) return;
         panel.setSelection({ scene: saved.scene, entity: saved.entity });
         outline(panel.selected);
+        void inspector.show(panel.selected);
       })
       .catch(() => undefined);
   }

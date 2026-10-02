@@ -246,6 +246,14 @@ app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶
   `paintSelection` por cima do jogo (nunca entra na simulação), e é gravada em `.vibe/selection.json`
   (`EditorSelectionSchema`, `shared/src/editor.ts`) para o agente (`get_selection`). Páginas de host (`?paused=1`,
   screenshots) não têm painéis.
+- **Inspector** (V0.5, `server/src/inspector.ts` + `app/inspector-panel.ts`): o lado Node (plugin do Vite,
+  `GET/POST /api/projects/<p>/inspect`) descreve a entidade em campos tipados — `z.toJSONSchema` de cada componente
+  (enum, número com limites, boolean, asset, cor, listas, JSON) + dados efetivos (prefab + padrões), marcando o que
+  está no arquivo (`set`) e o que vem do prefab. Edições viram um merge patch (`inspectorPatch`; objetos são
+  substituídos com `replacePatch`) aplicado pela tool `modify_game_object` com autor `user`: mesma validação,
+  gravação atômica, histórico e undo do agente. A página só renderiza e mostra os valores ao vivo
+  (`game.getState`). O `History` relê `.vibe/history.jsonl` quando o tamanho muda, então o servidor MCP e o dev
+  server compartilham o log (seqs não colidem; o agente desfaz edições do usuário).
 
 - **Renderização em duas fases.** `buildDrawList(world)` é pura: converte entidades em comandos em
   coordenadas de tela (câmera, zoom, escala, rotação, flip), descarta o que está fora da tela e ordena por

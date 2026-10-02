@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite';
-import { handleProjectRequest, handleSaveRequest, handleSelectionRequest, liveRunOfFile, projectOfFile } from './project-files';
+import { handleInspectRequest, handleProjectRequest, handleSaveRequest, handleSelectionRequest, liveRunOfFile, projectOfFile } from './project-files';
 
 /**
  * Serves project data to the runtime page and tells it when project files change,
@@ -18,12 +18,18 @@ export function vibeProjects(projectsRoot: string): Plugin {
       };
       server.middlewares.use((req, res, next) => {
         if (!req.url) return next();
-        const handler = /\/save(\?|$)/.test(req.url) ? handleSaveRequest : /\/selection(\?|$)/.test(req.url) ? handleSelectionRequest : null;
+        const handler = /\/save(\?|$)/.test(req.url)
+          ? handleSaveRequest
+          : /\/selection(\?|$)/.test(req.url)
+            ? handleSelectionRequest
+            : /\/inspect(\?|$)/.test(req.url)
+              ? handleInspectRequest
+              : null;
         if (handler && req.url.startsWith('/api/projects/')) {
           const chunks: Buffer[] = [];
           req.on('data', (c: Buffer) => chunks.push(c));
-          req.on('end', () => {
-            const result = handler(projectsRoot, req.method ?? 'GET', req.url!, Buffer.concat(chunks).toString('utf8'));
+          req.on('end', async () => {
+            const result = await handler(projectsRoot, req.method ?? 'GET', req.url!, Buffer.concat(chunks).toString('utf8'));
             if (result) send(res, result);
             else next();
           });

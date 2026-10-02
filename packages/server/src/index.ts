@@ -12,3 +12,4 @@ export * from './runtime/dev-server';
 export * from './mcp/server';
 export * from './mcp/workspace';
 export * from './runtime/scenario';
+export * from './inspector';

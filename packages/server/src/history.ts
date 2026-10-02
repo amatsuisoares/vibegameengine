@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createTwoFilesPatch } from 'diff';
 
@@ -45,11 +45,21 @@ export function unifiedDiff(c: FileChange): string {
  */
 export class History {
   private entries: HistoryEntry[] = [];
+  /** Size of the log when it was last read: another process (the editor panels) may append to it. */
+  private size = -1;
 
   constructor(private readonly file: string) {
-    if (!existsSync(file)) return;
-    const lines = readFileSync(file, 'utf8').split('\n');
-    for (const line of lines) {
+    this.sync();
+  }
+
+  /** Re-reads the log when it changed on disk since it was last read. */
+  private sync() {
+    const size = existsSync(this.file) ? statSync(this.file).size : 0;
+    if (size === this.size) return;
+    this.size = size;
+    this.entries = [];
+    if (!size) return;
+    for (const line of readFileSync(this.file, 'utf8').split('\n')) {
       if (!line.trim()) continue;
       try {
         this.entries.push(JSON.parse(line));
@@ -60,28 +70,31 @@ export class History {
   }
 
   all(): readonly HistoryEntry[] {
+    this.sync();
     return this.entries;
   }
 
   get(seq: number): HistoryEntry | undefined {
-    return this.entries.find((e) => e.seq === seq);
+    return this.all().find((e) => e.seq === seq);
   }
 
   get nextSeq() {
-    return (this.entries.at(-1)?.seq ?? 0) + 1;
+    return (this.all().at(-1)?.seq ?? 0) + 1;
   }
 
   append(entry: HistoryEntry) {
+    this.sync();
     mkdirSync(dirname(this.file), { recursive: true });
     appendFileSync(this.file, `${JSON.stringify(entry)}\n`, 'utf8');
     this.entries.push(entry);
+    this.size = statSync(this.file).size;
   }
 
   /** Edit seqs currently applied (undo pops from the end) and undone ones (redo pops from the end). */
   stacks(): { done: number[]; undone: number[] } {
     const done: number[] = [];
     let undone: number[] = [];
-    for (const e of this.entries) {
+    for (const e of this.all()) {
       if (e.action === 'edit') {
         done.push(e.seq);
         undone = [];
