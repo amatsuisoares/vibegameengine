@@ -1,11 +1,12 @@
 // Cérebro do pet. Guarda o estado em game.storage ("pet"), simula as necessidades pelo
-// relógio do jogo, escolhe o que o pet faz, fala do estado dele SÓ por observações
+// relógio do jogo, escolhe o que o pet faz, fala do estado dele SÓ por observações (game.notify)
 // ("Mimi parece estar com fome.") e expõe uma API (self.state.api) para os outros scripts.
 //
 // Quem o pet É fica nos componentes da entidade (scenes/quarto.json), não aqui:
 //   Traits       8 eixos de personalidade 0..1, sorteados ao nascer (self.traits.get('atividade'))
 //   Preferences  gostos por assunto: itens (maçã, bola...), tags (fruta, doce...) e contextos (carinho, escuro)
 //   Routine      hábitos por hora do dia, aprendidos do que ele faz (self.routine.record)
+//   Memory       o que ele viveu (susto, comida adorada, brincar com você), enfraquecendo com o tempo
 //   Persist      tudo isso fica em storage.petIndividuo e volta em toda sessão
 // Aqui só se decide o que cada traço e cada gosto MUDA no comportamento.
 
@@ -83,11 +84,10 @@ let refeicao = null; // comida oferecida sendo cheirada/comida: {item, level, fo
 let lastNow = 0;
 let localOffset = 0;
 let anim = 0;
-let lastNoteReal = -99;
 let lastPetReal = -99;
+let pedindoBola = -99; // tempo real em que foi até a bola pedir para brincar
 let lastLookBowl = -99;
 let realTime = 0;
-const realCooldown = {};
 
 // ---------------------------------------------------------------- utilidades
 
@@ -127,7 +127,6 @@ function newPet(game, name) {
     treats: { day: -1, n: 0 },
     revealed: {},
     cooldowns: {},
-    notes: [],
     lastSeen: game.clock.now,
   };
 }
@@ -180,21 +179,18 @@ function seenTraits() {
  * Mostra uma observação. kind agrupa mensagens parecidas: a mesma kind só volta depois
  * de `cooldownMin` minutos de jogo E de pelo menos 25 s reais (velocidades altas).
  */
-function observe(game, kind, text, cooldownMin = 0) {
-  const now = game.clock.now;
-  if (cooldownMin > 0) {
-    const last = pet.cooldowns[kind];
-    if (last !== undefined && now - last < cooldownMin * 60000) return false;
-    if (realCooldown[kind] !== undefined && realTime - realCooldown[kind] < 25) return false;
-  }
-  pet.cooldowns[kind] = now;
-  realCooldown[kind] = realTime;
-  lastNoteReal = realTime;
-  const msg = text.replace('{n}', pet.name);
-  pet.notes.push({ t: now, text: msg });
-  if (pet.notes.length > 30) pet.notes.shift();
-  game.emit('observacao', { kind, text: msg });
-  return true;
+/**
+ * Uma observação para o jogador ("{n} parece..."): passa pelo Notifier da engine (game.notify), que
+ * segura repetições (cooldown em minutos de jogo e 25 s reais, para não virar spam a 600×), guarda o
+ * histórico e evita empilhar: prioridade 0 (o que se vê do pet sozinho) não atropela uma reação a você.
+ */
+function observe(game, kind, text, cooldownMin = 0, priority = 1) {
+  return game.notify(kind, text.replace('{n}', pet.name), {
+    cooldownMs: cooldownMin * 60000,
+    realCooldownMs: cooldownMin > 0 ? 25000 : 0,
+    priority,
+    entity: me.id,
+  });
 }
 
 /**
@@ -412,6 +408,22 @@ function favorito(game) {
   return best && best.id;
 }
 
+/**
+ * Memória (componente Memory da engine): o pet lembra o que viveu — um susto, uma comida adorada, uma
+ * brincadeira com você — e a lembrança enfraquece com o tempo de jogo (meia-vida por tipo, na cena) e
+ * fica mais forte quando se repete. me.memory.feeling(assunto, tipo) = -1..1 puxa as decisões.
+ */
+function lembrar(type, subject, valence, importance) {
+  me.memory.remember(type, { subject, valence, importance });
+}
+const lembranca = (subject, type) => me.memory.feeling(subject, type);
+
+/** Quanto a memória mexe no peso de um brinquedo: um susto quase zera; boas lembranças aumentam um pouco. */
+function fatorMemoria(id) {
+  const f = lembranca(id);
+  return Math.max(0, Math.min(1.3, 1 + f * 1.2));
+}
+
 // Peso de cada jeito na nota de brincar (UtilityAI, target.props.peso) e quanto dura uma brincadeira.
 const PESO = { favorito: 2.4, gosta: 1.3, neutro: 0.5, nao: 0 };
 const DURA = { favorito: 7, gosta: 4, neutro: 2.2, nao: 1.2 };
@@ -457,6 +469,17 @@ function decide(game, self) {
   } else if (choice === 'explorar' && target) {
     go(game, spot(game, target) + (game.random() - 0.5) * 30, 'investigate');
     mind.what = target;
+  } else if (choice === 'chamar') {
+    // Lembra das brincadeiras de bola com você: vai até a bola e fica olhando para você.
+    const ball = game.entity('bola');
+    if (ball) go(game, ball.x - 50, () => {
+      // Se você não jogar a bola (jogar interrompe isto), ele lembra disso também e vai pedindo menos.
+      mind = { act: 'greet', t: 5, then: () => (lembrar('brincouComVoce', 'voce', -0.4, 0.3), decide(game, self)) };
+      self.get('Sprite').flipX = false;
+      emote(game, self, '?', '#ffd166');
+      pedindoBola = realTime;
+      observe(game, 'chamar', '{n} foi até a bola e está olhando para você. Parece querer brincar de novo.', 15);
+    });
   } else if (choice === 'procurar') {
     go(game, 480, 'greet');
   } else if (choice === 'passear') {
@@ -481,7 +504,11 @@ function sincronizarProps(game, self) {
   p.olhouTigela = realTime - lastLookBowl < 20;
   p.limiteFome = Math.round(hungerLimit());
   p.limiteSono = Math.round(limiteSono());
-  for (const toy of game.find('brinquedo')) toy.props.peso = PESO[jeitoCom(game, String(toy.props.item))];
+  for (const toy of game.find('brinquedo')) {
+    const id = String(toy.props.item);
+    toy.props.peso = Math.round(PESO[jeitoCom(game, id)] * fatorMemoria(id) * 100) / 100;
+  }
+  p.temBola = !!game.entity('bola');
 }
 
 function arrive(game, self, then) {
@@ -556,8 +583,12 @@ function brincouSozinho(game, self, id) {
   if (barulhoIncomoda(item)) {
     n.diversao = clamp(n.diversao - 6);
     reveal('sensibilidade', 'alto');
+    lembrar('susto', item.id, -1, 0.8);
     observe(game, `barulho:${item.id}`, `{n} não parece gostar do barulho ${doItem(item)}.`, 120);
-  } else if (jeito === 'favorito') {
+    return;
+  }
+  lembrar('brinquedo', item.id, { favorito: 1, gosta: 0.6, neutro: 0.1, nao: -0.3 }[jeito], 0.5);
+  if (jeito === 'favorito') {
     emote(game, self, '♥', '#ff8fab');
     observe(game, `favorito:${item.id}`, `{n} brincou um tempão com ${oItem(item)}. Parece ser o brinquedo preferido.`, 30);
   } else if (jeito === 'neutro') observe(game, `neutro:${item.id}`, `{n} mexeu um pouco ${noItem(item)} e logo perdeu o interesse.`, 60);
@@ -574,8 +605,16 @@ function verBrinquedo(game, self, id, como) {
   if (!item || pet.asleep || refeicao) return;
   const jeito = jeitoCom(game, item.id);
   const lado = self.x < toy.x ? -1 : 1;
+  // Ainda lembra do susto: olha de longe, desconfiado, e não chega perto.
+  if (lembranca(item.id, 'susto') <= -0.3) {
+    emote(game, self, '…', '#cfd8dc');
+    observe(game, `desconfiado:${item.id}`, `{n} ainda parece desconfiado ${doItem(item)}.`, 5);
+    go(game, toy.x + lado * 260, 'idle');
+    return;
+  }
   if (jeito === 'nao' || barulhoIncomoda(item)) {
     const susto = barulhoIncomoda(item) && como !== 'novo';
+    if (susto) lembrar('susto', item.id, -1, 0.8);
     const perto = () => {
       emote(game, self, susto ? '!' : '…', '#cfd8dc');
       observe(game, `naoGosta:${item.id}`, susto ? `{n} se assustou com o barulho ${doItem(item)} e foi para longe.` : `{n} cheirou ${oItem(item)} e se afastou. Não parece ter gostado.`, 10);
@@ -633,6 +672,7 @@ function finish(game, self) {
     pet.care.brincadeiras++;
     ganhar(game, 2, 'brincar', 30);
     reveal('brincadeira', 'alto');
+    lembrar('brincouComVoce', 'voce', { love: 1, like: 0.7, neutral: 0.35 }[b.level] ?? 0.1, 0.6);
     if (b.level === 'love') {
       observe(game, 'brincou', '{n} ficou animado!', 20);
       emote(game, self, '♪', '#ffd166');
@@ -659,6 +699,7 @@ function makeApi(game, self) {
       if (pet.asleep) {
         if (impaciente) {
           observe(game, 'acordado', '{n} acordou e não parece gostar disso.', 5);
+          lembrar('acordado', 'voce', -1, 0.7);
           wake(game, self, true);
           reveal('paciencia', 'baixo');
         } else observe(game, 'carinhoDormindo', '{n} se mexeu um pouco, ainda dormindo.', 10);
@@ -666,9 +707,17 @@ function makeApi(game, self) {
       }
       const recent = realTime - lastPetReal < 6;
       lastPetReal = realTime;
+      // Ainda lembra de ter sido acordado por você há pouco: se afasta.
+      if (!recent && lembranca('voce', 'acordado') <= -0.4) {
+        emote(game, self, '…', '#cfd8dc');
+        observe(game, 'aindaChateado', '{n} ainda parece chateado por ter sido acordado.', 5);
+        go(game, self.x + (self.x < 480 ? -1 : 1) * 160, 'idle');
+        return;
+      }
       if (impaciente && (n.energia < 40 || recent)) {
         n.afeto = clamp(n.afeto - 3);
         reveal('paciencia', 'baixo');
+        lembrar('carinho', 'voce', -0.6, 0.4);
         observe(game, 'carinhoRuim', '{n} não parece gostar disso agora.', 2);
         mind = { act: 'sulk', t: 3 };
         return;
@@ -685,16 +734,19 @@ function makeApi(game, self) {
         n.diversao = clamp(n.diversao + 3);
         emote(game, self, '♥', '#ff8fab');
         reveal('sociabilidade', 'alto');
+        lembrar('carinho', 'voce', level === 'love' ? 1 : 0.6, 0.4);
         observe(game, 'carinho', level === 'love' ? '{n} parece adorar o carinho.' : '{n} parece gostar do carinho.', 2);
         mind = { act: 'happy', t: 1.2 };
       } else if (level === 'neutral') {
         n.afeto = clamp(n.afeto + 8);
+        lembrar('carinho', 'voce', 0.1, 0.3);
         observe(game, 'carinho', '{n} aceitou o carinho, sem muita empolgação.', 2);
         mind = { act: 'idle', t: 1 };
       } else {
         // Não gosta: se afasta um pouco (afastar já diz muito; sem punição).
         n.afeto = clamp(n.afeto + 2);
         reveal('independencia', 'alto');
+        lembrar('carinho', 'voce', -0.4, 0.3);
         observe(game, 'carinhoAfasta', '{n} se afastou um pouco. Parece preferir o próprio espaço.', 30);
         go(game, self.x + (self.x < 480 ? -1 : 1) * 140, 'idle');
       }
@@ -725,6 +777,19 @@ function makeApi(game, self) {
     brinquedoNovo(id, como) {
       verBrinquedo(game, self, id, como || 'novo');
     },
+    /**
+     * Você abriu a comida: se ele lembra de ter adorado alguma das que você tem, vem correndo
+     * até a bandeja (lembra que dali vem coisa boa).
+     */
+    bandejaAberta() {
+      if (pet.asleep || refeicao || pet.sick) return;
+      const boa = game.inventory().list({ category: 'comida' }).map((e) => lembranca(e.item.id, 'comida')).reduce((a, b) => Math.max(a, b), 0);
+      if (boa < 0.4) return;
+      emote(game, self, '♥', '#ff8fab');
+      observe(game, 'bandeja', '{n} veio correndo quando você abriu a comida.', 10);
+      go(game, 480, 'greet');
+      mind.pressa = 1.6;
+    },
     /** O favorito entre os brinquedos que você tem (id), ou null. */
     favorito: () => favorito(game),
     bolaJogada(x) {
@@ -744,7 +809,12 @@ function makeApi(game, self) {
         return;
       }
       reveal('brincadeira', 'alto');
-      if (jeitoCom(game, 'bola') === 'favorito') emote(game, self, '♥', '#ff8fab');
+      if (realTime - pedindoBola < 20) {
+        // Era isso que ele estava pedindo.
+        pedindoBola = -99;
+        emote(game, self, '♥', '#ff8fab');
+        observe(game, 'pedidoAtendido', 'Parece que era exatamente isso que {n} queria!', 5);
+      } else if (jeitoCom(game, 'bola') === 'favorito') emote(game, self, '♥', '#ff8fab');
       mind = { act: 'chase' };
     },
     limpar(id) {
@@ -788,6 +858,7 @@ function makeApi(game, self) {
       game.storage.set('colecao', c);
       game.storage.remove('pet');
       if (me.persist.key) game.storage.remove(me.persist.key);
+      game.notifications.clear(); // as observações eram deste pet
       game.loadScene('inicio');
       return true;
     },
@@ -812,7 +883,9 @@ function diaryText(game) {
   if (isAdult()) lines.push('Fase adulta: você pode começar com um novo pet (botão abaixo).');
   lines.push('');
   lines.push('Últimas observações:');
-  for (const note of pet.notes.slice(-6)) lines.push(`· ${note.text}`);
+  const log = game.notifications.log(6, me.id);
+  // Saves de antes do Notifier: as notas antigas aparecem até haver novas.
+  for (const note of log.length ? log : (pet.notes || []).slice(-6)) lines.push(`· ${note.text}`);
   lines.push('');
   lines.push('O jogo é salvo automaticamente.  (clique no diário para fechar)');
   return lines.join('\n');
@@ -891,6 +964,15 @@ function onItem(self, item, game) {
   // Uma comida ainda no chão (oferecida logo antes): termina aquela primeiro.
   terminarRefeicao(game, self, false);
   const r = me.prefs.item(item.id);
+  const lembra = lembranca(item.id, 'comida');
+  if (lembra <= -0.5) {
+    // Já provou e detestou: reconhece de longe e nem cheira.
+    emote(game, self, '…', '#cfd8dc');
+    observe(game, `reconheceu:${item.id}`, `{n} reconheceu ${oItem(item)} e virou o rosto.`);
+    mind = { act: 'sulk', t: 1.4 };
+    game.emit('reacao', { item: item.id, level: r.level, lembrou: true });
+    return { consumed: false, level: r.level, reason: 'lembrou' };
+  }
   // Primeira vez que este pet prova algo: descobrir rende moedas (incentiva experimentar).
   pet.provou = pet.provou || {};
   if (!pet.provou[item.id]) {
@@ -901,8 +983,12 @@ function onItem(self, item, game) {
   const food = game.spawn('oferta', self.x + dir * 70, FEET_Y - 12);
   food.get('Text').text = item.icon || '•';
   refeicao = { item, level: r.level, food, dir };
-  // Primeiro cheira (inclina a cabeça); a reação vem depois.
-  mind = { act: 'investigate', t: 0.9, refeicao: true, then: () => react(game, self) };
+  // Primeiro cheira (inclina a cabeça); a reação vem depois. O que ele lembra de ter adorado: nem precisa cheirar.
+  if (lembra >= 0.5) {
+    emote(game, self, '♥', '#ff8fab');
+    observe(game, `reconheceu:${item.id}`, `{n} reconheceu ${oItem(item)} e se animou na hora!`);
+  }
+  mind = { act: lembra >= 0.5 ? 'happy' : 'investigate', t: lembra >= 0.5 ? 0.5 : 0.9, refeicao: true, then: () => react(game, self) };
   game.emit('reacao', { item: item.id, level: r.level });
   return { consumed: r.level !== 'hate', level: r.level };
 }
@@ -912,6 +998,7 @@ function react(game, self) {
   const { item, level, food, dir } = refeicao;
   if (level === 'hate') {
     refeicao = null;
+    lembrar('comida', item.id, -1, 0.9);
     observe(game, `comida:${item.id}`, `{n} cheirou ${oItem(item)} e se afastou.`);
     sumir(food, 1.5);
     go(game, self.x - dir * 140, 'idle');
@@ -932,6 +1019,7 @@ function terminarRefeicao(game, self, reagir) {
   refeicao = null;
   sumir(food, 0.3);
   if (level === 'hate') return;
+  lembrar('comida', item.id, { love: 1, like: 0.5, neutral: 0.05, dislike: -0.6 }[level], { love: 0.8, like: 0.4, neutral: 0.2, dislike: 0.6 }[level]);
   const n = pet.needs;
   const part = level === 'dislike' ? 0.5 : 1;
   n.fome = clamp(n.fome + (Number(item.props.fome) || 10) * part);
@@ -1190,17 +1278,16 @@ function updateDirt(game) {
 
 function checkObservations(game, self) {
   const n = pet.needs;
-  if (realTime - lastNoteReal < 4) return; // não empilhar avisos
   const awake = !pet.asleep;
-  if (pet.sick && observe(game, 'doente', '{n} não parece estar se sentindo bem.', 90)) return emote(game, self, '~', '#9fd8a4');
+  if (pet.sick && observe(game, 'doente', '{n} não parece estar se sentindo bem.', 90, 0)) return emote(game, self, '~', '#9fd8a4');
   // Observações só contam o que se vê; decidir o que fazer é da UtilityAI (decide).
-  if (awake && n.fome < 30 && observe(game, 'fome', '{n} parece estar com fome.', 90)) return;
-  if (awake && n.energia < 20 && observe(game, 'cansaco', n.energia < 10 ? '{n} parece estar muito cansado.' : '{n} está ficando cansado.', 90)) return;
-  if (awake && n.diversao < 30 && observe(game, 'tedio', '{n} parece entediado.', 120)) return;
-  if (awake && n.afeto < 30 && observe(game, 'saudade', '{n} parece estar com saudade de você.', 120)) return;
-  if (n.higiene < 30 && observe(game, 'sujo', '{n} parece incomodado com a sujeira.', 120)) return;
-  if (pet.asleep && pet.lightOn && isNightAt(game.clock.now) && lightBothers() && observe(game, 'luz', '{n} parece incomodado com a luz.', 60)) return;
-  if (awake && Math.min(n.fome, n.energia, n.diversao, n.higiene, n.afeto) > 80 && observe(game, 'feliz', '{n} parece muito feliz!', 180)) {
+  if (awake && n.fome < 30 && observe(game, 'fome', '{n} parece estar com fome.', 90, 0)) return;
+  if (awake && n.energia < 20 && observe(game, 'cansaco', n.energia < 10 ? '{n} parece estar muito cansado.' : '{n} está ficando cansado.', 90, 0)) return;
+  if (awake && n.diversao < 30 && observe(game, 'tedio', '{n} parece entediado.', 120, 0)) return;
+  if (awake && n.afeto < 30 && observe(game, 'saudade', '{n} parece estar com saudade de você.', 120, 0)) return;
+  if (n.higiene < 30 && observe(game, 'sujo', '{n} parece incomodado com a sujeira.', 120, 0)) return;
+  if (pet.asleep && pet.lightOn && isNightAt(game.clock.now) && lightBothers() && observe(game, 'luz', '{n} parece incomodado com a luz.', 60, 0)) return;
+  if (awake && Math.min(n.fome, n.energia, n.diversao, n.higiene, n.afeto) > 80 && observe(game, 'feliz', '{n} parece muito feliz!', 180, 0)) {
     ganhar(game, 2, 'feliz');
     emote(game, self, '♪', '#ffd166');
     mind = { act: 'happy', t: 1.5 };

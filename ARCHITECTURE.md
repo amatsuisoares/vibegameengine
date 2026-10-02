@@ -270,6 +270,14 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Rotina** (V0.7, `engine/src/routine.ts`): pesos por atividade × faixa do dia em `Routine.values`, com decaimento
   exponencial aplicado no próximo `record` (`updatedAt`); `habit`/`peak`/`patterns` só leem. Persistida pelo
   `IndividualRunner` junto com traços e gostos.
+- **Memória** (V0.7, `engine/src/memory.ts`): `Memory.entries` com força calculada na consulta (importância ×
+  meia-vida por tipo, a partir de `last`); reforço por tipo + assunto; esquecimento (abaixo da força mínima e acima da
+  capacidade) só em `remember`/`recall`, com evento `memory_forgotten`. O snapshot usa uma consulta só de leitura.
+  Persistida pelo `IndividualRunner` (com validação de cada entrada ao carregar).
+- **Notifier** (V0.7, `engine/src/notifier.ts`): um por `Game` (sobrevive a trocas de cena). Cooldowns de relógio e
+  histórico em `storage["vibe.notifications"]`; cooldowns reais e a última prioridade em memória, medidos em
+  `world.time` (tempo simulado, não muda com `clock.speed`). Emite `notification`; a ação de regra `notify` usa o
+  mesmo objeto (`world.notifier`).
 - **Itens** (V0.7, `engine/src/items.ts`): `Project.items` (de `items/<id>.json`) vira um `ItemCatalog` só de leitura no
   `Game`. `Game.useItem(item, alvo, por?)` emite `item_used` e chama `ScriptRunner.itemUsed` → hook `onItem` do alvo,
   devolvendo o retorno do hook (clonado como JSON). A engine não interpreta o item: o alvo decide, normalmente pelo

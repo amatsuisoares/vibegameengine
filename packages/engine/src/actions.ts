@@ -95,6 +95,9 @@ export function runAction(w: World, a: RuleAction, target: (ref: string) => Enti
         w.console.log(`takeItem: not enough "${a.item}" (${origin.label})`, origin.source);
       }
       return;
+    case 'notify':
+      w.notifier?.notify(a.kind, a.text, { cooldownMs: a.cooldownMs, realCooldownMs: a.realCooldownMs, ...(a.priority !== undefined && { priority: a.priority }) });
+      return;
     case 'addCurrency':
       w.economy?.wallet.add(a.amount, a.currency, origin.label);
       return;

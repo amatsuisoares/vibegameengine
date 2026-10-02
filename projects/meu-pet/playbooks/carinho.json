@@ -16,7 +16,7 @@
     { "assert": "state", "id": "pet", "is": "happy", "name": "o pet ficou feliz" },
     {
       "assert": "eventOccurred",
-      "event": "observacao",
+      "event": "notification",
       "match": { "kind": "carinho", "text": "Bolinha parece adorar o carinho." },
       "name": "observação de que adora"
     },

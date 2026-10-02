@@ -23,6 +23,8 @@ import { affinityOf, IndividualRunner } from './individual';
 import { ItemCatalog } from './items';
 import { habitOf } from './routine';
 import { Economy } from './economy';
+import { recall } from './memory';
+import { Notifier, type NotifyOptions } from './notifier';
 import { cooldownsLeft, type TimerInfo } from './timers';
 import type { TweenInfo } from './tweens';
 import { SoundDirector, soundOf } from './sound';
@@ -192,6 +194,8 @@ export interface EntitySnapshot {
   prefs?: Record<string, number>;
   /** Routine: share of each activity at this time of day (only those > 0). */
   habits?: Record<string, number>;
+  /** Memory: the strongest memories now (up to 8). */
+  memories?: { type: string; subject?: string; valence: number; strength: number; count: number }[];
   /** AudioSource: clip, whether it plays (a loop sounding / a one-shot about to play), and volume / pan as heard now. */
   audio?: { clip: string; loop: boolean; playing: boolean; volume: number; pan: number };
   components?: Record<string, unknown>;
@@ -279,6 +283,8 @@ export class Game implements SlotHost {
   readonly items: ItemCatalog;
   /** Inventories, wallets and shop (kept in storage). */
   readonly economy: Economy;
+  /** Observations shown to the player, with cooldowns and priority (game.notify). */
+  readonly notifications: Notifier;
   /** Music asset playing (for the `music` event when a scene without music follows one with music). */
   private music: string | null = null;
 
@@ -293,6 +299,13 @@ export class Game implements SlotHost {
     this.scripts = new ScriptLibrary(project.scripts ?? {});
     this.items = new ItemCatalog(project.items ?? {});
     this.economy = new Economy(this.storage, this.items, () => this.world);
+    this.notifications = new Notifier({
+      storage: this.storage,
+      clock: this.clock,
+      realMs: () => Math.round((this.world?.time ?? 0) * 1000),
+      world: () => this.world,
+      config: () => this.project.config.notifications ?? { minGapMs: 0, logSize: 50 },
+    });
     this.loadScene(options.scene ?? project.config.startScene, {});
   }
 
@@ -305,6 +318,11 @@ export class Game implements SlotHost {
     if (!target.active) throw new Error(`useItem: entity "${target.id}" is not active`);
     this.world.emit('item_used', { item: item.id, target: target.id, ...(by && { by: by.id }), category: item.category, tags: [...item.tags] });
     return this.scriptRunner.itemUsed(target, item, by);
+  }
+
+  /** Shows an observation to the player if its cooldowns and priority allow (see Notifier); returns whether it did. */
+  notify(kind: string, text: string, options?: NotifyOptions): boolean {
+    return this.notifications.notify(kind, text, options);
   }
 
   /** Validates raw JSON and creates a game; throws with every validation error listed. */
@@ -331,6 +349,7 @@ export class Game implements SlotHost {
     this.world.prefabs = this.project.prefabs ?? {};
     this.world.slots = this;
     this.world.economy = this.economy;
+    this.world.notifier = this.notifications;
     this.world.particles.reseed(this.seed);
     this.world.frame = prevFrame;
     this.world.time = prevTime;
@@ -615,7 +634,7 @@ export class Game implements SlotHost {
       input: this.input.snapshot(),
       entityCount: w.entities.length,
       entities: list.map((e) => {
-        const snap = snapshotEntity(w, e, !!query.components, this.clock.hour);
+        const snap = snapshotEntity(w, e, !!query.components, this.clock.hour, this.clock.now);
         const box = boxes.get(e);
         return box ? { ...snap, screen: box } : snap;
       }),
@@ -627,7 +646,7 @@ export class Game implements SlotHost {
   }
 }
 
-function snapshotEntity(w: World, e: Entity, withComponents: boolean, clockHour: number): EntitySnapshot {
+function snapshotEntity(w: World, e: Entity, withComponents: boolean, clockHour: number, clockNow: number): EntitySnapshot {
   const s: EntitySnapshot = { id: e.id, name: e.name, tags: [...e.tags], x: round2(e.x), y: round2(e.y) };
   const b = e.components.Body;
   if (b && b.type !== 'static') {
@@ -677,6 +696,10 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean, clockHour:
   if (e.components.Routine) {
     const habits = Object.fromEntries(Object.keys(e.components.Routine.values).map((a) => [a, habitOf(e, a, clockHour)]).filter(([, v]) => (v as number) > 0));
     if (Object.keys(habits).length) s.habits = habits;
+  }
+  if (e.components.Memory) {
+    const top = recall(e, clockNow, { limit: 8 }, undefined, true).map((m) => ({ type: m.type, ...(m.subject !== undefined && { subject: m.subject }), valence: m.valence, strength: m.strength, count: m.count }));
+    if (top.length) s.memories = top;
   }
   if (e.components.Preferences) s.prefs = Object.fromEntries(Object.keys(e.components.Preferences.values).map((k) => [k, affinityOf(e, k)]));
   const props = e.components.Script?.props;

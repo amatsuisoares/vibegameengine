@@ -3,6 +3,7 @@ import { findPath, pathOptionsFor } from './nav';
 import { stackAt } from './mouse';
 import { affinityOf, evaluateItem, traitOf } from './individual';
 import { habitOf } from './routine';
+import { feelingOf } from './memory';
 import { screenToWorld } from './systems/camera';
 
 /**
@@ -15,6 +16,7 @@ import { screenToWorld } from './systems/camera';
  *   functions    entity(id) exists(id) hasSlot(name) count(tag) events(type) distance(a,b) pathDistance(a,b) abs(x) min(a,b) max(a,b) clamp(x,lo,hi)
  *                trait([entity,] axis) likes([entity,] subject or item id)   (one argument = self)   item(id)
  *                itemCount(id [, inventory]) currency([name]) habit([entity,] activity)
+ *                memory(subject [, type]) / memory(entity, subject, type)
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
  * Field access on null yields null (the assertion then fails and shows the null).
  */
@@ -272,6 +274,19 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
           game.individuals.ensure(he);
           return habitOf(he, String(args[args.length - 1]), game.clock.hour);
         }
+        case 'memory': {
+          // Feeling from memories: memory(subject), memory(subject, type) for self; memory(entity, subject, type|null).
+          if (args.length < 1 || args.length > 3) throw new ExprError('memory() takes 1 to 3 arguments (subject [, type]) or (entity, subject, type)', src);
+          const three = args.length === 3;
+          const mid = three ? idOf(args[0]) : (scope.self ?? null);
+          if (mid === null) throw new ExprError("memory() needs \"self\"; pass the entity: memory('id', subject, type)", src);
+          const me = game.entity(mid);
+          if (!me || !me.components.Memory) return null;
+          game.individuals.ensure(me);
+          const subject = String(args[three ? 1 : 0]);
+          const type = args[three ? 2 : 1];
+          return feelingOf(me, game.clock.now, subject, type === undefined || type === null ? undefined : String(type));
+        }
         case 'trait':
         case 'likes': {
           if (args.length !== 1 && args.length !== 2) throw new ExprError(`${n.fn}() takes 1 or 2 arguments ([entity,] name)`, src);
@@ -304,7 +319,7 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'max':
           return Math.max(...args.map(Number));
         default:
-          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, habit, item, itemCount, currency)`, src);
+          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, habit, memory, item, itemCount, currency)`, src);
       }
     }
     case 'unary': {

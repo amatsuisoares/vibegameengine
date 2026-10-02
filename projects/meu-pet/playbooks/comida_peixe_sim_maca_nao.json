@@ -45,7 +45,7 @@
     },
     {
       "assert": "eventOccurred",
-      "event": "observacao",
+      "event": "notification",
       "match": { "kind": "comida:maca" },
       "name": "observação da recusa"
     },

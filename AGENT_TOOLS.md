@@ -337,7 +337,7 @@ sentido aos eixos e aos assuntos.
 - **Expressões:** `trait('eixo')` / `likes('assunto')` (da própria entidade, em `UtilityAI`/`StateMachine`/
   `Interactable`) e `trait('id', 'eixo')` / `likes('id', 'assunto')` em qualquer lugar.
 - **Estado:** `inspect_game_state` mostra `traits` e `prefs` (afinidade efetiva) da entidade.
-- **Validação ao gravar:** influência de traço precisa de um eixo existente; `Persist` precisa de `Traits` ou
+- **Validação ao gravar:** influência de traço precisa de um eixo existente; `Persist` precisa de `Traits`, `Routine`, `Memory` ou
   `Preferences`; `min ≤ max`.
 
 ## Rotina (`Routine`)
@@ -358,6 +358,47 @@ em dias de jogo. Ninguém escreve "brinca depois do almoço": a entidade acaba f
   (`[{activity, slot, from, to, share, weight}]`, hábitos estáveis — base do diário).
 - **Expressões:** `habit('atividade')` (própria entidade, agora) ou `habit('id', 'atividade')`: viés de hábito nas notas.
 - **Estado:** `habits` = fração de cada atividade na faixa de agora. `Persist` guarda a rotina junto com traços e gostos.
+
+## Memória (`Memory`)
+
+Implementado na V0.7 (`engine/src/memory.ts`). O que a entidade **viveu** e como foi: cada memória é `{type, subject?,
+tags, valence -1..1, importance 0..1}`. A força é `importance × ½^(idade / meia-vida)`, com a idade no relógio do jogo
+desde a última vez. Viver o mesmo de novo (mesmo `type` + `subject`) **reforça** aquela memória (mais forte, e a
+valência anda para a nova) em vez de criar outra. Memórias fracas são esquecidas; passando da capacidade, a mais fraca
+vai primeiro. A engine nunca decide o que vale lembrar: o jogo decide.
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `capacity` | `40` | memórias guardadas no máximo |
+| `halfLifeHours` | `24` | meia-vida em horas de jogo |
+| `halfLives` | `{}` | meia-vida por tipo, ex. `{"susto": 3, "comida": 72}` |
+| `minStrength` | `0.05` | abaixo disso é esquecida |
+| `entries` | `[]` | as memórias (preenchido pelo jogo; salvo com `Persist`) |
+
+- **Scripts:** `self.memory.remember(type, {subject?, tags?, valence?, importance?})` → a memória como ficou
+  (`{type, subject, valence, importance, strength, count, t, last}`); `recall({type?, subject?, tag?, minStrength?,
+  limit?})` → mais fortes primeiro; `feeling(subject, type?)` → Σ valência × força, -1..1 (0 = não lembra);
+  `forget({type?, subject?})` → quantas.
+- **Expressões:** `memory('assunto')`, `memory('assunto', 'tipo')` (própria entidade) ou `memory('id', 'assunto', 'tipo')`:
+  "procura de novo o que foi bom, evita o que assustou" nas notas da Utility AI.
+- **Eventos:** `memory {entity, memory, subject?, valence, strength, count, reinforced}` e `memory_forgotten {entity, memory,
+  subject?, valence, importance, count}` (base do diário: o que marcou antes de sumir).
+- **Estado:** `memories` = as 8 mais fortes agora. Nada roda por frame: a força é calculada quando pedida.
+
+## Observações (`game.notify`)
+
+Implementado na V0.7 (`engine/src/notifier.ts`). Tudo que o jogo **mostra ao jogador** como observação passa por um
+lugar só, com as regras que evitam spam:
+
+- `game.notify(tipo, texto, {cooldownMs?, realCooldownMs?, priority?, entity?, data?})` → `true` se mostrou.
+  `cooldownMs`: o mesmo tipo não se repete nesse tempo de **relógio** (vale entre sessões); `realCooldownMs`: nem nesse
+  tempo **real** (a 600× o relógio voa, o jogador não); `priority` (padrão 1): até `config.notifications.minGapMs` (real)
+  depois de uma observação, as de prioridade 0 (de fundo) e as de prioridade menor que a dela são descartadas.
+- Mostrada vira o evento `notification {kind, text, priority, entity?, ...data}` (o que a UI do jogo exibe) e entra no
+  histórico (`game.notifications.log(n?, entidade?)`; `clear()` esquece histórico e cooldowns), guardado no storage em
+  `vibe.notifications` com os cooldowns.
+- **Regras:** ação `notify {kind, text, cooldownMs?, realCooldownMs?, priority?}`.
+- **Config:** `notifications: {minGapMs: 0, logSize: 50}` em `project.json` (`modify_project_config`).
 
 ## Animação (`Animator`)
 
@@ -747,7 +788,7 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
   uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
-  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
+  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").

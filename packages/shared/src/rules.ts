@@ -99,6 +99,14 @@ const immediateActions = [
     currency: z.string().min(1).optional().describe('Currency name (default "coins").'),
   }),
   z.strictObject({
+    action: z.literal('notify'),
+    kind: z.string().min(1).describe('Kind of observation: the same kind respects its cooldowns.'),
+    text: z.string().min(1).describe('What the player reads ({var} placeholders are not expanded).'),
+    cooldownMs: z.number().min(0).optional().describe('Not again within this much game clock.'),
+    realCooldownMs: z.number().min(0).optional().describe('Not again within this much real time.'),
+    priority: z.number().optional().describe('Default 1; 0 = background (dropped right after another one).'),
+  }),
+  z.strictObject({
     action: z.literal('spawn'),
     prefab: z.string().min(1),
     x: z.number().optional().describe('World x (or offset from "at").'),

@@ -368,11 +368,33 @@ export const RoutineSchema = z.strictObject({
   minEvidence: z.number().min(0).default(3).describe('patterns(): weight a slot needs before it counts as a habit.'),
 });
 
+export const MemoryEntrySchema = z.strictObject({
+  type: z.string().min(1).describe('What kind of experience (e.g. "ate", "scared", "played").'),
+  subject: z.string().min(1).optional().describe('What it was about (an item id, an entity, "petting"...). Same type + subject = the same memory, reinforced.'),
+  tags: z.array(z.string()).default(() => []),
+  valence: z.number().min(-1).max(1).describe('How it felt: -1 awful .. 1 great.'),
+  importance: z.number().min(0).max(1).describe('How marking it was (strength when fresh).'),
+  t: z.number().describe('Game clock (ms) of the first time.'),
+  last: z.number().describe('Game clock (ms) of the last time (strength fades from here).'),
+  count: z.number().int().min(1).default(1),
+});
+
+export const MemorySchema = z.strictObject({
+  capacity: z.number().int().min(1).max(500).default(40).describe('Most memories kept; past it, the weakest is forgotten.'),
+  halfLifeHours: z.number().positive().default(24).describe('A memory weighs half after this many hours of game clock (per type: halfLives).'),
+  halfLives: z
+    .record(z.string(), z.number().positive())
+    .default(() => ({}))
+    .describe('Half-life in hours per memory type, e.g. {"scared": 6, "ate": 72}.'),
+  minStrength: z.number().min(0).max(1).default(0.05).describe('Below this strength a memory is forgotten (event memory_forgotten).'),
+  entries: z.array(MemoryEntrySchema).default(() => []).describe('The memories (filled by self.memory.remember; kept by Persist).'),
+});
+
 export const PersistSchema = z.strictObject({
   key: z
     .string()
     .min(1)
-    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences and Routine values) across sessions and scenes.'),
+    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences, Routine and Memory values) across sessions and scenes.'),
 });
 
 /** Registry of all built-in components. Add new component types here. */
@@ -401,6 +423,7 @@ export const ComponentSchemas = {
   Traits: TraitsSchema,
   Preferences: PreferencesSchema,
   Routine: RoutineSchema,
+  Memory: MemorySchema,
   Persist: PersistSchema,
   Script: ScriptSchema,
 } as const;
@@ -433,7 +456,8 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Traits: 'Personality of an individual: named axes 0..1, fixed or drawn from ranges by the seed; read by expressions (trait()) and scripts (self.traits).',
   Preferences: 'Likes and dislikes per subject (item, tag, context): innate (optionally from traits) + slowly learned; evaluate(subject, tags) gives a score and a level (love..hate).',
   Routine: 'Habits: what the entity tends to do at each time of day, learned from what it does (self.routine.record), fading with time; habit() biases decisions, patterns() lists stable habits.',
-  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine) in game.storage under a key: loaded before onStart, saved when it changes.',
+  Memory: 'Episodic memory: experiences (type, subject, valence, importance) that fade with game-clock time and get stronger when repeated; feeling(subject) / memory() in expressions bias decisions.',
+  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory) in game.storage under a key: loaded before onStart, saved when it changes.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -463,6 +487,7 @@ export const ComponentsSchema = z.strictObject({
   Traits: TraitsSchema.optional(),
   Preferences: PreferencesSchema.optional(),
   Routine: RoutineSchema.optional(),
+  Memory: MemorySchema.optional(),
   Persist: PersistSchema.optional(),
   Script: ScriptSchema.optional(),
 });

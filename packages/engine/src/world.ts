@@ -7,6 +7,7 @@ import { Scheduler } from './timers';
 import { TweenRunner } from './tweens';
 import { ParticleSystem } from './particles';
 import type { Economy } from './economy';
+import type { Notifier } from './notifier';
 import type { SlotHost } from './saves';
 
 export type GameStatus = 'running' | 'won' | 'lost' | 'crashed';
@@ -44,6 +45,8 @@ export class World {
   slots: SlotHost | null = null;
   /** Inventories, wallets and shop (set by the Game) for rule actions. */
   economy: Economy | null = null;
+  /** The game's notifier (game.notify), for the rule action "notify". */
+  notifier: Notifier | null = null;
   /** Interactable that the interaction key would use now, and by which actor (for the on-screen prompt). */
   interactFocus: { entity: string; by: string } | null = null;
   readonly events: GameEvent[] = [];

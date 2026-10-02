@@ -178,6 +178,25 @@ diário (fase 7).
 Velocidade base 90 px/s × 0,7–1,3 pela atividade (doente ×0,5, energia < 25 ×0,7). As observações ("parece estar com
 fome") só contam o que se vê; quem decide é a IA.
 
+## 6a. Memória (V0.7: componente `Memory`)
+
+O pet **lembra** o que viveu, e a lembrança enfraquece com o tempo de jogo (meia-vida por tipo) e fica mais forte quando
+se repete. Tudo aparece no 1× em poucos minutos:
+
+| Lembrança (tipo · assunto) | Meia-vida | Quando | O que muda |
+|---|---|---|---|
+| `comida` · o item | 72 h | comeu ou recusou uma comida (adorou +1 … odiou −1) | **detestou:** da próxima vez reconhece e vira o rosto na hora, sem cheirar ("reconheceu o peixe e virou o rosto."; não come). **Adorou:** se anima antes de comer ("reconheceu a maçã e se animou na hora!") e, ao **abrir a Comida**, vem correndo até a bandeja ("veio correndo quando você abriu a comida.") |
+| `susto` · brinquedo | 3 h | o barulho do chocalho assustou um pet sensível | **desconfia:** não escolhe mais o chocalho (peso quase 0) e, se você mexe nele, olha de longe e se afasta ("ainda parece desconfiado do chocalho.") |
+| `brinquedo` · brinquedo | 24 h | brincou sozinho (favorito +1, neutro +0,1) | boas lembranças aumentam até 30% a vontade de brincar com ele |
+| `brincouComVoce` · você | 8 h | brincou de bola com você | **pede de novo:** vai até a bola e fica olhando para você com "?" ("foi até a bola e está olhando para você. Parece querer brincar de novo."); jogar a bola nessa hora: ♥ e "parece que era exatamente isso que queria!". Pedido ignorado enfraquece a lembrança (pede cada vez menos: ~3 vezes em 10 min, caindo) |
+| `carinho` · você | 6 h | carinho bom (+), aceito sem empolgação, recusado (−) | carinhos bons fazem o pet sociável vir até você mais vezes (nota de "procurar") |
+| `acordado` · você | 2 h | você o acordou e ele é impaciente | fica chateado: um carinho logo depois o faz se afastar ("ainda parece chateado por ter sido acordado."); procura menos você |
+
+Na Utility AI: `chamar` (nova; só com a bola no quarto, energia > 30; nota = lembrança de brincar com você × 3 × tédio ×
+sociabilidade; 60 s de intervalo) e `procurar` + `memory('voce', 'carinho')` × sociabilidade × 1,5 + `memory('voce',
+'acordado')` × 2. O peso de cada brinquedo é multiplicado por `1 + 1,2 × lembrança` (entre 0 e 1,3). A memória é salva
+com o indivíduo (`storage.petIndividuo`) e volta ao reabrir o jogo.
+
 ## 7. Interações do jogador (mouse)
 
 | Ação | Como | Efeito e reação |
@@ -244,9 +263,13 @@ mais rende. Brinquedos: pelúcia (12) e chocalho (10), uma vez cada (seção 6).
 
 ## 8. Sistema de observação
 
-Fluxo: **estado → evento → notificação**. Cada notificação tem um tipo (`kind`) com **cooldown**: o mesmo tipo só
-volta depois de N minutos de jogo **e** de pelo menos 25 s reais (para não virar spam em 600×). Entre duas
-notificações automáticas há no mínimo 4 s reais. A faixa no topo mostra uma por vez por 5 s (fila de no máximo 3).
+Fluxo: **estado → evento → notificação**, tudo pelo `game.notify` da engine (V0.7, fase 6). Cada notificação tem um tipo
+(`kind`) com **cooldown**: o mesmo tipo só volta depois de N minutos de jogo **e** de pelo menos 25 s reais (para não
+virar spam em 600×); os cooldowns de jogo e o histórico (50) ficam em `storage["vibe.notifications"]` e valem entre
+sessões. As checagens automáticas têm **prioridade 0** e as reações a você prioridade 1: até 4 s reais depois de uma
+observação (`config.notifications.minGapMs`), as automáticas não aparecem. A faixa no topo (`scripts/aviso.js`, evento
+`notification`) mostra uma por vez por 5 s — 2,5 s se outra estiver esperando, para a reação ao que você fez não chegar atrasada (fila de no máximo 3). O diário lista as últimas 6 do histórico; um novo pet
+limpa o histórico.
 
 Checagem automática a cada segundo (em ordem de prioridade):
 

@@ -184,10 +184,15 @@
               "score": "0.2 + trait('curiosidade') * 2 - distance(self, target) / 2000 + habit('explorar') * 0.5"
             },
             "procurar": {
-              "score": "trait('sociabilidade') * (0.3 + clamp((75 - self.props.afeto) / 60, 0, 1) * 2.5) * (1.2 - trait('independencia')) + (self.props.fome < 30 && !self.props.temRacao) * trait('sociabilidade') * 2 + habit('procurar') * 0.8"
+              "score": "trait('sociabilidade') * (0.3 + clamp((75 - self.props.afeto) / 60, 0, 1) * 2.5) * (1.2 - trait('independencia')) + (self.props.fome < 30 && !self.props.temRacao) * trait('sociabilidade') * 2 + habit('procurar') * 0.8 + memory('voce', 'carinho') * trait('sociabilidade') * 1.5 + memory('voce', 'acordado') * 2"
             },
             "descansar": {
               "score": "0.5 + (1 - trait('atividade')) * 1.5 + clamp((60 - self.props.energia) / 60, 0, 1) * 1.5 + self.props.doente * 4 + habit('descansar') * 0.5"
+            },
+            "chamar": {
+              "when": "self.props.temBola && self.props.energia > 30 && !self.props.doente",
+              "cooldownMs": 60000,
+              "score": "memory('voce', 'brincouComVoce') * 3 * (0.3 + clamp((90 - self.props.diversao) / 50, 0, 1)) * (0.5 + trait('sociabilidade'))"
             }
           },
           "noise": 1,
@@ -252,7 +257,20 @@
           "tagBlend": 0.7
         },
         "Persist": { "key": "petIndividuo" },
-        "Routine": { "slots": 8, "halfLifeDays": 4, "minEvidence": 3 }
+        "Routine": { "slots": 8, "halfLifeDays": 4, "minEvidence": 3 },
+        "Memory": {
+          "capacity": 40,
+          "halfLifeHours": 12,
+          "halfLives": {
+            "susto": 3,
+            "acordado": 2,
+            "carinho": 6,
+            "brincouComVoce": 8,
+            "brinquedo": 24,
+            "comida": 72
+          },
+          "minStrength": 0.05
+        }
       }
     },
     {

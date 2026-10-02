@@ -1,4 +1,4 @@
-import type { Components } from '@vibe/shared';
+import { MemoryEntrySchema, type Components } from '@vibe/shared';
 import type { Entity } from './entity';
 import { itemTags } from './items';
 import { Rng } from './rng';
@@ -13,6 +13,7 @@ import type { World } from './world';
  *   Preferences  affinity -1..1 per subject (item id, tag, context) = innate + learned; innate values
  *                may lean on traits; learning moves slowly and is bounded
  *   Routine      habits by time of day (see routine.ts)
+ *   Memory       experiences that fade and get reinforced (see memory.ts)
  *   Persist      keeps them in game.storage[key]: loaded before the entity's first onStart, drawn
  *                when missing, saved at the end of any frame in which they changed
  *
@@ -42,6 +43,7 @@ export interface PersistedIndividual {
   traits?: Record<string, number>;
   preferences?: Record<string, { innate: number; learned: number; n: number }>;
   routine?: { values: Record<string, number[]>; updatedAt?: number };
+  memory?: unknown[];
 }
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -159,6 +161,7 @@ export function persistedOf(c: Components): PersistedIndividual {
   if (c.Traits) out.traits = { ...c.Traits.values };
   if (c.Preferences) out.preferences = structuredClone(c.Preferences.values);
   if (c.Routine) out.routine = { values: structuredClone(c.Routine.values), ...(c.Routine.updatedAt !== undefined && { updatedAt: c.Routine.updatedAt }) };
+  if (c.Memory) out.memory = structuredClone(c.Memory.entries);
   return out;
 }
 
@@ -187,6 +190,10 @@ function applyPersisted(c: Components, saved: unknown): boolean {
     }
     if (typeof s.routine.updatedAt === 'number') c.Routine.updatedAt = s.routine.updatedAt;
   }
+  if (c.Memory && Array.isArray(s.memory)) {
+    const ok = MemoryEntrySchema.array().safeParse(s.memory.filter((x) => MemoryEntrySchema.safeParse(x).success));
+    if (ok.success) c.Memory.entries = ok.data;
+  }
   return true;
 }
 
@@ -202,7 +209,7 @@ export class IndividualRunner {
   private readonly dirty = new Set<Entity>();
   private resets = 0;
   /** Values the entity was authored with (before loading and drawing), for reset. */
-  private readonly authored = new WeakMap<Entity, { traits?: Record<string, number>; preferences?: PersistedIndividual['preferences']; routine?: Record<string, number[]> }>();
+  private readonly authored = new WeakMap<Entity, { traits?: Record<string, number>; preferences?: PersistedIndividual['preferences']; routine?: Record<string, number[]>; memory?: unknown[] }>();
 
   constructor(
     private readonly world: World,
@@ -218,9 +225,9 @@ export class IndividualRunner {
   ensure(e: Entity) {
     if (this.ready.has(e)) return;
     const c = e.components;
-    if (!c.Traits && !c.Preferences && !c.Routine) return;
+    if (!c.Traits && !c.Preferences && !c.Routine && !c.Memory) return;
     this.ready.add(e);
-    this.authored.set(e, { traits: c.Traits && { ...c.Traits.values }, preferences: c.Preferences && structuredClone(c.Preferences.values), routine: c.Routine && structuredClone(c.Routine.values) });
+    this.authored.set(e, { traits: c.Traits && { ...c.Traits.values }, preferences: c.Preferences && structuredClone(c.Preferences.values), routine: c.Routine && structuredClone(c.Routine.values), memory: c.Memory && structuredClone(c.Memory.entries) });
     const key = c.Persist?.key;
     const loaded = key !== undefined && applyPersisted(c, this.host.storage.get(key));
     const rng = new Rng(hash(`${this.host.seed}:${e.id}:${this.host.clock.now}`));
@@ -264,6 +271,7 @@ export class IndividualRunner {
       c.Routine.values = structuredClone(authored?.routine ?? {});
       delete c.Routine.updatedAt;
     }
+    if (c.Memory) c.Memory.entries = structuredClone((authored?.memory ?? []) as typeof c.Memory.entries);
     const key = c.Persist?.key;
     if (key !== undefined) this.host.storage.remove(key);
     this.dirty.delete(e);

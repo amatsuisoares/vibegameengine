@@ -23,6 +23,9 @@ function abrir(self, game) {
   self.get('Sprite').visible = true;
   if (!owned.length) carta(game, self, 0, '🧺\nVazia: Loja', '');
   owned.forEach((e, i) => carta(game, self, i, `${e.item.icon || '?'} ×${e.count}\n${e.item.name}`, e.item.id));
+  // O pet pode lembrar que dali vem coisa boa.
+  const pet = game.entity('pet');
+  if (pet && pet.state.api && pet.state.api.bandejaAberta) pet.state.api.bandejaAberta();
 }
 
 function fechar(self, game) {

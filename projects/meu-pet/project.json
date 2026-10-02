@@ -26,5 +26,6 @@
     { "id": "sfx_guizo", "type": "audio", "path": "sfx/sfx_guizo.wav" }
   ],
   "gravity": 0,
-  "pixelArt": false
+  "pixelArt": false,
+  "notifications": { "minGapMs": 4000, "logSize": 50 }
 }

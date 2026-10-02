@@ -190,6 +190,14 @@
       "text": "A experiência ideal é no 1x: a velocidade (60x/600x) é só para testes. Toda mudança precisa ser perceptível no 1x em poucos minutos; calibrar pelo que se vê a 1x, não por dias simulados. Origem: a usuária não percebeu preferência de brinquedo em 3 pets",
       "status": "open",
       "updatedAt": "2026-10-02T19:40:00.549Z"
+    },
+    {
+      "id": "f15",
+      "kind": "feature",
+      "text": "Memória do pet (Memory) e observações pelo game.notify: reconhece comida detestada (vira o rosto) e adorada (se anima, corre até a bandeja aberta), desconfia do brinquedo que assustou, pede a bola depois de brincar com você (desiste aos poucos se ignorado), carinho bom aproxima, ser acordado afasta; tudo salvo com o indivíduo",
+      "status": "verified",
+      "evidence": "teste de regressão 'memory:' (comida, bandeja, susto do chocalho, pedido de bola em < 4 min a 1x, reabrir mantém); medição: ~3 pedidos de bola em 10 min, caindo; playtest com screenshots (peixe reconhecido, maçã, bandeja, pedido de bola atendido)",
+      "updatedAt": "2026-10-02T21:16:26.152Z"
     }
   ],
   "plans": []

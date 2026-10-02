@@ -92,6 +92,17 @@ export const ProjectConfigSchema = z.strictObject({
     .record(z.string(), SoundRefSchema)
     .default(() => ({}))
     .describe('Event type -> audio asset played when that event happens, e.g. {"jump": "sfx_jump", "collect": "sfx_coin"}.'),
+  notifications: z
+    .strictObject({
+      minGapMs: z
+        .number()
+        .min(0)
+        .default(0)
+        .describe('Real ms after a notification during which background ones (priority 0) and lower-priority ones are dropped (no pile-up).'),
+      logSize: z.number().int().min(0).max(500).default(50).describe('Notifications kept in the log (game.notifications.log()).'),
+    })
+    .default(() => ({ minGapMs: 0, logSize: 50 }))
+    .describe('game.notify(): observations shown to the player, with cooldowns and priority.'),
 });
 
 export const ProjectSchema = z.strictObject({

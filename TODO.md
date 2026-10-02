@@ -294,7 +294,15 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
   qualquer um, a bola também, que passou a ser item do inventário); **arrastar** pelúcia e chocalho (lugar salvo).
   Engine: no `weighted` o alvo também é sorteado (∝ nota^sharpness); clique/arrasto escolhem a entidade de cima pela
   camada do `Sprite` **ou** do `Text` (um emoji na frente do pet não era clicável)
-- [ ] **Fase 6 — Memória + observações (`Notifier`)**
+- [x] **Fase 6 — Memória + observações (`Notifier`)**: componente `Memory` (memórias {tipo, assunto, tags, valência,
+  importância} com força pela idade no relógio e meia-vida por tipo, reforço do que se repete, esquecimento com evento
+  `memory_forgotten`, `remember/recall/feeling/forget`, `memory()` nas expressões, `memories` no estado, salvo pelo
+  `Persist`); `game.notify` (cooldown de relógio salvo + cooldown real, prioridade com `config.notifications.minGapMs`,
+  evento `notification`, histórico em storage, ação de regra `notify`)
+- [x] meu-pet: observações migradas para o `game.notify` (automáticas com prioridade 0); memória com efeito visível no
+  1×: reconhece comida detestada (vira o rosto) ou adorada (se anima, corre até a bandeja aberta), desconfia do
+  brinquedo que assustou, pede a bola de novo depois de brincar com você (e desiste aos poucos se ignorado), carinho
+  bom aproxima, ser acordado afasta; playbooks migrados para `notification`; 458 testes
 - [ ] **Fase 7 — Diário individual** (`Knowledge`, `Journal`, `Text.maxWidth`)
 - [ ] **Fase 8 — Ambiente + sono** (`Ambient`, `env()`)
 - [ ] **Fase 9 — Preferências dinâmicas + histórico**

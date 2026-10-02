@@ -10,6 +10,8 @@ import type { EmitterOptions } from './particles';
 import { aiOf, type UtilityRunner } from './utility';
 import { ItemCatalog, type ItemFilter, type ItemInfo } from './items';
 import { habitOf, patternsOf, peakOf, recordActivity, type Habit } from './routine';
+import { feelingOf, forget, recall, remember, type MemoryView, type RecallQuery, type RememberInput } from './memory';
+import type { NotificationEntry, Notifier, NotifyOptions } from './notifier';
 import type { BuyOptions, BuyResult, Economy, Inventory, Wallet } from './economy';
 import { affinityOf, evaluate, evaluateItem, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
@@ -63,6 +65,7 @@ export interface ScriptHost extends SlotHost {
   readonly individuals: IndividualRunner;
   readonly items: ItemCatalog;
   readonly economy: Economy;
+  readonly notifications: Notifier;
   useItem(itemId: string, target: Entity, by?: Entity): { handled: boolean; result: unknown };
 }
 
@@ -106,6 +109,18 @@ export interface ScriptRoutine {
   peak(activity: string): { slot: number; from: number; to: number; weight: number } | null;
   /** Stable habits: [{activity, slot, from, to, share, weight}], strongest first. */
   patterns(minShare?: number): Habit[];
+}
+
+/** self.memory: what the entity lived and how it felt (Memory). */
+export interface ScriptMemory {
+  /** Remembers an experience (same type + subject = reinforced); returns it as it is now. Saved with Persist. */
+  remember(type: string, input?: RememberInput): MemoryView;
+  /** Memories matching {type, subject, tag, minStrength, limit}, strongest first, each with its strength now. */
+  recall(query?: RecallQuery): MemoryView[];
+  /** Σ valence × strength about a subject (optionally one type), -1..1; 0 = nothing remembered. */
+  feeling(subject: string, type?: string): number;
+  /** Drops memories matching {type, subject} (all without a query); returns how many. */
+  forget(query?: { type?: string; subject?: string }): number;
 }
 
 /** self.persist: where the individual data is kept (Persist). */
@@ -276,6 +291,8 @@ export interface ScriptEntity {
   readonly prefs: ScriptPrefs;
   /** The entity's Routine. */
   readonly routine: ScriptRoutine;
+  /** The entity's Memory. */
+  readonly memory: ScriptMemory;
   /** The entity's Persist. */
   readonly persist: ScriptPersist;
   /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
@@ -382,6 +399,14 @@ export interface ScriptGame {
   readonly shop: { list(filter?: ItemFilter): ItemInfo[]; buy(item: string, options?: BuyOptions): BuyResult };
   /** Uses an item on an entity: event "item_used" and its onItem hook; returns {handled, result}. */
   useItem(item: string | ItemInfo, target: string | ScriptEntity, by?: string | ScriptEntity): { handled: boolean; result: unknown };
+  /**
+   * Shows an observation to the player (event "notification" {kind, text, priority, entity?, ...data}) unless
+   * the same kind is cooling down (cooldownMs: game clock; realCooldownMs: real time) or a recent one of higher
+   * priority is still on (priority 0 = background). Returns whether it was shown.
+   */
+  notify(kind: string, text: string, options?: NotifyOptions): boolean;
+  /** The notifications shown: log(n?, entity?) oldest first (kept in storage), clear() forgets them and their cooldowns. */
+  readonly notifications: { log(n?: number, entity?: string | ScriptEntity): NotificationEntry[]; clear(): void };
 }
 
 /** Builds the `self`/`game` objects scripts see, bound to one world. */
@@ -540,6 +565,11 @@ class ScriptApi {
           resolve(target, 'game.useItem target'),
           by === undefined ? undefined : resolve(by, 'game.useItem by'),
         ),
+      notify: (kind, text, options) => host.notifications.notify(String(kind), String(text), options ?? {}),
+      notifications: {
+        log: (n, entity) => host.notifications.log(n === undefined ? undefined : finite(n, 'n'), entity === undefined ? undefined : typeof entity === 'string' ? entity : entity.id),
+        clear: () => host.notifications.clear(),
+      },
     };
   }
 
@@ -723,6 +753,35 @@ class ScriptApi {
       peak: (activity) => (routineData(), peakOf(e, String(activity))),
       patterns: (minShare) => (routineData(), patternsOf(e, minShare === undefined ? undefined : finite(minShare, 'minShare'))),
     };
+    const memoryData = () => {
+      if (!e.components.Memory) throw new Error(`entity "${e.id}" has no Memory`);
+      individuals.ensure(e);
+    };
+    const forgotten = (x: { type: string; subject?: string; importance: number; count: number; valence: number }) =>
+      w.emit('memory_forgotten', { entity: e.id, memory: x.type, ...(x.subject !== undefined && { subject: x.subject }), valence: x.valence, importance: x.importance, count: x.count });
+    const memory: ScriptMemory = {
+      remember: (type, input) => {
+        memoryData();
+        const r = remember(e, host.clock.now, String(type), input ?? {}, forgotten);
+        individuals.touch(e);
+        w.emit('memory', { entity: e.id, memory: r.memory.type, ...(r.memory.subject !== undefined && { subject: r.memory.subject }), valence: r.memory.valence, strength: r.memory.strength, count: r.memory.count, reinforced: r.reinforced });
+        return r.memory;
+      },
+      recall: (query) => {
+        memoryData();
+        const n = e.components.Memory!.entries.length;
+        const out = recall(e, host.clock.now, query ?? {}, forgotten);
+        if (e.components.Memory!.entries.length !== n) individuals.touch(e);
+        return out;
+      },
+      feeling: (subject, type) => (memoryData(), feelingOf(e, host.clock.now, String(subject), type === undefined ? undefined : String(type))),
+      forget: (query) => {
+        memoryData();
+        const k = forget(e, query ?? {});
+        if (k) individuals.touch(e);
+        return k;
+      },
+    };
     const persist: ScriptPersist = {
       get key() {
         return e.components.Persist?.key ?? null;
@@ -740,6 +799,7 @@ class ScriptApi {
       traits,
       prefs,
       routine,
+      memory,
       persist,
       get x() {
         return e.x;

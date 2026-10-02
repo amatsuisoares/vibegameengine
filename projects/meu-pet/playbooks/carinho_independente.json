@@ -16,7 +16,7 @@
     { "assert": "state", "id": "pet", "is": "walk", "name": "o pet se afasta" },
     {
       "assert": "eventOccurred",
-      "event": "observacao",
+      "event": "notification",
       "match": { "kind": "carinhoAfasta" },
       "name": "observação de que prefere o próprio espaço"
     },

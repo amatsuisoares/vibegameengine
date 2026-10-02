@@ -141,7 +141,7 @@ reabrir) → docs (ARCHITECTURE, AGENT_TOOLS, FEATURES do jogo) → TODO → com
 | 3 ✅ | catálogo de itens, `useItem` + `onItem` + `item_used` | comidas e brinquedos com tags; reação por preferência (aproximar/afastar, emote, animação); fim do petisco único |
 | 4 ✅ | inventário, moeda, loja (`buy`), ações/expressões | tela de inventário e loja; renda pequena (cuidado diário) |
 | 5 ✅ | `UtilityAI` com alvos, `Routine` | decisão sem prioridades fixas; conflito de necessidades decidido pela personalidade; rotina individual |
-| 6 | `Memory`, `Notifier` | lembra experiências boas/ruins e procura de novo; observações migram para o Notifier |
+| 6 ✅ | `Memory`, `Notifier` | lembra experiências boas/ruins e procura de novo; observações migram para o Notifier |
 | 7 | `Knowledge`, `Journal`, `Text.maxWidth` | diário em seções (básico, personalidade descoberta, gostos, memórias, descobertas, hábitos, evolução) |
 | 8 | `Ambient`, `env()` | luz, música, silêncio, conforto; qualidade do sono pela cama/luz/ruído/preferências |
 | 9 | aprendizado de afinidade ligado à memória | preferências que mudam devagar; hábitos no diário |
