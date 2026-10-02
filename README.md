@@ -79,7 +79,9 @@ Exemplo de `play.json` — anda, pula e fotografa com colliders anotados:
 
 Screenshots ficam em `projects/<nome>/.vibe/runs/`.
 
-Com `npm run dev` aberto, cada alteração aparece no jogo na hora (hot reload).
+Com `npm run dev` aberto, cada alteração aparece no jogo na hora (hot reload). O jogo **mantém o estado**: cena,
+posições, variáveis e progresso. Só o que a edição mudou é trocado. Desligue **Manter estado** para recomeçar a cada
+edição.
 
 ### Runtime no browser
 

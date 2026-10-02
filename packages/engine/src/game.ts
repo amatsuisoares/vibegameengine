@@ -300,6 +300,11 @@ export class Game {
     cameraSystem(this.world);
   }
 
+  /** The current scene's rule runner (its memory is kept by a hot reload). */
+  get rules(): RuleRunner {
+    return this.ruleRunner;
+  }
+
   /** Back to the start scene with fresh variables. Input is released. */
   restart() {
     this.input.releaseAll();

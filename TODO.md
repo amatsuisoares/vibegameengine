@@ -203,6 +203,25 @@ Complementa o Claude Code (fluxo IA-first continua), sem virar um editor tipo Un
   passando
 - [x] 373 testes unitários + 23 e2e
 
+## V0.6 — Robustez (em andamento)
+Um sistema por vez; só depois que os anteriores estão funcionando.
+- [x] **Hot reload com estado**: capturar → recarregar → restaurar o que é compatível (`captureHotState` /
+  `restoreHotState`, `engine/src/hot-state.ts`).
+  - A fusão é de três vias, campo a campo: se o arquivo não mudou o valor, vale o do jogo rodando; se mudou, vale a
+    edição.
+  - Ficam: cena, frame, variáveis, câmera, sequência aleatória, posições, ativado/destruído, valores dos componentes
+    (`Health.current`, velocidade, `Script.props`...), estado da `StateMachine`, memória das regras (`start`/`once`
+    não repetem, expressões mantêm a borda) e entidades criadas no jogo, refeitas do prefab atualizado.
+  - Recomeçam: timers, tweens, partículas, `self.state` (o `onStart` roda de novo), IA, navegação e animação.
+  - Na página jogada há a caixa **Manter estado**. Não vale no modo edição, no "Seguir agente" nem nas runs do
+    agente, que são replay.
+- [x] meu-pet: `inicio` e `quarto` restauram sem erro (8 e 34 entidades); playbooks passando
+- [x] 380 testes unitários + 24 e2e
+- [ ] CCD (colisão contínua: objetos rápidos atravessando sólidos finos)
+- [ ] AudioSource (som por entidade: clip, volume, loop, spatial, falloff)
+- [ ] Save slots (`saveSlot` / `loadSlot` / `deleteSlot` / `listSlots`, opcional por jogo)
+- [ ] Agent Planning (objetivo → tarefas → verificação, como memória operacional do agente)
+
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.
 
@@ -216,7 +235,7 @@ O jogo de plataforma do enunciado não será feito como teste final; o próximo 
 - Arquivos binários de assets não entram no histórico (só a entrada em `project.json`); undo não apaga o arquivo.
 - Ids de entidade não são renomeáveis (duplicar + apagar). Edições feitas fora do store não entram no histórico.
 - Sem trava entre processos: dois processos escrevendo no mesmo projeto ao mesmo tempo podem conflitar.
-- Física sem colisão contínua: sólidos finos (< 16 px) podem ser atravessados em queda rápida.
+- Física sem colisão contínua: sólidos finos (< 16 px) podem ser atravessados em queda rápida (CCD planejada na V0.6).
 - Corpos dinâmicos não colidem entre si (inimigos se sobrepõem).
 - Plataforma móvel não empurra corpos de lado (só carrega quem está em cima); esmagar contra o teto não é tratado.
 - Contatos O(n²) — suficiente para cenas de centenas de entidades.

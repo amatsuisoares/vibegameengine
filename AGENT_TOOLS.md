@@ -741,7 +741,15 @@ task do VS Code), usa ele; senão sobe um dentro do servidor MCP, que vive enqua
 O agente mostra a URL como link: com `.vscode/settings.json` (`workbench.externalUriOpeners`), o VS Code abre
 links para `localhost:5173` no **Simple Browser**.
 
-- `follow: false` (padrão): o usuário joga; a página recarrega a cada edição do projeto (hot reload).
+- `follow: false` (padrão): o usuário joga; a página recarrega a cada edição do projeto (hot reload) **mantendo o
+  estado** (V0.6): cena, posições, variáveis, vida, `props`, estado das máquinas de estado, entidades criadas no jogo
+  e a memória das regras.
+  - O que a edição mudou no arquivo substitui o valor em jogo; o resto continua. O console diz o que foi mantido:
+    `Hot reload: state kept in "level1" (15 entities); edited: coin2`.
+  - Timers, tweens, partículas e o `self.state` dos scripts recomeçam: o `onStart` roda de novo. Um script que
+    precisa guardar algo usa `props` ou `game.storage`.
+  - A caixa **Manter estado** desligada (ou o botão Restart) recomeça do zero. O modo Editar mostra a cena como está
+    no arquivo.
 - `follow: true` (`?live=1`): a página **segue a run do agente**. Depois de cada ação que muda a run
   (`run_game`, `perform_inputs`, `wait`...), o host grava a run em `.vibe/live.json` (projeto exato, seed, cena
   e log de `GameOp`); o dev server avisa a página, que reaplica as ops novas em tempo real. Se a página fica mais de

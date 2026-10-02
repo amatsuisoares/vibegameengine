@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { Input, type ClockOptions, type GameOp, type LogEntry } from '@vibe/engine';
+import { captureHotState, describeHotRestore, Input, restoreHotState, type ClockOptions, type GameOp, type LogEntry } from '@vibe/engine';
 import {
   AssetStore,
   attachDomInput,
@@ -44,6 +44,7 @@ const debugBox = $<HTMLInputElement>('debug');
 const followBox = $<HTMLInputElement>('follow');
 const clearSaveBtn = $<HTMLButtonElement>('clearSave');
 const soundBox = $<HTMLInputElement>('sound');
+const keepStateBox = $<HTMLInputElement>('keepState');
 /** Follow mode: the page mirrors the agent's run (.vibe/live.json) instead of being played. */
 const follow = params.get('live') === '1';
 
@@ -583,9 +584,24 @@ async function main() {
     return;
   }
 
-  // Hot reload: when a file of this project changes on disk, reload and restart it.
+  // Hot reload: when a file of this project changes on disk, reload it. A played game keeps its
+  // state (scene, positions, variables, progress: captureHotState -> reload -> restoreHotState,
+  // where file edits win over running values); edit mode and "Manter estado" off restart it.
   // One save can emit several change events, and loads can finish out of order: bursts are
   // debounced and only the newest load is applied.
+  keepStateBox.parentElement!.hidden = !playing;
+  try {
+    keepStateBox.checked = localStorage.getItem('vibe:keepState') !== '0';
+  } catch {
+    keepStateBox.checked = true;
+  }
+  keepStateBox.onchange = () => {
+    try {
+      localStorage.setItem('vibe:keepState', keepStateBox.checked ? '1' : '0');
+    } catch {
+      // Remembered for this page only.
+    }
+  };
   let reloadTimer: ReturnType<typeof setTimeout> | undefined;
   let reloadSeq = 0;
   const changed = new Set<string>();
@@ -601,7 +617,17 @@ async function main() {
         const next = await loadProject(name, undefined);
         if (seq !== reloadSeq) return;
         window.__vibeError = undefined;
+        const kept = playing && !editing && keepStateBox.checked ? captureHotState(runtime.game) : null;
         runtime.setProject(next.project, next.assets, playing ? playStart() : undefined);
+        if (kept) {
+          try {
+            appendLog('log', describeHotRestore(restoreHotState(runtime.game, kept)));
+          } catch (err) {
+            appendLog('warn', `Hot reload: could not keep the state (${err instanceof Error ? err.message : String(err)}); the game restarted`);
+            runtime.setProject(next.project, next.assets, playStart());
+          }
+          runtime.render();
+        }
         viewport?.onReload();
         setupSound(next.project);
         logAssetErrors(next.assetErrors);

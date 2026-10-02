@@ -8,6 +8,8 @@ import type { ScriptInstance } from './scripts';
 /** Runtime instance of an entity. Component data is a deep copy of the scene data and may be mutated. */
 export class Entity {
   readonly id: string;
+  /** Prefab it was created from (instances and spawned entities). */
+  readonly prefab?: string;
   name: string;
   tags: Set<string>;
   enabled: boolean;
@@ -59,6 +61,7 @@ export class Entity {
 
   constructor(data: EntityData) {
     this.id = data.id;
+    if (data.prefab) this.prefab = data.prefab;
     this.name = data.name ?? data.id;
     this.tags = new Set(data.tags);
     this.enabled = data.enabled;

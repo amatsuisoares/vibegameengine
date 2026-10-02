@@ -6,6 +6,15 @@ export class Rng {
     this.state = seed >>> 0;
   }
 
+  /** The generator's position, to continue the same sequence elsewhere (hot reload). */
+  get position(): number {
+    return this.state;
+  }
+
+  set position(value: number) {
+    this.state = value >>> 0;
+  }
+
   next(): number {
     let t = (this.state = (this.state + 0x6d2b79f5) >>> 0);
     t = Math.imul(t ^ (t >>> 15), t | 1);

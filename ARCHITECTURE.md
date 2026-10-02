@@ -261,6 +261,18 @@ app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶
   selecionada). O movimento é a edição `move { dx, dy }` do inspector (mesma rota, `modify_game_object` como `user`),
   e o hot reload mostra a posição nova. No modo edição o jogo fica pausado, sem input (como em "Seguir agente"), e
   reinicia na cena editada.
+- **Hot reload com estado** (V0.6, `engine/src/hot-state.ts`):
+  - `captureHotState(game)` gera JSON puro com cena, frame/tempo, variáveis, câmera, posição do `Rng`, memória do
+    `RuleRunner` (`saveState`/`loadState`), as entidades destruídas da cena e, para cada entidade, o que o arquivo
+    antigo dizia (`authored`), o estado em jogo (`live`) e o estado da FSM. Também guarda os prefabs antigos.
+  - `restoreHotState(game, state)` roda num `Game` recém-criado com os arquivos novos, antes do primeiro passo. Cada
+    valor sai de `merge3(antigo, novo, live)`: se o arquivo não mudou o valor, vale o live; se mudou, vale o novo.
+    Objetos são fundidos chave a chave, e chaves criadas em jogo são mantidas.
+  - Entidades criadas em jogo são refeitas com o mesmo merge sobre o prefab (prefab apagado: a entidade é
+    descartada).
+  - Timers, tweens, partículas e `self.state` não são serializáveis. O `onStart` dos scripts roda de novo e os
+    reconstrói.
+  - Só a página jogada usa isso. As runs do agente continuam sendo replay determinístico (projeto + seed + ops).
 - **Asset browser** (V0.5, `server/src/asset-catalog.ts` + `app/asset-panel.ts`): `buildAssetCatalog(store)` lê os
   assets declarados e os arquivos. As dimensões saem do cabeçalho (`imageSize`: PNG, GIF, JPEG, WebP, SVG), e a
   duração do WAV de `wavSeconds`. O catálogo aponta arquivos ausentes, quadros que não fecham e arquivos não

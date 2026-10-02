@@ -17,13 +17,21 @@ interface FireContext {
  * systems. A rule that throws (bad expression, missing target at runtime) is reported and
  * disabled until the scene reloads, like a failing script.
  */
+/** What a rule runner remembers between frames (kept by a hot reload, so rules do not fire again). */
+export interface RuleRunnerState {
+  started: boolean;
+  startFrame: number;
+  fired: string[];
+  exprWasTrue: Record<string, boolean>;
+}
+
 export class RuleRunner {
   private readonly rules: Rule[];
   private readonly fired = new Set<string>();
   private readonly failed = new Set<string>();
   private readonly exprWasTrue = new Map<string, boolean>();
   private readonly compiled = new Map<string, (scope: ExprScope) => unknown>();
-  private readonly startFrame: number;
+  private startFrame: number;
   private processed: number;
   private started = false;
 
@@ -34,6 +42,19 @@ export class RuleRunner {
     this.rules = world.scene.rules.filter((r) => r.enabled);
     this.startFrame = world.frame;
     this.processed = world.emitted;
+  }
+
+  saveState(): RuleRunnerState {
+    return { started: this.started, startFrame: this.startFrame, fired: [...this.fired], exprWasTrue: Object.fromEntries(this.exprWasTrue) };
+  }
+
+  /** Continues from a saved state (rules that no longer exist are ignored). */
+  loadState(s: RuleRunnerState) {
+    const ids = new Set(this.rules.map((r) => r.id));
+    this.started = s.started;
+    this.startFrame = s.startFrame;
+    for (const id of s.fired) if (ids.has(id)) this.fired.add(id);
+    for (const [id, v] of Object.entries(s.exprWasTrue)) if (ids.has(id)) this.exprWasTrue.set(id, v);
   }
 
   /** `entered`: contacts that began this frame. */

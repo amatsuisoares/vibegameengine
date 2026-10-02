@@ -24,3 +24,4 @@ export * from './nav';
 export * from './particles';
 export * from './assertions';
 export * from './mouse';
+export * from './hot-state';

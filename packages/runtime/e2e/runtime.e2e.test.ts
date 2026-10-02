@@ -144,6 +144,49 @@ describe('runtime page (Chromium)', () => {
     await page.close();
   });
 
+  it('keeps the played state on hot reload, with file edits winning', async () => {
+    cpSync(repo('test-fixtures/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
+    const { page, errors } = await open('project=e2e-tmp');
+    // Play deterministically from the page: walk right until coin1 is collected, then stand still.
+    const played = await vibe(page, (v) => {
+      v.pause();
+      v.apply([{ op: 'keyDown', key: 'ArrowRight' }]);
+      for (let i = 0; i < 300 && v.getState().vars.coins !== 1; i++) v.step(1);
+      v.apply([{ op: 'keyUp', key: 'ArrowRight' }]);
+      v.step(40);
+      const s = v.getState({ ids: ['player'] });
+      return { frame: s.frame, x: s.entities[0].x, coins: s.vars.coins };
+    });
+    expect(played.coins).toBe(1);
+
+    // An edit (here by the agent, through the store): the game reloads but keeps going.
+    const store = new ProjectStore(TMP_PROJECT);
+    const move = (x: number) => createEditingTools().call('modify_game_object', { scene: 'level1', id: 'coin2', patch: { transform: { x } } }, { store, author: 'agent' });
+    await move(1000);
+    const consoleText = () => page.locator('#console').textContent();
+    await expect.poll(consoleText, { timeout: 10_000 }).toMatch(/Hot reload: state kept in "level1" \(\d+ entities\); edited: coin2; still destroyed: 1/);
+    const after = await vibe(page, (v) => {
+      const s = v.getState({ ids: ['player', 'coin1', 'coin2'] });
+      return { frame: s.frame, vars: s.vars, ids: s.entities.map((e) => [e.id, e.x]) };
+    });
+    expect(after.frame).toBe(played.frame);
+    expect(after.vars.coins).toBe(1);
+    expect(after.ids).toEqual([
+      ['player', played.x],
+      ['coin2', 1000],
+    ]);
+
+    // "Manter estado" off: the reload starts the game over.
+    await page.locator('#keepState').uncheck();
+    await move(1050);
+    await page.waitForFunction(() => window.__vibe!.getState({ ids: ['coin2'] }).entities[0]?.x === 1050, undefined, { timeout: 10_000 });
+    const fresh = await vibe(page, (v) => v.getState({ ids: ['coin1'] }));
+    expect(fresh.vars.coins).toBe(0);
+    expect(fresh.entities.map((e) => e.id)).toEqual(['coin1']);
+    expect(errors).toEqual([]);
+    await page.close();
+  });
+
   it('hot-reloads when project files change and reports invalid edits', async () => {
     const { page } = await open('project=e2e-tmp&paused=1');
     const sceneFile = `${TMP_PROJECT}/scenes/level1.json`;
