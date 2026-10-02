@@ -6,6 +6,7 @@ import { GameStorage } from './storage';
 import { round2 } from './math';
 import { Rng } from './rng';
 import { animationSystem, animFrameIndex } from './systems/animation';
+import { audioMix, audioSourceSystem } from './audio-source';
 import { cameraSystem, worldToScreen } from './systems/camera';
 import { controllerSystem } from './systems/controllers';
 import { moverSystem } from './systems/mover';
@@ -175,6 +176,8 @@ export interface EntitySnapshot {
   tweens?: TweenInfo[];
   /** Animator: clip showing and its frame index. */
   anim?: { clip: string | null; frame: number };
+  /** AudioSource: clip, whether it plays (a loop sounding / a one-shot about to play), and volume / pan as heard now. */
+  audio?: { clip: string; loop: boolean; playing: boolean; volume: number; pan: number };
   components?: Record<string, unknown>;
   /** Box on screen (only with `onScreen` queries). */
   screen?: ScreenBox;
@@ -358,6 +361,7 @@ export class Game {
         w.tweens.run();
         w.particles.run(dt);
         animationSystem(w, dt);
+        audioSourceSystem(w);
         this.soundDirector.run();
         this.scriptRunner.events();
         w.flushDestroyed();
@@ -554,6 +558,8 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
   const tweens = w.tweens.list(e);
   if (tweens.length) s.tweens = tweens;
   if (e.components.Animator) s.anim = { clip: e.animName, frame: Math.max(0, animFrameIndex(e)) };
+  const audio = e.components.AudioSource;
+  if (audio) s.audio = { clip: audio.clip, loop: audio.loop, playing: audio.playing && e.active, ...audioMix(w, e) };
   const props = e.components.Script?.props;
   if (props && Object.keys(props).length) s.props = { ...props };
   if (withComponents) s.components = structuredClone(e.components) as Record<string, unknown>;

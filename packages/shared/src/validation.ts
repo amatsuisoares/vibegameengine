@@ -205,6 +205,11 @@ export function checkScene(scene: Scene, project?: Project): { errors: string[];
     if (project && c.Sprite?.asset && !assetIds.has(c.Sprite.asset)) {
       errors.push(`${ep}.components.Sprite.asset: asset "${c.Sprite.asset}" does not exist`);
     }
+    if (project && c.AudioSource) {
+      const clip = project.config.assets.find((a) => a.id === c.AudioSource!.clip);
+      if (!clip) errors.push(`${ep}.components.AudioSource.clip: audio asset "${c.AudioSource.clip}" does not exist`);
+      else if (clip.type !== 'audio') errors.push(`${ep}.components.AudioSource.clip: asset "${clip.id}" is ${clip.type}, not audio`);
+    }
     if (c.Body?.type === 'dynamic' && !c.Collider) {
       warnings.push(`${ep}: dynamic Body without Collider will fall through everything`);
     }

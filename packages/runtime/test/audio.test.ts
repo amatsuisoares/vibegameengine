@@ -12,9 +12,9 @@ function recorder(failing: string[] = []) {
       log.push(`load ${url}`);
       return url.split('/').pop()!;
     },
-    play: (clip, { volume, loop }) => {
-      log.push(`play ${clip} ${volume}${loop ? ' loop' : ''}`);
-      return () => log.push(`stop ${clip}`);
+    play: (clip, { volume, loop, pan }) => {
+      log.push(`play ${clip} ${volume}${loop ? ' loop' : ''}${pan ? ` pan ${pan}` : ''}`);
+      return { stop: () => log.push(`stop ${clip}`), set: (v, p) => log.push(`set ${clip} ${v} ${p}`) };
     },
   };
   return { log, backend };
@@ -81,5 +81,52 @@ describe('Runtime.onEvents', () => {
     scheduler.run(32);
     expect(seen.slice(3)).toEqual(['scene_loaded@0']);
     expect(rt.game).toBeInstanceOf(Game);
+  });
+});
+
+describe('AudioSource voices', () => {
+  const voice = (entity: string, asset: string, volume = 1, pan = 0) => ({ entity, asset, volume, pan });
+
+  it('starts, follows, stops and mutes the loops of the game', async () => {
+    const { log, backend } = recorder();
+    const player = new SoundPlayer(ASSETS, '/a/', backend);
+    await player.loadAll();
+    log.length = 0;
+
+    player.updateVoices([voice('fan', 'theme', 0.5, -0.25), voice('radio', 'other')]);
+    expect(log).toEqual(['play theme.ogg 0.5 loop pan -0.25', 'play other.ogg 1 loop']);
+    player.updateVoices([voice('fan', 'theme', 0.5, -0.25), voice('radio', 'other')]);
+    expect(log).toHaveLength(2); // nothing changed: nothing restarted
+    player.updateVoices([voice('fan', 'theme', 0.2, 0.5)]);
+    expect(log.slice(2)).toEqual(['stop other.ogg', 'set theme.ogg 0.2 0.5']);
+    player.updateVoices([voice('fan', 'coin', 0.2, 0.5)]); // another clip: restarted
+    expect(log.slice(4)).toEqual(['stop theme.ogg', 'play coin.wav 0.2 loop pan 0.5']);
+
+    player.setMuted(true);
+    expect(log.at(-1)).toBe('stop coin.wav');
+    player.updateVoices([voice('fan', 'coin')]);
+    expect(log).toHaveLength(7);
+    player.setMuted(false);
+    player.updateVoices([voice('fan', 'coin')]);
+    expect(log.at(-1)).toBe('play coin.wav 1 loop');
+    player.stopAll();
+    expect(log.at(-1)).toBe('stop coin.wav');
+  });
+
+  it('plays one-shots with their pan, and the runtime hands it the voices every frame', async () => {
+    const { log, backend } = recorder();
+    const player = new SoundPlayer(ASSETS, '/a/', backend);
+    await player.loadAll();
+    player.handle([ev(1, 'sound', { asset: 'coin', volume: 0.5, pan: 0.75 })], 1);
+    expect(log.at(-1)).toBe('play coin.wav 0.5 pan 0.75');
+
+    const frames: number[] = [];
+    const scheduler = manualScheduler();
+    const p = assertProject({ config: { name: 't', startScene: 'main' }, scenes: { main: { id: 'main', entities: [] } } });
+    const rt = new Runtime(fakeCanvas().canvas, p, { scheduler: scheduler.scheduler, paused: true, onFrame: (g) => frames.push(g.frame) });
+    rt.start();
+    scheduler.run(0);
+    scheduler.run(16);
+    expect(frames).toEqual([0, 0]);
   });
 });

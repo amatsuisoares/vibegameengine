@@ -83,7 +83,7 @@ function fieldKind(key: string, p: JsonSchema): Pick<InspectorField, 'kind' | 'o
   if (p.type === 'integer') return { kind: 'integer' };
   if (p.type === 'number') return { kind: 'number' };
   if (p.type === 'string') {
-    if (key === 'asset' || /Asset$/.test(key)) return { kind: 'asset' };
+    if (key === 'asset' || key === 'clip' || /Asset$/.test(key)) return { kind: 'asset' };
     if (/colou?r$/i.test(key)) return { kind: 'color' };
     return { kind: 'string' };
   }

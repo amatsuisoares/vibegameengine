@@ -385,6 +385,19 @@ Implementado na Etapa 8 (`tools/asset-tools.ts`, `sfx.ts`, `engine/src/sound.ts`
   roda; regras têm a ação `playSound` e scripts `game.playSound(id, volume?)`. A run emite `sound`
   (`{asset, volume, cause}`) e `music` (`{asset | null}`): o agente verifica pelos eventos, sem ouvir; o browser toca
   com Web Audio (depois do primeiro clique/tecla, regra dos navegadores) e a barra do jogo tem a caixa **Som**.
+- **Som por entidade (`AudioSource`, V0.6):** `{clip, volume, loop, playing, spatial, falloff}`.
+  - `loop: true` soa enquanto a entidade está ativa e `playing` é `true`. Serve para ambiente, máquina, passos ligados
+    pelo script ou NPC falando. Não gera eventos: o agente vê em `inspect_game_state`
+    (`audio: {clip, loop, playing, volume, pan}`).
+  - `loop: false` é um som único. Toca quando `playing` fica `true` (inclusive no início) e volta a `false`. Para
+    tocar de novo, use `modify {target, component: "AudioSource", set: {playing: true}}` ou, no script,
+    `self.get('AudioSource').playing = true`. Emite `sound` com `entity`.
+  - `spatial: true`: o ouvinte é o centro da câmera. O volume cai linearmente até zero em `falloff` px (padrão 400) e
+    o som vai para a esquerda ou a direita conforme a posição.
+  - O `clip` tem que ser um asset de áudio (validado).
+  ```json
+  "AudioSource": { "clip": "sfx_fogo", "loop": true, "volume": 0.6, "spatial": true, "falloff": 300 }
+  ```
 
 ## Código e arquivos
 

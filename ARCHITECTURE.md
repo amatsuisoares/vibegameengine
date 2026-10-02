@@ -99,6 +99,7 @@ Memória do agente em `.vibe/memory.json`.
 | `UtilityAI` | escolhe o que fazer pela nota de cada opção (expressões); entra no estado correspondente |
 | `NavAgent` | anda até um alvo (entidade ou ponto) por um caminho A* em grade, desviando de sólidos (visão de cima) |
 | `ParticleEmitter` | partículas visuais (taxa contínua e rajadas, gravidade, arrasto, fade, cores, glifos) |
+| `AudioSource` | som da entidade: `clip`, `volume`, `loop`, `playing`, `spatial`, `falloff` (loop contínuo ou som único repetível; posicional) |
 | `Script` | comportamento em JavaScript (`scripts/*.js`): `onStart/onUpdate/onCollision` com API restrita |
 | `Mover` | segue waypoints (vaivém ou loop, pausa); com Body kinematic vira plataforma móvel/elevador |
 
@@ -163,6 +164,15 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   mapeados em `config.sounds` em `sound`; `loadScene` emite `music`. No browser, `Runtime.onEvents` entrega os eventos
   novos a cada quadro e o `SoundPlayer` (`runtime/src/audio.ts`, Web Audio) toca — sons com mais de 6 frames de
   atraso são descartados (o modo seguir adianta sem rajada). Páginas de screenshot (`?paused=1`) ficam mudas.
+- **AudioSource** (V0.6, `engine/src/audio-source.ts`): som por entidade, também fora da simulação.
+  - Som único: `audioSourceSystem` emite `sound` com `entity`, volume e pan já mixados quando `playing` fica `true`,
+    e volta a `playing` para `false`.
+  - Loop: é estado, não evento. `audioVoices(world)` é pura (como `buildDrawList`) e lista o que deve soar agora.
+    A cada quadro, o `Runtime.onFrame` passa essa lista ao `SoundPlayer.updateVoices`, que inicia, para e ajusta
+    volume e pan (`StereoPanner`, com rampa curta).
+  - Espacial: o ouvinte é o centro da câmera (`listenerOf`); o volume cai linearmente até `falloff` e o pan segue o
+    deslocamento horizontal.
+  - O snapshot da entidade mostra `audio {clip, loop, playing, volume, pan}`.
 - **Relógio e dados salvos** (`engine/src/clock.ts`, `storage.ts`): `GameClock` é a data/hora do calendário, separada do
   tempo de simulação: avança `speed` ms por ms simulado (âncora + frames inteiros, sem erro acumulado) e pula com a op
   `advanceClock`. `GameStorage` guarda JSON. Ambos voltam ao início no `restart`. Runs headless começam numa data fixa

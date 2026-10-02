@@ -81,6 +81,54 @@ describe('runtime page (Chromium)', () => {
     await page.close();
   });
 
+  it('plays AudioSource loops through Web Audio and stops them when the game says so', async () => {
+    cpSync(repo('test-fixtures/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
+    const store = new ProjectStore(TMP_PROJECT);
+    const tools = createEditingTools();
+    const hum = (patch: Record<string, unknown>) =>
+      tools.call('modify_game_object', { scene: 'level1', id: 'flag', patch: { components: { AudioSource: patch } } }, { store, author: 'agent' });
+    expect((await hum({ clip: 'sfx_win', loop: true, spatial: true, falloff: 3000 })).ok).toBe(true);
+
+    const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    // Count the looping sources the page starts and stops, and the pan they get.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __loops: { started: number; stopped: number; pan: number[] } };
+      w.__loops = { started: 0, stopped: 0, pan: [] };
+      const start = AudioBufferSourceNode.prototype.start;
+      const stop = AudioBufferSourceNode.prototype.stop;
+      AudioBufferSourceNode.prototype.start = function (this: AudioBufferSourceNode, ...args: [number?, number?, number?]) {
+        if (this.loop) w.__loops.started++;
+        return start.apply(this, args);
+      };
+      AudioBufferSourceNode.prototype.stop = function (this: AudioBufferSourceNode, ...args: [number?]) {
+        if (this.loop) w.__loops.stopped++;
+        return stop.apply(this, args);
+      };
+      const createPanner = AudioContext.prototype.createStereoPanner;
+      AudioContext.prototype.createStereoPanner = function (this: AudioContext) {
+        const p = createPanner.call(this);
+        queueMicrotask(() => w.__loops.pan.push(p.pan.value));
+        return p;
+      };
+    });
+    await page.goto(`${baseUrl}?project=e2e-tmp`);
+    await page.waitForFunction(() => window.__vibe?.ready, undefined, { timeout: 20_000 });
+    const loops = () => page.evaluate(() => (window as unknown as { __loops: { started: number; stopped: number; pan: number[] } }).__loops);
+    await expect.poll(async () => (await loops()).started, { timeout: 10_000 }).toBe(1);
+    // The flag is far to the right of the view: the loop is panned right.
+    expect((await loops()).pan.at(-1)).toBeGreaterThan(0.3);
+    expect(await vibe(page, (v) => v.getState({ ids: ['flag'] }).entities[0].audio)).toMatchObject({ clip: 'sfx_win', loop: true, playing: true });
+
+    // The game turns it off (an edit here): the page stops the loop.
+    await hum({ playing: false });
+    await expect.poll(async () => (await loops()).stopped, { timeout: 10_000 }).toBe(1);
+    expect((await loops()).started).toBe(1);
+    expect(errors).toEqual([]);
+    await page.close();
+  });
+
   it('loads and decodes the demo sounds', async () => {
     const { page, errors } = await open('project=e2e-tmp');
     await page.waitForFunction(() => /Audio: \d+\/\d+ sounds loaded/.test(document.getElementById('console')!.textContent ?? ''), undefined, {

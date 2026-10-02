@@ -223,7 +223,15 @@ Um sistema por vez; só depois que os anteriores estão funcionando.
   antes. Spatial hash e broad phase ficam para quando houver necessidade real.
 - [x] meu-pet: playbooks passando
 - [x] 387 testes unitários + 24 e2e
-- [ ] AudioSource (som por entidade: clip, volume, loop, spatial, falloff)
+- [x] **AudioSource**: som por entidade `{clip, volume, loop, playing, spatial, falloff}`.
+  - Loop soa enquanto a entidade está ativa e `playing`. Não vira evento: a engine expõe `audioVoices` (pura) e o
+    runtime concilia a cada quadro (inicia, para, volume, pan).
+  - Som único toca quando `playing` vira `true` e volta a `false`, então `modify` e scripts repetem o som. Emite
+    `sound` com `entity`.
+  - Espacial: volume linear até `falloff` a partir do centro da câmera, mais pan estéreo.
+  - Snapshot `audio`, validação do `clip`, campo de asset no inspector.
+- [x] meu-pet: playbooks passando
+- [x] 395 testes unitários + 25 e2e
 - [ ] Save slots (`saveSlot` / `loadSlot` / `deleteSlot` / `listSlots`, opcional por jogo)
 - [ ] Agent Planning (objetivo → tarefas → verificação, como memória operacional do agente)
 

@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { captureHotState, describeHotRestore, Input, restoreHotState, type ClockOptions, type GameOp, type LogEntry } from '@vibe/engine';
+import { audioVoices, captureHotState, describeHotRestore, Input, restoreHotState, type ClockOptions, type GameOp, type LogEntry } from '@vibe/engine';
 import {
   AssetStore,
   attachDomInput,
@@ -242,6 +242,7 @@ async function main() {
     onLog: (e) => appendLog(e.level, e.message, e.frame),
     onTick: follow ? (now) => (holdLive ? liveLoop.reset() : liveLoop.tick(now)) : undefined,
     onEvents: (events, game) => sound?.handle(events, game.frame),
+    onFrame: (game) => sound?.updateVoices(audioVoices(game.world)),
   });
   setupSound(loaded.project);
   const player = new LivePlayer((op) => runtime.game.apply(op));

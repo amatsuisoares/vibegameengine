@@ -45,6 +45,8 @@ export interface RuntimeOptions {
   onTick?: (now: number) => void;
   /** Receives the events emitted since the previous animation frame (e.g. to play sounds). */
   onEvents?: (events: GameEvent[], game: Game) => void;
+  /** Called on every animation frame after the events (e.g. to follow continuous sounds: audioVoices). */
+  onFrame?: (game: Game) => void;
   /** Calendar clock and saved data of the game (see GameClock / GameStorage). */
   clock?: ClockOptions;
   storage?: Record<string, unknown>;
@@ -152,6 +154,7 @@ export class Runtime {
       }
       this.options.onTick?.(now);
       this.dispatchEvents();
+      this.options.onFrame?.(this.game);
       this.render();
     };
     this.rafId = this.scheduler.request(frame);

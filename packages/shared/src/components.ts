@@ -241,6 +241,18 @@ export const NavAgentSchema = z.strictObject({
   avoidTags: z.array(z.string()).default(() => []).describe('Entities with these tags are obstacles too (solid colliders always are).'),
 });
 
+export const AudioSourceSchema = z.strictObject({
+  clip: z.string().min(1).describe('Audio asset id.'),
+  volume: z.number().min(0).max(1).default(1),
+  loop: z.boolean().default(false).describe('true: sounds continuously while the entity is active and `playing` (ambient, engine, NPC chatter). false: a one-shot.'),
+  playing: z
+    .boolean()
+    .default(true)
+    .describe('Loop: on/off. One-shot: plays once when it becomes true (also at start) and turns back to false, so setting it again (modify action, script) replays it.'),
+  spatial: z.boolean().default(false).describe('Volume falls with the distance to the listener (the camera center) and the sound pans left/right.'),
+  falloff: z.number().positive().default(400).describe('Spatial: distance in px where the sound becomes silent (linear).'),
+});
+
 export const ParticleEmitterSchema = z.strictObject({
   emitting: z.boolean().default(true).describe('Emits `rate` particles per second while true (scripts and "modify" toggle it).'),
   rate: z.number().min(0).default(10).describe('Particles per second while emitting (0 = bursts only).'),
@@ -300,6 +312,7 @@ export const ComponentSchemas = {
   UtilityAI: UtilityAISchema,
   NavAgent: NavAgentSchema,
   ParticleEmitter: ParticleEmitterSchema,
+  AudioSource: AudioSourceSchema,
   Script: ScriptSchema,
 } as const;
 
@@ -327,6 +340,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   UtilityAI: 'Chooses what to do by scoring options (needs, distance, time, personality...) with expressions; enters the matching StateMachine state.',
   NavAgent: 'Walks to a target (entity or point) along a grid path (A*) around solid colliders, re-planning as things move (top-down).',
   ParticleEmitter: 'Light visual particles (smoke, dust, hearts, stars, confetti, sparks): continuous rate and/or bursts, gravity, fade; seeded.',
+  AudioSource: 'Sound attached to an entity: a loop (ambient, footsteps, machines) or a one-shot replayed by setting playing; optionally positional (fades with distance, pans).',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -352,6 +366,7 @@ export const ComponentsSchema = z.strictObject({
   UtilityAI: UtilityAISchema.optional(),
   NavAgent: NavAgentSchema.optional(),
   ParticleEmitter: ParticleEmitterSchema.optional(),
+  AudioSource: AudioSourceSchema.optional(),
   Script: ScriptSchema.optional(),
 });
 

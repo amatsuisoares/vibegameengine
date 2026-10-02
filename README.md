@@ -7,7 +7,7 @@ Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa,
 > com hot reload e um modo que segue ao vivo o que o agente está jogando. Além dos componentes prontos há scripts,
 > regras de evento/condição, prefabs, som, plataformas móveis e memória do projeto.
 > **V0.2 concluída** (engine orientada a comportamento): **interações** (`Interactable`: clique, tecla
-> em alcance, entrada numa área, scripts), **máquinas de estado** (`StateMachine`), **Utility AI** (`UtilityAI`), **animação por estado** (`Animator`), **timers**, **tweens**, **pathfinding** (`NavAgent`) e **partículas** (`ParticleEmitter`). **V0.3 concluída** (QA do agente): `verify_game` (cenário → relatório PASS/FAIL + screenshots),
+> em alcance, entrada numa área, scripts), **máquinas de estado** (`StateMachine`), **Utility AI** (`UtilityAI`), **animação por estado** (`Animator`), **timers**, **tweens**, **pathfinding** (`NavAgent`) e **partículas** (`ParticleEmitter`); na V0.6, **som por entidade** (`AudioSource`: loop ou som único, posicional). **V0.3 concluída** (QA do agente): `verify_game` (cenário → relatório PASS/FAIL + screenshots),
 > **asserções estruturadas** (`entityExists`, `state`, `variable`, `eventOccurred`... com valor esperado, encontrado e
 > evidência), **playbooks** de regressão (`playbooks/<id>.json`, `run_playbooks`) e **relatório de diagnóstico**
 > (evidências + sistemas prováveis quando algo falha). **V0.4 concluída** (percepção do agente): `observe` (estado + entidades na tela + input + eventos + screenshot numa

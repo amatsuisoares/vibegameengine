@@ -7,7 +7,7 @@ export const VIBE_INSTRUCTIONS = `VibeGameEngine: a 2D game engine you drive wit
 PROJECTS
 - list_projects / open_project / create_project select what you work on. With a single project, it opens automatically.
 - A project is data: project.json (viewport size, gravity, input actions, assets) and scenes/<id>.json (world size, background, camera, killY, vars, entities). Entities have an id, tags, a transform and components.
-- Built-in components: Sprite, Body, Collider, PlatformerController, Patrol, FollowTarget, Health, Damage, Stompable, Collectible, Goal, Checkpoint, Text, Animator, Mover (waypoints; with a kinematic Body = moving platform that carries the player), Interactable, StateMachine, UtilityAI, NavAgent, ParticleEmitter, Script. list_component_types shows them; pass types=[...] for full schemas with defaults.
+- Built-in components: Sprite, Body, Collider, PlatformerController, Patrol, FollowTarget, Health, Damage, Stompable, Collectible, Goal, Checkpoint, Text, Animator, Mover (waypoints; with a kinematic Body = moving platform that carries the player), Interactable, StateMachine, UtilityAI, NavAgent, ParticleEmitter, AudioSource, Script. list_component_types shows them; pass types=[...] for full schemas with defaults.
 - Prefer the scene/entity/component tools over raw file edits. Edits are incremental (JSON merge patches), validated before writing (a rejected edit writes nothing; read the error and retry), recorded in the history with your "reason", and undoable (undo/redo).
 
 RULES (events and conditions without code)
@@ -73,6 +73,7 @@ ASSETS AND SOUND
 - list_assets is the asset catalog: image sizes, spritesheet frames, audio length, prefabs, scripts, where each is used, missing/undeclared files; unused: true finds what nothing uses. Check it before adding art or sounds (reuse what exists) and frame sizes before animating a spritesheet.
 - import_asset copies an image/spritesheet/audio file the user gives you (absolute path) into assets/ and declares it. create_sound generates a retro WAV effect (coin, jump, hit, powerup, explosion, blip, laser, win, lose; pitch/duration/volume).
 - Sound is driven by events: config.sounds maps event types to audio assets (modify_project_config {"sounds":{"jump":"sfx_jump","collect":"sfx_coin"}}), scene "music" loops a track, rules have a playSound action and scripts game.playSound(id). Runs emit "sound"/"music" events: verify sounds with read_events / events('sound') — the browser plays them.
+- AudioSource {clip, volume, loop, playing, spatial, falloff} = sound on an entity. loop: sounds while active and playing (ambient, machines, footsteps toggled by a script); no events, check entity audio {clip, loop, playing, volume, pan} in inspect_game_state. One-shot (loop false): plays when playing becomes true (also at start) and resets it; replay with modify {component:"AudioSource", set:{playing:true}} or self.get('AudioSource').playing = true; emits "sound" with entity. spatial: fades to 0 at falloff px from the camera center and pans.
 
 RUNNING AND TESTING
 - run_game starts a headless run; time only advances with wait / wait_until / perform_inputs / click_mouse, so runs are deterministic and fast. Each action returns what happened since the previous one (player state, new events, warnings).
