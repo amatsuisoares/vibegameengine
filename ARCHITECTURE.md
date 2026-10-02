@@ -274,6 +274,12 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   meia-vida por tipo, a partir de `last`); reforço por tipo + assunto; esquecimento (abaixo da força mínima e acima da
   capacidade) só em `remember`/`recall`, com evento `memory_forgotten`. O snapshot usa uma consulta só de leitura.
   Persistida pelo `IndividualRunner` (com validação de cada entrada ao carregar).
+- **Conhecimento e crônica** (V0.7, `engine/src/knowledge.ts`, `journal.ts`): `Knowledge.values` = evidência por chave
+  (nível calculado pelos limites do componente, evento `discovery` ao subir) e `Journal.entries` (deduplicação por chave,
+  corte pela menor importância). Ambos persistidos pelo `IndividualRunner`. A engine não sabe o que é "gosto" ou "jeito":
+  as chaves e os textos são do jogo.
+- **`Text.maxWidth`** (V0.7): `buildDrawList` continua puro e só repassa `maxWidth` no `TextCmd`; a quebra
+  (`wrapLines`, testável com uma medida falsa) acontece no `paint`, onde há `measureText`.
 - **Notifier** (V0.7, `engine/src/notifier.ts`): um por `Game` (sobrevive a trocas de cena). Cooldowns de relógio e
   histórico em `storage["vibe.notifications"]`; cooldowns reais e a última prioridade em memória, medidos em
   `world.time` (tempo simulado, não muda com `clock.speed`). Emite `notification`; a ação de regra `notify` usa o

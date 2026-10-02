@@ -42,6 +42,8 @@ export interface TextCmd {
   align: 'left' | 'center' | 'right';
   baseline: 'top' | 'middle';
   opacity?: number;
+  /** Wrap width in viewport pixels (Text.maxWidth): lines are broken at paint time, where text can be measured. */
+  maxWidth?: number;
 }
 
 export type DrawCmd = SpriteCmd | TextCmd;
@@ -94,6 +96,7 @@ export function buildDrawList(world: World, cam: CameraState = world.camera): Dr
         align: t.align,
         baseline: screen ? 'top' : 'middle',
         ...(t.opacity < 1 && { opacity: t.opacity }),
+        ...(t.maxWidth !== undefined && { maxWidth: t.maxWidth * zoom }),
       });
     }
   }
@@ -258,16 +261,42 @@ function paintSprite(ctx: CanvasRenderingContext2D, c: SpriteCmd, o: PaintOption
   ctx.restore();
 }
 
+/**
+ * Breaks lines wider than `maxWidth` at spaces (a single word wider than it stays whole on its line).
+ * `measure` gives the width of a string in the current font.
+ */
+export function wrapLines(lines: string[], maxWidth: number, measure: (s: string) => number): string[] {
+  const out: string[] = [];
+  for (const line of lines) {
+    if (measure(line) <= maxWidth) {
+      out.push(line);
+      continue;
+    }
+    const lead = /^\s*/.exec(line)![0];
+    let cur = '';
+    for (const word of line.slice(lead.length).split(/ +/)) {
+      const next = cur ? `${cur} ${word}` : lead + word;
+      if (cur && measure(next) > maxWidth) {
+        out.push(cur);
+        cur = lead + word;
+      } else cur = next;
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
 function paintText(ctx: CanvasRenderingContext2D, c: TextCmd) {
   const lh = c.fontSize * LINE_HEIGHT;
-  const y0 = c.baseline === 'middle' ? c.y - ((c.lines.length - 1) * lh) / 2 : c.y;
   ctx.save();
   ctx.globalAlpha = c.opacity ?? 1;
   ctx.font = `${c.fontSize}px ${c.font}`;
+  const lines = c.maxWidth !== undefined ? wrapLines(c.lines, c.maxWidth, (s) => ctx.measureText(s).width) : c.lines;
+  const y0 = c.baseline === 'middle' ? c.y - ((lines.length - 1) * lh) / 2 : c.y;
   ctx.fillStyle = c.color;
   ctx.textAlign = c.align;
   ctx.textBaseline = c.baseline;
-  c.lines.forEach((line, i) => ctx.fillText(line, c.x, y0 + i * lh));
+  lines.forEach((line, i) => ctx.fillText(line, c.x, y0 + i * lh));
   ctx.restore();
 }
 

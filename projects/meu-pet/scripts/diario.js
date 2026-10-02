@@ -1,5 +1,7 @@
-// Diário: painel com idade, estágio, personalidade percebida e últimas observações.
-// Abre/fecha pelo botão "Diário"; clicar no painel fecha.
+// Diário: painel em abas (jeito, gostos, histórias) com o que você já percebeu do pet (pet.state.api.diario).
+// Abre/fecha pelo botão "Diário"; as abas trocam o conteúdo; clicar no resto do painel fecha.
+const PARTES = ['diario', 'diarioTexto', 'diarioAba1', 'diarioAba2', 'diarioAba3', 'botaoNovoPet'];
+
 function onUpdate(self, game) {
   const pet = game.entity('pet');
   const text = game.entity('diarioTexto');
@@ -8,7 +10,7 @@ function onUpdate(self, game) {
 }
 
 function onClick(self, game) {
-  for (const id of ['diario', 'diarioTexto', 'botaoNovoPet']) {
+  for (const id of PARTES) {
     const e = game.entity(id);
     if (e) e.enabled = false;
   }

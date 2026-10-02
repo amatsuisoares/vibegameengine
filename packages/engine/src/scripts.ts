@@ -12,6 +12,8 @@ import { ItemCatalog, type ItemFilter, type ItemInfo } from './items';
 import { habitOf, patternsOf, peakOf, recordActivity, type Habit } from './routine';
 import { feelingOf, forget, recall, remember, type MemoryView, type RecallQuery, type RememberInput } from './memory';
 import type { NotificationEntry, Notifier, NotifyOptions } from './notifier';
+import { knowledgeLevel, listKnowledge, observeKnowledge, type KnowledgeLevel, type KnowledgeView } from './knowledge';
+import { addEntry, hasEntry, journalEntries, removeEntry, type JournalAdd, type JournalEntry } from './journal';
 import type { BuyOptions, BuyResult, Economy, Inventory, Wallet } from './economy';
 import { affinityOf, evaluate, evaluateItem, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
@@ -121,6 +123,26 @@ export interface ScriptMemory {
   feeling(subject: string, type?: string): number;
   /** Drops memories matching {type, subject} (all without a query); returns how many. */
   forget(query?: { type?: string; subject?: string }): number;
+}
+
+/** self.knowledge: what the player knows about the entity (Knowledge). */
+export interface ScriptKnowledge {
+  /** The player had a chance to see `key` (weight default 1; negative takes evidence back). Saved with Persist. */
+  observe(key: string, weight?: number): KnowledgeView & { discovered: boolean; from: KnowledgeLevel };
+  /** 'unknown' | 'possible' | 'observed' | 'confirmed'. */
+  level(key: string): KnowledgeLevel;
+  /** Known keys ({prefix, minLevel = 'possible'}), most evidence first. */
+  list(query?: { prefix?: string; minLevel?: KnowledgeLevel }): KnowledgeView[];
+}
+
+/** self.journal: the entity's chronicle (Journal). */
+export interface ScriptJournal {
+  /** Adds an entry; with a key already there it is skipped (null) unless replace. Saved with Persist. */
+  add(category: string, text: string, options?: JournalAdd): JournalEntry | null;
+  /** Entries ({category, limit}), newest first. */
+  entries(query?: { category?: string; limit?: number }): JournalEntry[];
+  has(key: string): boolean;
+  remove(key: string): boolean;
 }
 
 /** self.persist: where the individual data is kept (Persist). */
@@ -293,6 +315,10 @@ export interface ScriptEntity {
   readonly routine: ScriptRoutine;
   /** The entity's Memory. */
   readonly memory: ScriptMemory;
+  /** What the player knows about the entity (Knowledge). */
+  readonly knowledge: ScriptKnowledge;
+  /** The entity's chronicle (Journal). */
+  readonly journal: ScriptJournal;
   /** The entity's Persist. */
   readonly persist: ScriptPersist;
   /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
@@ -782,6 +808,40 @@ class ScriptApi {
         return k;
       },
     };
+    const need = (c: 'Knowledge' | 'Journal') => {
+      if (!e.components[c]) throw new Error(`entity "${e.id}" has no ${c}`);
+      individuals.ensure(e);
+    };
+    const knowledge: ScriptKnowledge = {
+      observe: (key, weight = 1) => {
+        need('Knowledge');
+        const r = observeKnowledge(e, host.clock.now, String(key), finite(weight, 'weight'));
+        individuals.touch(e);
+        if (r.discovered) w.emit('discovery', { entity: e.id, key: r.key, level: r.level, from: r.from });
+        return r;
+      },
+      level: (key) => (need('Knowledge'), knowledgeLevel(e, String(key))),
+      list: (query) => (need('Knowledge'), listKnowledge(e, query ?? {})),
+    };
+    const journal: ScriptJournal = {
+      add: (category, text, options) => {
+        need('Journal');
+        const entry = addEntry(e, host.clock.now, String(category), String(text), options ?? {});
+        if (entry) {
+          individuals.touch(e);
+          w.emit('journal', { entity: e.id, category: entry.category, text: entry.text, ...(entry.key !== undefined && { key: entry.key }) });
+        }
+        return entry;
+      },
+      entries: (query) => (need('Journal'), journalEntries(e, query ?? {})),
+      has: (key) => (need('Journal'), hasEntry(e, String(key))),
+      remove: (key) => {
+        need('Journal');
+        const ok = removeEntry(e, String(key));
+        if (ok) individuals.touch(e);
+        return ok;
+      },
+    };
     const persist: ScriptPersist = {
       get key() {
         return e.components.Persist?.key ?? null;
@@ -800,6 +860,8 @@ class ScriptApi {
       prefs,
       routine,
       memory,
+      knowledge,
+      journal,
       persist,
       get x() {
         return e.x;

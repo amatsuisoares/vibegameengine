@@ -135,6 +135,7 @@ export const TextSchema = z.strictObject({
   screenSpace: z.boolean().default(true).describe('true: fixed on screen (HUD). false: placed in the world.'),
   opacity: z.number().min(0).max(1).default(1),
   layer: z.number().default(100),
+  maxWidth: z.number().positive().optional().describe('Wraps lines wider than this many px, word by word (\n still breaks lines).'),
 });
 
 export const AnimationClipSchema = z.strictObject({
@@ -390,11 +391,36 @@ export const MemorySchema = z.strictObject({
   entries: z.array(MemoryEntrySchema).default(() => []).describe('The memories (filled by self.memory.remember; kept by Persist).'),
 });
 
+export const KnowledgeSchema = z
+  .strictObject({
+    possible: z.number().positive().default(1).describe('Evidence for "possible" (a first hint).'),
+    observed: z.number().positive().default(3).describe('Evidence for "observed".'),
+    confirmed: z.number().positive().default(6).describe('Evidence for "confirmed".'),
+    values: z
+      .record(z.string(), z.strictObject({ evidence: z.number().min(0), first: z.number(), last: z.number() }))
+      .default(() => ({}))
+      .describe('Evidence per key (filled by self.knowledge.observe; kept by Persist).'),
+  })
+  .refine((k) => k.possible <= k.observed && k.observed <= k.confirmed, 'thresholds must be possible <= observed <= confirmed');
+
+export const JournalEntrySchema = z.strictObject({
+  t: z.number().describe('Game clock (ms).'),
+  category: z.string().min(1),
+  text: z.string().min(1),
+  importance: z.number().min(0).max(1).default(0.5),
+  key: z.string().min(1).optional().describe('Dedup key ("first time X"): an entry with the same key is not added twice.'),
+});
+
+export const JournalSchema = z.strictObject({
+  capacity: z.number().int().min(1).max(1000).default(60).describe('Most entries kept; past it, the least important (then the oldest) is dropped.'),
+  entries: z.array(JournalEntrySchema).default(() => []).describe('The chronicle (filled by self.journal.add; kept by Persist).'),
+});
+
 export const PersistSchema = z.strictObject({
   key: z
     .string()
     .min(1)
-    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences, Routine and Memory values) across sessions and scenes.'),
+    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences, Routine, Memory, Knowledge, Journal) across sessions and scenes.'),
 });
 
 /** Registry of all built-in components. Add new component types here. */
@@ -424,6 +450,8 @@ export const ComponentSchemas = {
   Preferences: PreferencesSchema,
   Routine: RoutineSchema,
   Memory: MemorySchema,
+  Knowledge: KnowledgeSchema,
+  Journal: JournalSchema,
   Persist: PersistSchema,
   Script: ScriptSchema,
 } as const;
@@ -457,7 +485,9 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Preferences: 'Likes and dislikes per subject (item, tag, context): innate (optionally from traits) + slowly learned; evaluate(subject, tags) gives a score and a level (love..hate).',
   Routine: 'Habits: what the entity tends to do at each time of day, learned from what it does (self.routine.record), fading with time; habit() biases decisions, patterns() lists stable habits.',
   Memory: 'Episodic memory: experiences (type, subject, valence, importance) that fade with game-clock time and get stronger when repeated; feeling(subject) / memory() in expressions bias decisions.',
-  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory) in game.storage under a key: loaded before onStart, saved when it changes.',
+  Knowledge: 'What the PLAYER knows about the entity: evidence per key (e.g. "likes:apple") that grows into possible / observed / confirmed (event discovery); knows() in expressions. Nothing is revealed for free.',
+  Journal: 'A chronicle of the entity: entries with category, text, importance and a dedup key ("first time it..."), capped by dropping the least important; the base of a diary.',
+  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory, Knowledge, Journal) in game.storage under a key: loaded before onStart, saved when it changes.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -488,6 +518,8 @@ export const ComponentsSchema = z.strictObject({
   Preferences: PreferencesSchema.optional(),
   Routine: RoutineSchema.optional(),
   Memory: MemorySchema.optional(),
+  Knowledge: KnowledgeSchema.optional(),
+  Journal: JournalSchema.optional(),
   Persist: PersistSchema.optional(),
   Script: ScriptSchema.optional(),
 });

@@ -270,7 +270,9 @@
             "comida": 72
           },
           "minStrength": 0.05
-        }
+        },
+        "Knowledge": { "possible": 1, "observed": 3, "confirmed": 6 },
+        "Journal": { "capacity": 80 }
       }
     },
     {
@@ -382,7 +384,14 @@
       "id": "diarioTexto",
       "transform": { "x": 185, "y": 100 },
       "components": {
-        "Text": { "text": "", "fontSize": 17, "font": "sans-serif", "color": "#3b2f2f", "layer": 71 }
+        "Text": {
+          "text": "",
+          "fontSize": 16,
+          "font": "sans-serif",
+          "color": "#3b2f2f",
+          "layer": 71,
+          "maxWidth": 590
+        }
       },
       "enabled": false
     },
@@ -497,6 +506,60 @@
         "Sprite": { "width": 140, "color": "#3f6b35" },
         "Text": { "text": "Brinquedos" },
         "Script": { "props": { "acao": "brinquedos" } }
+      }
+    },
+    {
+      "id": "diarioAba1",
+      "enabled": false,
+      "transform": { "x": 560, "y": 110 },
+      "components": {
+        "Text": {
+          "text": "Jeito",
+          "fontSize": 16,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#9a8b7a",
+          "screenSpace": false,
+          "layer": 72
+        },
+        "Collider": { "width": 92, "height": 30, "isTrigger": true },
+        "Script": { "src": "scripts/diarioAba.js", "props": { "aba": "jeito", "nome": "Jeito" } }
+      }
+    },
+    {
+      "id": "diarioAba2",
+      "enabled": false,
+      "transform": { "x": 655, "y": 110 },
+      "components": {
+        "Text": {
+          "text": "Gostos",
+          "fontSize": 16,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#9a8b7a",
+          "screenSpace": false,
+          "layer": 72
+        },
+        "Collider": { "width": 92, "height": 30, "isTrigger": true },
+        "Script": { "src": "scripts/diarioAba.js", "props": { "aba": "gostos", "nome": "Gostos" } }
+      }
+    },
+    {
+      "id": "diarioAba3",
+      "enabled": false,
+      "transform": { "x": 750, "y": 110 },
+      "components": {
+        "Text": {
+          "text": "Histórias",
+          "fontSize": 16,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#9a8b7a",
+          "screenSpace": false,
+          "layer": 72
+        },
+        "Collider": { "width": 92, "height": 30, "isTrigger": true },
+        "Script": { "src": "scripts/diarioAba.js", "props": { "aba": "historias", "nome": "Histórias" } }
       }
     }
   ]

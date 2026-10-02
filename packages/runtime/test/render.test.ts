@@ -11,6 +11,7 @@ import {
   type AssetResolver,
   type SpriteCmd,
   type TextCmd,
+  wrapLines,
 } from '../src';
 import { demoProject, project, recordingContext } from './helpers';
 
@@ -69,6 +70,15 @@ describe('buildDrawList', () => {
     expect(h).toMatchObject({ x: 8, y: 8, lines: ['Coins: 2', 'HP 4'], baseline: 'top', fontSize: 16 });
     expect(s).toMatchObject({ x: 200, y: 200, baseline: 'middle', fontSize: 20 });
     expect(texts.map((t) => t.id)).toEqual(['hud', 'sign']);
+  });
+
+  it('Text.maxWidth goes to the draw command (scaled by zoom) and wrapLines breaks words to fit, keeping explicit lines and indentation', () => {
+    const note = { id: 'note', transform: { x: 300, y: 100 }, components: { Text: { text: 'a', screenSpace: false, maxWidth: 50 } } };
+    const game = new Game(project([note], { camera: { x: 200, zoom: 2, clampToBounds: false } }));
+    expect((buildDrawList(game.world) as TextCmd[])[0].maxWidth).toBe(100);
+    const measure = (t: string) => t.length * 10; // 10 px per character
+    expect(wrapLines(['one two three four', 'short', '  · indented line here'], 140, measure)).toEqual(['one two three', 'four', 'short', '  · indented', '  line here']);
+    expect(wrapLines(['supercalifragilistic word'], 100, measure)).toEqual(['supercalifragilistic', 'word']);
   });
 });
 

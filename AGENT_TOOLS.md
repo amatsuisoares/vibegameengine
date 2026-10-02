@@ -337,8 +337,8 @@ sentido aos eixos e aos assuntos.
 - **Expressões:** `trait('eixo')` / `likes('assunto')` (da própria entidade, em `UtilityAI`/`StateMachine`/
   `Interactable`) e `trait('id', 'eixo')` / `likes('id', 'assunto')` em qualquer lugar.
 - **Estado:** `inspect_game_state` mostra `traits` e `prefs` (afinidade efetiva) da entidade.
-- **Validação ao gravar:** influência de traço precisa de um eixo existente; `Persist` precisa de `Traits`, `Routine`, `Memory` ou
-  `Preferences`; `min ≤ max`.
+- **Validação ao gravar:** influência de traço precisa de um eixo existente; `Persist` precisa de `Traits`, `Preferences`, `Routine`,
+  `Memory`, `Knowledge` ou `Journal`; `min ≤ max`.
 
 ## Rotina (`Routine`)
 
@@ -384,6 +384,33 @@ vai primeiro. A engine nunca decide o que vale lembrar: o jogo decide.
 - **Eventos:** `memory {entity, memory, subject?, valence, strength, count, reinforced}` e `memory_forgotten {entity, memory,
   subject?, valence, importance, count}` (base do diário: o que marcou antes de sumir).
 - **Estado:** `memories` = as 8 mais fortes agora. Nada roda por frame: a força é calculada quando pedida.
+
+## Conhecimento do jogador (`Knowledge`) e crônica (`Journal`)
+
+Implementado na V0.7 (`engine/src/knowledge.ts`, `engine/src/journal.ts`). A base de um diário que **não revela nada de
+graça**.
+
+- **`Knowledge`** = o que o **jogador** sabe da entidade (não o que ela sabe). O jogo registra evidência em chaves que ele
+  escolhe (`"gosto:maca:love"`, `"jeito:curiosidade:alto"`) cada vez que o jogador teve chance de ver aquilo; a evidência
+  vira níveis `possible` → `observed` → `confirmed` nos limites do componente (`possible: 1, observed: 3, confirmed: 6`
+  no padrão). Cada nível ganho é o evento `discovery {entity, key, level, from}`.
+  - Scripts: `self.knowledge.observe(chave, peso?)` → `{key, level, evidence, discovered, from}` (peso negativo tira
+    evidência); `level(chave)` → `'unknown' | 'possible' | 'observed' | 'confirmed'`; `list({prefix?, minLevel?})` → as
+    conhecidas, mais evidência primeiro.
+  - Expressões: `knows('chave')` ou `knows('id', 'chave')` → 0..3. Estado: `knowledge` = nível de cada chave conhecida.
+- **`Journal`** = a história da entidade, nas palavras do jogo: entradas `{t, category, text, importance, key?}`. Uma
+  entrada com `key` entra uma vez só ("provou a maçã pela primeira vez"), a não ser com `replace: true`. Passando de
+  `capacity` (60), sai a menos importante (a mais antiga entre iguais).
+  - Scripts: `self.journal.add(categoria, texto, {importance?, key?, replace?})` → a entrada ou `null` (chave repetida);
+    `entries({category?, limit?})` (mais nova primeiro); `has(chave)`; `remove(chave)`. Evento `journal {entity,
+    category, text, key?}`. Estado: `journal: {count, last}` (3 mais novas).
+- Os dois são guardados pelo `Persist`, junto com o resto do indivíduo.
+
+## Texto com quebra de linha (`Text.maxWidth`)
+
+`Text.maxWidth` (px) quebra as linhas mais largas que isso, palavra por palavra (`
+` continua quebrando; um recuo no
+começo da linha se repete nas continuações). A quebra é feita na hora de desenhar, medindo o texto de verdade.
 
 ## Observações (`game.notify`)
 
@@ -788,7 +815,7 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
   uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
-  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
+  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `knows([id,] chave)` (0..3), `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").

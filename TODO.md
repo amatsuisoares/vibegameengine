@@ -303,7 +303,13 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
   1×: reconhece comida detestada (vira o rosto) ou adorada (se anima, corre até a bandeja aberta), desconfia do
   brinquedo que assustou, pede a bola de novo depois de brincar com você (e desiste aos poucos se ignorado), carinho
   bom aproxima, ser acordado afasta; playbooks migrados para `notification`; 458 testes
-- [ ] **Fase 7 — Diário individual** (`Knowledge`, `Journal`, `Text.maxWidth`)
+- [x] **Fase 7 — Diário individual**: componente `Knowledge` (o que o jogador sabe: evidência por chave → possível /
+  observado / confirmado, evento `discovery`, `knows()`), componente `Journal` (crônica com chave "primeira vez",
+  importância e corte), ambos salvos pelo `Persist`; `Text.maxWidth` (quebra de linha medida no paint)
+- [x] meu-pet: diário em abas (Jeito · Gostos · Histórias), sem números: jeito e gostos só aparecem depois de vistos, com
+  "talvez / parece / é"; brinquedo preferido; hábitos da rotina; histórias com "Dia N" (primeira comida, primeiro
+  carinho, susto, primeira bola, pedido, evolução, doença, esqueceu o susto); sinais antigos e comidas já provadas
+  migram; coleção usa o que você percebeu
 - [ ] **Fase 8 — Ambiente + sono** (`Ambient`, `env()`)
 - [ ] **Fase 9 — Preferências dinâmicas + histórico**
 - [ ] **Fase 10 — Evolução por histórico**

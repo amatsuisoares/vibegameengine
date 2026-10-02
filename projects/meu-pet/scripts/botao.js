@@ -52,7 +52,7 @@ function onEvent(self, ev, game) {
 function toggleDiary(game, open) {
   const pet = game.entity('pet');
   const adult = !!(pet && pet.state.api && pet.state.api.adulto());
-  for (const id of ['diario', 'diarioTexto']) {
+  for (const id of ['diario', 'diarioTexto', 'diarioAba1', 'diarioAba2', 'diarioAba3']) {
     const e = game.entity(id);
     if (e) e.enabled = open;
   }

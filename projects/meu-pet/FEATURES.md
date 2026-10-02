@@ -52,9 +52,9 @@ aleatório com seed, eventos). Cada frame é 1/60 s; as necessidades usam o **re
 - **Quarto** (`quarto`): parede, chão, janela (céu e sol/lua pela hora), planta, lâmpada pendurada, cama, tigela com
   ração, bola, sujeira quando houver. Faixa no topo com as observações. Barra inferior: dicas, relógio
   (hh:mm e velocidade), botões **Comida, Remédio, Diário, Coleção, Velocidade**.
-- **Diário** (painel sobre o quarto): "Diário de {nome} · {Bebê|Jovem|Adulto}", idade (dias e horas),
-  personalidade percebida ("Parece ser: brincalhão, curioso" ou "ainda observando..."), as 6 últimas observações,
-  aviso de save automático. Na fase adulta: botão "Começar com um novo pet".
+- **Diário** (painel sobre o quarto, V0.7 fase 7) em três abas — **Jeito · Gostos · Histórias** — que só contam o que
+  você teve chance de ver, com a confiança disso e **sem números** (seção 8a). Na fase adulta: botão "Começar com um
+  novo pet".
 - **Coleção** (`colecao`): grade com as 9 formas — descobertas mostram o desenho e o nome do pet que a revelou; não
   descobertas mostram "?" — contador "N de 9 formas descobertas", e a lista "Pets anteriores" (nome, forma final,
   dias de vida, traços percebidos).
@@ -113,8 +113,9 @@ gostarem (a surpresa a descobrir); a ração é quase sempre neutra.
 | bola jogada | corre atrás; brincar rende diversão ×1,5 ("ficou animado!") | corre e "brincou um pouco com a bola" | afinidade ≤ −0,3: só olha a bola passar, "não parece muito interessado nela" |
 | luz à noite | quem gosta de escuro dorme pior com a luz acesa e melhor no escuro ("parece incomodado com a luz") | | quem não gosta de escuro dorme pior no escuro e não se incomoda com a luz |
 
-**Revelação:** cada comportamento típico de um traço **forte** (> 0,65 ou < 0,35) conta um sinal ("atividade:alto",
-"paciencia:baixo"...). Com 3 sinais o diário diz "Parece ser: bastante ativo, impaciente…" (16 descrições possíveis).
+**Revelação:** cada comportamento típico de um traço **forte** (> 0,65 ou < 0,35) é meio ponto de evidência no
+`Knowledge` ("jeito:atividade:alto"...). Com 1 ponto o diário diz "Talvez seja bastante ativo.", com 3 "Parece ser…",
+com 6 "É bastante ativo." (16 descrições possíveis); confirmado, vira também uma página da história.
 
 **Save antigo (v1):** traços sim/não viram eixos (brincalhão → brincadeira 0,85 e atividade 0,7; preguiçoso → atividade
 0,15; carinhoso → sociabilidade 0,85 e independência 0,2; curioso → curiosidade 0,85; irritável → paciência 0,15 e
@@ -268,8 +269,31 @@ Fluxo: **estado → evento → notificação**, tudo pelo `game.notify` da engin
 virar spam em 600×); os cooldowns de jogo e o histórico (50) ficam em `storage["vibe.notifications"]` e valem entre
 sessões. As checagens automáticas têm **prioridade 0** e as reações a você prioridade 1: até 4 s reais depois de uma
 observação (`config.notifications.minGapMs`), as automáticas não aparecem. A faixa no topo (`scripts/aviso.js`, evento
-`notification`) mostra uma por vez por 5 s — 2,5 s se outra estiver esperando, para a reação ao que você fez não chegar atrasada (fila de no máximo 3). O diário lista as últimas 6 do histórico; um novo pet
-limpa o histórico.
+`notification`) mostra uma por vez por 5 s — 2,5 s se outra estiver esperando, para a reação ao que você fez não chegar atrasada (fila de no máximo 3). Um novo pet limpa o histórico.
+
+## 8a. Diário (V0.7: `Knowledge` + `Journal`)
+
+**O que você sabe** (`Knowledge` do pet: possível ≥ 1, observado ≥ 3, confirmado ≥ 6 de evidência) — cada reação vista
+conta: comida adorada/detestada 2, gostou/não gostou 1,5, neutra 1 (reconhecer pela memória: metade); bola, carinho e
+luz igual; brincar sozinho com um brinquedo conta o gosto dele (metade) e, se é o favorito, "favorito:{id}". Por isso
+uma maçã adorada uma vez dá "Talvez adore maçã.", duas "Parece adorar maçã.", três "Adora maçã." — e uma banana
+adorada que você nunca ofereceu **não aparece**.
+
+| Aba | Conteúdo |
+|---|---|
+| **Jeito** | idade e fase; até 6 jeitos ("Talvez seja curioso." / "Parece ser…" / "É…"); até 4 hábitos da rotina estável ("Costuma dormir de madrugada." — madrugada, manhã, tarde, noite; aparecem com os dias) |
+| **Gostos** | Comidas (até 7, sem artigo: "Adora maçã."), Brinquedos ("O brinquedo preferido parece ser a pelúcia.", "Talvez adore a bola."), Outras coisas (carinho, dormir no escuro). Por assunto vale o nível com mais evidência. Nada visto: "Ainda não deu para perceber do que gosta." |
+| **Histórias** | as 10 páginas mais novas do `Journal` com "Dia N" |
+
+**Páginas da história** (cada uma uma vez só): Chegou ao quarto · Começou este diário (saves antigos) · Provou {a comida}
+pela primeira vez e adorou / gostou / sem muito entusiasmo / não gostou muito / recusou na hora · Recebeu o primeiro
+carinho e adorou (ou se afastou…) · Brincou com {o brinquedo} pela primeira vez · Escolheu {o brinquedo} como brinquedo
+preferido · Levou um susto com o barulho do chocalho · Parece ter esquecido o susto com o chocalho (quando a memória
+se apaga) · Brincou de bola com você pela primeira vez · Pediu pela primeira vez para brincar de bola · Ficou chateado
+quando você o acordou · Ficou doente pela primeira vez · Ficou claro que é {jeito} · Cresceu: agora é jovem/adulto.
+
+Saves antigos: os sinais de jeito viram evidência (3 sinais = observado), as comidas já provadas viram gostos vistos, e
+a história começa em "Começou este diário." (sem inventar o passado). O texto quebra linha sozinho (`Text.maxWidth`).
 
 Checagem automática a cada segundo (em ordem de prioridade):
 

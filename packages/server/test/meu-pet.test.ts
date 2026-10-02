@@ -106,7 +106,11 @@ describe('meu-pet (regression)', () => {
     const game = new Game(load(), { seed: 5, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z' }, storage: { pet: v1, colecao } });
     game.step(2);
     const pet = game.storage.get('pet') as Record<string, unknown>;
-    expect(pet).toMatchObject({ version: 2, name: 'Kuro', stage: 'bebe', bowl: 2, care: v1.care, revealed: { 'brincadeira:alto': 3, 'paciencia:baixo': 1 } });
+    expect(pet).toMatchObject({ version: 2, name: 'Kuro', stage: 'bebe', bowl: 2, care: v1.care, revealed: {} });
+    // The old signals became what you know about it (3 signals = observed, 1 = possible), and its diary starts here.
+    const known = game.getState({ ids: ['pet'] }).entities[0];
+    expect(known.knowledge).toMatchObject({ 'jeito:brincadeira:alto': 'observed', 'jeito:paciencia:baixo': 'possible' });
+    expect(known.journal!.last).toEqual(['Começou este diário.']);
     expect(pet.traits).toBeUndefined();
     expect((pet.needs as Record<string, number>).fome).toBeCloseTo(66, 0);
     const individual = game.storage.get('petIndividuo') as { traits: Record<string, number>; preferences: Record<string, unknown> };
@@ -114,7 +118,8 @@ describe('meu-pet (regression)', () => {
     expect(Object.keys(individual.preferences)).toEqual(expect.arrayContaining(['carinho', 'bola', 'racao', 'escuro']));
     expect(game.storage.get('colecao')).toEqual(colecao);
     game.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 100 }]);
-    expect(game.entity('diarioTexto')!.components.Text!.text).toContain('Parece ser: brincalhão');
+    expect(game.entity('diarioTexto')!.components.Text!.text).toContain('Parece ser brincalhão.');
+    expect(game.entity('diarioTexto')!.components.Text!.text).toContain('Talvez seja impaciente.');
     expect(game.console.read(0, 'error')).toEqual([]);
 
     // The next session loads the same individual (no new draw).
@@ -501,6 +506,64 @@ describe('meu-pet (regression)', () => {
     const fish = again.world.withTag('cartaComida').find((c) => c.components.Script!.props.item === 'peixe')!.id;
     again.perform([{ type: 'click', entity: fish }, { type: 'wait', ms: 500 }]);
     expect(again.events(0, 'notification').map((e) => e.kind)).toContain('reconheceu:peixe');
+  });
+
+  it('diary: nothing is revealed for free — tastes and ways appear only after you could see them, with growing confidence; the story keeps its firsts', () => {
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const pet = {
+      version: 2, name: 'Mimi', born: t, stage: 'bebe', needs: { fome: 40, energia: 90, diversao: 60, higiene: 95, saude: 100, afeto: 60 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const individual = {
+      version: 1,
+      traits: { atividade: 0.5, sociabilidade: 0.8, curiosidade: 0.5, independencia: 0.2, sensibilidade: 0.4, apetite: 0.5, paciencia: 0.8, brincadeira: 0.5 },
+      preferences: { maca: p(1), fruta: p(1), fresco: p(0.5), peixe: p(-1), proteina: p(-1), cheiroso: p(-1), salgado: p(-1), carinho: p(1), banana: p(1) },
+    };
+    const game = new Game(load(), {
+      seed: 2, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z' },
+      storage: { pet, petIndividuo: individual, 'vibe.inventory': { default: { maca: 3, peixe: 1, bola: 1 } }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } },
+    });
+    const diary = (tab: string) => {
+      game.perform([{ type: 'click', entity: `diarioAba${['jeito', 'gostos', 'historias'].indexOf(tab) + 1}` }, { type: 'wait', ms: 50 }]);
+      return game.entity('diarioTexto')!.components.Text!.text;
+    };
+    const offer = (item: string) => {
+      game.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
+      const card = game.world.withTag('cartaComida').find((c) => c.components.Script!.props.item === item)!.id;
+      game.perform([{ type: 'click', entity: card }, { type: 'wait', ms: 4000 }]);
+    };
+    game.perform([{ type: 'wait', ms: 500 }, { type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 50 }]);
+    expect(diary('gostos')).toContain('Ainda não deu para perceber do que gosta.');
+    expect(diary('historias')).toContain('Começou este diário.');
+    game.perform([{ type: 'click', entity: 'diario' }, { type: 'wait', ms: 50 }]);
+
+    offer('maca');
+    offer('peixe');
+    game.perform([{ type: 'click', entity: 'pet' }, { type: 'wait', ms: 3000 }]);
+    game.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 50 }]);
+    let tastes = diary('gostos');
+    expect(tastes).toContain('Talvez adore maçã.'); // once: just a hint
+    expect(tastes).toContain('Talvez deteste peixe.');
+    expect(tastes).toContain('Talvez adore carinho.');
+    expect(tastes).not.toContain('banana'); // loves it, but you never saw it
+    const story = diary('historias');
+    expect(story).toContain('Dia 1  ·  Provou a maçã pela primeira vez e adorou.');
+    expect(story).toContain('Provou o peixe pela primeira vez e recusou na hora.');
+    expect(story).toContain('Recebeu o primeiro carinho e adorou.');
+    game.perform([{ type: 'click', entity: 'diario' }, { type: 'wait', ms: 50 }]);
+
+    // More of the same: the diary grows surer, the "first time" is still written once.
+    offer('maca');
+    offer('maca');
+    game.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 50 }]);
+    tastes = diary('gostos');
+    expect(tastes).toContain('Adora maçã.');
+    expect(diary('historias').match(/Provou a maçã/g)).toHaveLength(1);
+    expect(game.getState({ ids: ['pet'] }).entities[0].knowledge).toMatchObject({ 'gosto:maca:love': 'confirmed', 'gosto:peixe:hate': 'possible' });
+    expect(game.events(0, 'discovery').length).toBeGreaterThan(3);
+    expect(game.console.read(0, 'error')).toEqual([]);
   });
 
   it('verify_game plays a scenario of the real game and reports PASS per check', async () => {

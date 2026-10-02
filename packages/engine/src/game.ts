@@ -24,6 +24,7 @@ import { ItemCatalog } from './items';
 import { habitOf } from './routine';
 import { Economy } from './economy';
 import { recall } from './memory';
+import { KNOWLEDGE_LEVELS, levelIndex } from './knowledge';
 import { Notifier, type NotifyOptions } from './notifier';
 import { cooldownsLeft, type TimerInfo } from './timers';
 import type { TweenInfo } from './tweens';
@@ -196,6 +197,10 @@ export interface EntitySnapshot {
   habits?: Record<string, number>;
   /** Memory: the strongest memories now (up to 8). */
   memories?: { type: string; subject?: string; valence: number; strength: number; count: number }[];
+  /** Knowledge: level of each key the player has some evidence of. */
+  knowledge?: Record<string, string>;
+  /** Journal: how many entries and the 3 newest texts. */
+  journal?: { count: number; last: string[] };
   /** AudioSource: clip, whether it plays (a loop sounding / a one-shot about to play), and volume / pan as heard now. */
   audio?: { clip: string; loop: boolean; playing: boolean; volume: number; pan: number };
   components?: Record<string, unknown>;
@@ -701,6 +706,13 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean, clockHour:
     const top = recall(e, clockNow, { limit: 8 }, undefined, true).map((m) => ({ type: m.type, ...(m.subject !== undefined && { subject: m.subject }), valence: m.valence, strength: m.strength, count: m.count }));
     if (top.length) s.memories = top;
   }
+  const k = e.components.Knowledge;
+  if (k) {
+    const known = Object.entries(k.values).map(([key, v]) => [key, KNOWLEDGE_LEVELS[levelIndex(k, v.evidence)]] as const).filter(([, l]) => l !== 'unknown');
+    if (known.length) s.knowledge = Object.fromEntries(known);
+  }
+  const j = e.components.Journal;
+  if (j && j.entries.length) s.journal = { count: j.entries.length, last: j.entries.map((x, i) => ({ x, i })).sort((a, b) => b.x.t - a.x.t || b.i - a.i).slice(0, 3).map(({ x }) => x.text) };
   if (e.components.Preferences) s.prefs = Object.fromEntries(Object.keys(e.components.Preferences.values).map((k) => [k, affinityOf(e, k)]));
   const props = e.components.Script?.props;
   if (props && Object.keys(props).length) s.props = { ...props };

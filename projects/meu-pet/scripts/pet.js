@@ -85,6 +85,7 @@ let lastNow = 0;
 let localOffset = 0;
 let anim = 0;
 let lastPetReal = -99;
+let gameRef = null; // o game (para reveal, chamado de muitos lugares)
 let pedindoBola = -99; // tempo real em que foi até a bola pedir para brincar
 let lastLookBowl = -99;
 let realTime = 0;
@@ -167,18 +168,45 @@ function discover(game, stage) {
 
 const isAdult = () => pet.stage.startsWith('adulto');
 
+/** Os jeitos que você já percebeu (Knowledge "jeito:eixo:alto|baixo", a partir de "observado"), para a coleção. */
 function seenTraits() {
-  return Object.entries(pet.revealed)
-    .filter(([k, c]) => c >= 3 && JEITO[k])
-    .map(([k]) => JEITO[k]);
+  return me.knowledge
+    .list({ prefix: 'jeito:', minLevel: 'observed' })
+    .map((k) => JEITO[k.key.slice(6)])
+    .filter(Boolean);
+}
+
+// ---------------------------------------------------------------- o que você sabe dele (Knowledge) e a história dele (Journal)
+
+/**
+ * Você teve a chance de ver algo sobre o pet (um jeito, um gosto): mais evidência na chave. O diário só
+ * fala do que tem evidência, com a confiança dela: possível ("talvez"), observado ("parece"), confirmado.
+ */
+function saber(game, key, weight = 1) {
+  const r = me.knowledge.observe(key, weight);
+  if (!r.discovered) return r;
+  // Ficou claro (confirmado): vira uma página da história dele.
+  if (r.level === 'confirmed' && key.startsWith('jeito:') && JEITO[key.slice(6)]) anotar(game, 'jeito', `Ficou claro que é ${JEITO[key.slice(6)]}.`, key, 0.6);
+  if (r.level === 'observed' && key.startsWith('favorito:')) {
+    const item = game.items.get(key.slice(9));
+    if (item) anotar(game, 'brinquedo', `Escolheu ${oItem(item)} como brinquedo preferido.`, key, 0.8);
+  }
+  return r;
+}
+
+/** Uma página do diário (Journal): com chave, só a primeira vez ("provou a maçã pela primeira vez"). */
+function anotar(game, category, text, key, importance = 0.5) {
+  return me.journal.add(category, text.replace('{n}', pet.name), { key, importance });
+}
+
+/** A reação a algo de que ele tem gosto (comida, brinquedo, carinho) conta como evidência desse gosto. */
+const NIVEL_PESO = { love: 2, hate: 2, like: 1.5, dislike: 1.5, neutral: 1 };
+function gostoVisto(game, subject, level, extra = 1) {
+  saber(game, `gosto:${subject}:${level}`, (NIVEL_PESO[level] || 1) * extra);
 }
 
 // ---------------------------------------------------------------- observações
 
-/**
- * Mostra uma observação. kind agrupa mensagens parecidas: a mesma kind só volta depois
- * de `cooldownMin` minutos de jogo E de pelo menos 25 s reais (velocidades altas).
- */
 /**
  * Uma observação para o jogador ("{n} parece..."): passa pelo Notifier da engine (game.notify), que
  * segura repetições (cooldown em minutos de jogo e 25 s reais, para não virar spam a 600×), guarda o
@@ -194,14 +222,13 @@ function observe(game, kind, text, cooldownMin = 0, priority = 1) {
 }
 
 /**
- * Sinal de personalidade: um comportamento típico de um traço forte ("alto" ou "baixo").
- * Só conta se o pet realmente é assim; depois de 3 sinais o diário passa a mencionar.
+ * Sinal de personalidade: um comportamento típico de um traço forte ("alto" ou "baixo"). Só conta se o
+ * pet realmente é assim; vira evidência (Knowledge "jeito:eixo:dir") e o diário passa de "talvez" a "é".
  */
 function reveal(axis, dir) {
   const v = T(axis);
   if (dir === 'alto' ? v < HIGH : v > LOW) return;
-  const k = `${axis}:${dir}`;
-  pet.revealed[k] = (pet.revealed[k] || 0) + 1;
+  saber(gameRef, `jeito:${axis}:${dir}`, 0.5);
 }
 
 function emote(game, self, glyph, color) {
@@ -241,7 +268,10 @@ function decay(game, h, at) {
   // Doença: chance por hora quando mal cuidado.
   if (!pet.sick && (n.higiene < 25 || n.fome < 10 || n.saude < 30)) {
     const p = 1 - Math.pow(1 - 0.15, h);
-    if (game.random() < p) pet.sick = true;
+    if (game.random() < p) {
+      pet.sick = true;
+      anotar(game, 'saude', 'Ficou doente pela primeira vez.', 'doente', 0.6);
+    }
   }
 
   // Média de bem-estar (decide a evolução): meia-vida de ~6 h.
@@ -355,6 +385,7 @@ function checkEvolution(game, self) {
   discover(game, next);
   mind = { act: 'evolve', t: 2.5 };
   observe(game, 'evolucao', '{n} cresceu!');
+  anotar(game, 'evolucao', `Cresceu: agora é ${STAGES[next].label.toLowerCase()}.`, `estagio:${next}`, 1);
   if (isAdult()) observe(game, 'adulto', '{n} chegou à fase adulta! No Diário você pode começar com um novo pet.');
   game.emit('evolucao', { stage: next });
   game.playSound('sfx_evolucao');
@@ -479,6 +510,7 @@ function decide(game, self) {
       emote(game, self, '?', '#ffd166');
       pedindoBola = realTime;
       observe(game, 'chamar', '{n} foi até a bola e está olhando para você. Parece querer brincar de novo.', 15);
+      anotar(game, 'lembranca', 'Pediu pela primeira vez para brincar de bola com você.', 'pediuBola', 0.6);
     });
   } else if (choice === 'procurar') {
     go(game, 480, 'greet');
@@ -558,6 +590,12 @@ function comecarBrincar(game, self, id) {
   if (jeito === 'favorito') emote(game, self, '♥', '#ff8fab');
 }
 
+/** O barulho de um brinquedo assustou o pet: ele lembra (desconfia por um tempo) e isso entra na história dele. */
+function assustou(game, item) {
+  lembrar('susto', item.id, -1, 0.8);
+  anotar(game, 'lembranca', `Levou um susto com o barulho ${doItem(item)}.`, `susto:${item.id}`, 0.7);
+}
+
 /** Uma mexida no brinquedo durante a brincadeira: a bola é empurrada para longe do pet, os outros balançam. */
 function mexerNo(game, self, toy) {
   if (toy.state.push) toy.state.push((toy.x >= self.x ? 1 : -1) * (110 + game.random() * 130));
@@ -583,11 +621,14 @@ function brincouSozinho(game, self, id) {
   if (barulhoIncomoda(item)) {
     n.diversao = clamp(n.diversao - 6);
     reveal('sensibilidade', 'alto');
-    lembrar('susto', item.id, -1, 0.8);
+    assustou(game, item);
     observe(game, `barulho:${item.id}`, `{n} não parece gostar do barulho ${doItem(item)}.`, 120);
     return;
   }
   lembrar('brinquedo', item.id, { favorito: 1, gosta: 0.6, neutro: 0.1, nao: -0.3 }[jeito], 0.5);
+  gostoVisto(game, item.id, me.prefs.item(item.id).level, 0.5);
+  if (jeito === 'favorito') saber(game, `favorito:${item.id}`, 1);
+  anotar(game, 'brinquedo', `Brincou com ${oItem(item)} pela primeira vez.`, `brincou:${item.id}`, 0.4);
   if (jeito === 'favorito') {
     emote(game, self, '♥', '#ff8fab');
     observe(game, `favorito:${item.id}`, `{n} brincou um tempão com ${oItem(item)}. Parece ser o brinquedo preferido.`, 30);
@@ -614,7 +655,7 @@ function verBrinquedo(game, self, id, como) {
   }
   if (jeito === 'nao' || barulhoIncomoda(item)) {
     const susto = barulhoIncomoda(item) && como !== 'novo';
-    if (susto) lembrar('susto', item.id, -1, 0.8);
+    if (susto) assustou(game, item);
     const perto = () => {
       emote(game, self, susto ? '!' : '…', '#cfd8dc');
       observe(game, `naoGosta:${item.id}`, susto ? `{n} se assustou com o barulho ${doItem(item)} e foi para longe.` : `{n} cheirou ${oItem(item)} e se afastou. Não parece ter gostado.`, 10);
@@ -673,6 +714,8 @@ function finish(game, self) {
     ganhar(game, 2, 'brincar', 30);
     reveal('brincadeira', 'alto');
     lembrar('brincouComVoce', 'voce', { love: 1, like: 0.7, neutral: 0.35 }[b.level] ?? 0.1, 0.6);
+    gostoVisto(game, 'bola', b.level);
+    anotar(game, 'lembranca', 'Brincou de bola com você pela primeira vez.', 'bolaComVoce', 0.5);
     if (b.level === 'love') {
       observe(game, 'brincou', '{n} ficou animado!', 20);
       emote(game, self, '♪', '#ffd166');
@@ -700,6 +743,7 @@ function makeApi(game, self) {
         if (impaciente) {
           observe(game, 'acordado', '{n} acordou e não parece gostar disso.', 5);
           lembrar('acordado', 'voce', -1, 0.7);
+          anotar(game, 'lembranca', 'Ficou chateado quando você o acordou.', 'acordado', 0.5);
           wake(game, self, true);
           reveal('paciencia', 'baixo');
         } else observe(game, 'carinhoDormindo', '{n} se mexeu um pouco, ainda dormindo.', 10);
@@ -735,11 +779,15 @@ function makeApi(game, self) {
         emote(game, self, '♥', '#ff8fab');
         reveal('sociabilidade', 'alto');
         lembrar('carinho', 'voce', level === 'love' ? 1 : 0.6, 0.4);
+        gostoVisto(game, 'carinho', level);
+        anotar(game, 'lembranca', level === 'love' ? 'Recebeu o primeiro carinho e adorou.' : 'Recebeu o primeiro carinho e gostou.', 'carinho', 0.5);
         observe(game, 'carinho', level === 'love' ? '{n} parece adorar o carinho.' : '{n} parece gostar do carinho.', 2);
         mind = { act: 'happy', t: 1.2 };
       } else if (level === 'neutral') {
         n.afeto = clamp(n.afeto + 8);
         lembrar('carinho', 'voce', 0.1, 0.3);
+        gostoVisto(game, 'carinho', level);
+        anotar(game, 'lembranca', 'Recebeu o primeiro carinho, sem muita empolgação.', 'carinho', 0.4);
         observe(game, 'carinho', '{n} aceitou o carinho, sem muita empolgação.', 2);
         mind = { act: 'idle', t: 1 };
       } else {
@@ -747,6 +795,8 @@ function makeApi(game, self) {
         n.afeto = clamp(n.afeto + 2);
         reveal('independencia', 'alto');
         lembrar('carinho', 'voce', -0.4, 0.3);
+        gostoVisto(game, 'carinho', level);
+        anotar(game, 'lembranca', 'No primeiro carinho, se afastou: parece gostar do próprio espaço.', 'carinho', 0.5);
         observe(game, 'carinhoAfasta', '{n} se afastou um pouco. Parece preferir o próprio espaço.', 30);
         go(game, self.x + (self.x < 480 ? -1 : 1) * 140, 'idle');
       }
@@ -805,6 +855,7 @@ function makeApi(game, self) {
         // Olha a bola passar e fica onde está.
         reveal('brincadeira', 'baixo');
         observe(game, 'bolaNao', '{n} olhou a bola passar, mas não parece muito interessado nela.', 20);
+        gostoVisto(game, 'bola', b.level);
         mind = { act: 'investigate', t: 1.5, what: 'bola' };
         return;
       }
@@ -832,12 +883,14 @@ function makeApi(game, self) {
       pet.lightOn = !pet.lightOn;
       if (pet.asleep && pet.lightOn && isNightAt(game.clock.now) && lightBothers()) {
         observe(game, 'luz', '{n} parece incomodado com a luz.', 30);
+        gostoVisto(game, 'escuro', feel('escuro').level);
         reveal('sensibilidade', 'alto');
       }
       save(game);
     },
-    diario() {
-      return diaryText(game);
+    /** O texto do diário na aba ("jeito" | "gostos" | "historias"; padrão: game.vars.diarioAba). */
+    diario(aba) {
+      return diaryText(game, aba || game.vars.diarioAba || 'jeito');
     },
     salvar() {
       save(game);
@@ -871,24 +924,129 @@ function wake(game, self, rude) {
   if (!rude) observe(game, 'acordou', '{n} acordou.', 60);
 }
 
-function diaryText(game) {
+// ---------------------------------------------------------------- diário (abas: jeito, gostos, histórias)
+//
+// O diário só conta o que você teve chance de ver (Knowledge), com a confiança disso — "talvez",
+// "parece", e sem rodeio quando está confirmado — e a história dele (Journal). Nenhum número.
+
+const PARTES_DO_DIA = [[0, 6, 'de madrugada'], [6, 12, 'de manhã'], [12, 18, 'à tarde'], [18, 24, 'à noite']];
+const ATIVIDADE = {
+  dormir: 'dormir',
+  comer: 'comer',
+  brincar: 'brincar',
+  explorar: 'explorar o quarto',
+  procurar: 'vir até você',
+  passear: 'passear pelo quarto',
+  descansar: 'descansar',
+  chamar: 'chamar você para brincar',
+};
+const VERBO = {
+  love: ['adore', 'adorar', 'Adora'],
+  like: ['goste de', 'gostar de', 'Gosta de'],
+  neutral: ['não ligue muito para', 'não ligar muito para', 'Não liga muito para'],
+  dislike: ['não goste de', 'não gostar de', 'Não gosta de'],
+  hate: ['deteste', 'detestar', 'Detesta'],
+};
+const CONFIANCA = { possible: 0, observed: 1, confirmed: 2 };
+const OUTROS = { carinho: 'carinho', escuro: 'dormir no escuro' };
+
+function fraseJeito(level, jeito) {
+  return [`Talvez seja ${jeito}.`, `Parece ser ${jeito}.`, `É ${jeito}.`][CONFIANCA[level]];
+}
+
+function fraseGosto(level, nivel, nome) {
+  const v = VERBO[nivel];
+  return [`Talvez ${v[0]} ${nome}.`, `Parece ${v[1]} ${nome}.`, `${v[2]} ${nome}.`][CONFIANCA[level]];
+}
+
+/** Por assunto, o nível de gosto com mais evidência: [{subject, nivel, level, evidence}]. */
+function gostosVistos() {
+  const best = {};
+  for (const k of me.knowledge.list({ prefix: 'gosto:' })) {
+    const [, subject, nivel] = k.key.split(':');
+    if (!VERBO[nivel]) continue;
+    if (!best[subject] || k.evidence > best[subject].evidence) best[subject] = { subject, nivel, level: k.level, evidence: k.evidence };
+  }
+  return Object.values(best);
+}
+
+function abaJeito(game) {
   const age = ageHours(game.clock.now);
   const days = Math.floor(age / 24);
   const hours = Math.floor(age % 24);
+  const lines = [`Idade: ${days > 0 ? `${days} ${days === 1 ? 'dia' : 'dias'} e ` : ''}${hours} h  ·  ${STAGES[pet.stage].label}`, '', 'Jeito'];
+  const jeitos = me.knowledge.list({ prefix: 'jeito:' }).filter((k) => JEITO[k.key.slice(6)]);
+  if (jeitos.length) for (const k of jeitos.slice(0, 6)) lines.push(`· ${fraseJeito(k.level, JEITO[k.key.slice(6)])}`);
+  else lines.push('· Ainda observando... cada coisa que ele faz conta.');
+  lines.push('', 'Hábitos');
+  const habitos = [];
+  for (const h of me.routine.patterns()) {
+    const parte = PARTES_DO_DIA.find(([a, b]) => h.from >= a && h.from < b);
+    const frase = ATIVIDADE[h.activity] && parte && `Costuma ${ATIVIDADE[h.activity]} ${parte[2]}.`;
+    if (frase && !habitos.includes(frase)) habitos.push(frase);
+  }
+  if (habitos.length) for (const f of habitos.slice(0, 4)) lines.push(`· ${f}`);
+  else lines.push('· Os hábitos aparecem com os dias.');
+  if (isAdult()) lines.push('', 'Fase adulta: você pode começar com um novo pet (botão abaixo).');
+  return lines;
+}
+
+function abaGostos(game) {
+  const comidas = [];
+  const brinquedos = [];
+  const outros = [];
+  for (const g of gostosVistos()) {
+    const item = game.items.get(g.subject);
+    // Comida sem artigo ("adora maçã"); brinquedo com ("adora a bola").
+    if (item && item.category === 'brinquedo') brinquedos.push(`· ${fraseGosto(g.level, g.nivel, oItem(item))}`);
+    else if (item) comidas.push(`· ${fraseGosto(g.level, g.nivel, nomeDe(item))}`);
+    else if (OUTROS[g.subject]) outros.push(`· ${fraseGosto(g.level, g.nivel, OUTROS[g.subject])}`);
+  }
+  const fav = me.knowledge.list({ prefix: 'favorito:' })[0];
+  const favItem = fav && game.items.get(fav.key.slice(9));
+  if (favItem) {
+    const o = oItem(favItem);
+    brinquedos.unshift(`· ${[`Talvez o brinquedo preferido seja ${o}.`, `O brinquedo preferido parece ser ${o}.`, `O brinquedo preferido é ${o}.`][CONFIANCA[fav.level]]}`);
+  }
   const lines = [];
-  lines.push(`Diário de ${pet.name}  ·  ${STAGES[pet.stage].label}`);
-  lines.push(`Idade: ${days > 0 ? `${days} dia(s) e ` : ''}${hours} h`);
-  const seen = seenTraits();
-  lines.push(seen.length ? `Parece ser: ${seen.join(', ')}` : 'Personalidade: ainda observando...');
-  if (isAdult()) lines.push('Fase adulta: você pode começar com um novo pet (botão abaixo).');
-  lines.push('');
-  lines.push('Últimas observações:');
-  const log = game.notifications.log(6, me.id);
-  // Saves de antes do Notifier: as notas antigas aparecem até haver novas.
-  for (const note of log.length ? log : (pet.notes || []).slice(-6)) lines.push(`· ${note.text}`);
-  lines.push('');
-  lines.push('O jogo é salvo automaticamente.  (clique no diário para fechar)');
-  return lines.join('\n');
+  if (comidas.length) lines.push('Comidas', ...comidas.slice(0, 7), '');
+  if (brinquedos.length) lines.push('Brinquedos', ...brinquedos.slice(0, 4), '');
+  if (outros.length) lines.push('Outras coisas', ...outros);
+  if (!lines.length) lines.push('Ainda não deu para perceber do que gosta.', '', 'Ofereça comidas, mostre brinquedos, faça carinho — e observe.');
+  return lines;
+}
+
+function abaHistorias(game) {
+  const entries = me.journal.entries({ limit: 10 });
+  if (!entries.length) return ['Nada aconteceu ainda.'];
+  return entries.map((e) => `Dia ${Math.max(1, Math.floor((e.t - pet.born) / DAY) + 1)}  ·  ${e.text}`);
+}
+
+function diaryText(game, aba) {
+  const body = aba === 'gostos' ? abaGostos(game) : aba === 'historias' ? abaHistorias(game) : abaJeito(game);
+  return [`Diário de ${pet.name}`, '', ...body].join('\n');
+}
+
+/**
+ * Saves de antes do diário: os sinais de jeito antigos viram evidência, os gostos já provados também,
+ * e a história começa aqui (sem inventar o passado).
+ */
+function migrarDiario(game) {
+  if (pet.revealed && Object.keys(pet.revealed).length) {
+    for (const [k, n] of Object.entries(pet.revealed)) if (JEITO[k]) saber(game, `jeito:${k}`, n);
+    pet.revealed = {};
+  }
+  for (const [id, level] of Object.entries(pet.provou || {})) {
+    if (game.items.get(id) && !me.knowledge.list({ prefix: `gosto:${id}:` }).length) gostoVisto(game, id, level);
+  }
+  if (!me.journal.entries({ limit: 1 }).length) anotar(game, 'evolucao', 'Começou este diário.', 'diario', 0.9);
+}
+
+/** Uma lembrança forte que se apagou também é parte da história. */
+function onEvent(self, ev, game) {
+  if (ev.type !== 'memory_forgotten' || ev.entity !== self.id || ev.memory !== 'susto' || ev.importance < 0.7) return;
+  const item = game.items.get(String(ev.subject));
+  if (item) anotar(game, 'lembranca', `Parece ter esquecido o susto com ${oItem(item)}.`, `esqueceu:susto:${item.id}`, 0.4);
 }
 
 // ---------------------------------------------------------------- moedas (engine: game.wallet / game.inventory)
@@ -969,6 +1127,7 @@ function onItem(self, item, game) {
     // Já provou e detestou: reconhece de longe e nem cheira.
     emote(game, self, '…', '#cfd8dc');
     observe(game, `reconheceu:${item.id}`, `{n} reconheceu ${oItem(item)} e virou o rosto.`);
+    gostoVisto(game, item.id, r.level, 0.5);
     mind = { act: 'sulk', t: 1.4 };
     game.emit('reacao', { item: item.id, level: r.level, lembrou: true });
     return { consumed: false, level: r.level, reason: 'lembrou' };
@@ -977,6 +1136,8 @@ function onItem(self, item, game) {
   pet.provou = pet.provou || {};
   if (!pet.provou[item.id]) {
     pet.provou[item.id] = r.level;
+    const como = { love: 'e adorou', like: 'e gostou', neutral: 'sem muito entusiasmo', dislike: 'e não gostou muito', hate: 'e recusou na hora' }[r.level];
+    anotar(game, 'comida', `Provou ${oItem(item)} pela primeira vez ${como}.`, `provou:${item.id}`, r.level === 'love' || r.level === 'hate' ? 0.7 : 0.4);
     ganhar(game, 3, 'descoberta');
   }
   const dir = self.get('Sprite').flipX ? -1 : 1;
@@ -999,6 +1160,7 @@ function react(game, self) {
   if (level === 'hate') {
     refeicao = null;
     lembrar('comida', item.id, -1, 0.9);
+    gostoVisto(game, item.id, 'hate');
     observe(game, `comida:${item.id}`, `{n} cheirou ${oItem(item)} e se afastou.`);
     sumir(food, 1.5);
     go(game, self.x - dir * 140, 'idle');
@@ -1020,6 +1182,7 @@ function terminarRefeicao(game, self, reagir) {
   sumir(food, 0.3);
   if (level === 'hate') return;
   lembrar('comida', item.id, { love: 1, like: 0.5, neutral: 0.05, dislike: -0.6 }[level], { love: 0.8, like: 0.4, neutral: 0.2, dislike: 0.6 }[level]);
+  gostoVisto(game, item.id, level);
   const n = pet.needs;
   const part = level === 'dislike' ? 0.5 : 1;
   n.fome = clamp(n.fome + (Number(item.props.fome) || 10) * part);
@@ -1064,6 +1227,7 @@ function comeuDoce(game) {
 
 function onStart(self, game) {
   me = self;
+  gameRef = game;
   const now = game.clock.now;
   localOffset = ((game.clock.hour * HOUR - (now % DAY)) % DAY + DAY) % DAY;
   const saved = game.storage.get('pet');
@@ -1079,7 +1243,9 @@ function onStart(self, game) {
     pet = newPet(game, (fresh && fresh.nome) || 'Pet');
     game.storage.remove('novoPet');
     observe(game, 'nasceu', '{n} chegou! Observe com atenção.');
+    anotar(game, 'evolucao', 'Chegou ao quarto.', 'nasceu', 1);
   }
+  migrarDiario(game);
   const cfg = game.storage.get('config');
   if (cfg && cfg.speed) game.clock.speed = cfg.speed;
   lastNow = now;
@@ -1286,7 +1452,7 @@ function checkObservations(game, self) {
   if (awake && n.diversao < 30 && observe(game, 'tedio', '{n} parece entediado.', 120, 0)) return;
   if (awake && n.afeto < 30 && observe(game, 'saudade', '{n} parece estar com saudade de você.', 120, 0)) return;
   if (n.higiene < 30 && observe(game, 'sujo', '{n} parece incomodado com a sujeira.', 120, 0)) return;
-  if (pet.asleep && pet.lightOn && isNightAt(game.clock.now) && lightBothers() && observe(game, 'luz', '{n} parece incomodado com a luz.', 60, 0)) return;
+  if (pet.asleep && pet.lightOn && isNightAt(game.clock.now) && lightBothers() && observe(game, 'luz', '{n} parece incomodado com a luz.', 60, 0)) return gostoVisto(game, 'escuro', feel('escuro').level);
   if (awake && Math.min(n.fome, n.energia, n.diversao, n.higiene, n.afeto) > 80 && observe(game, 'feliz', '{n} parece muito feliz!', 180, 0)) {
     ganhar(game, 2, 'feliz');
     emote(game, self, '♪', '#ffd166');
