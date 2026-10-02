@@ -51,7 +51,7 @@ aleatório com seed, eventos). Cada frame é 1/60 s; as necessidades usam o **re
   Enter ou "Começar". Se já existe um pet salvo, pula direto para o quarto. Botão "Coleção".
 - **Quarto** (`quarto`): parede, chão, janela (céu e sol/lua pela hora), planta, lâmpada pendurada, cama, tigela com
   ração, bola, sujeira quando houver. Faixa no topo com as observações. Barra inferior: dicas, relógio
-  (hh:mm e velocidade), botões **Petisco, Remédio, Diário, Coleção, Velocidade**.
+  (hh:mm e velocidade), botões **Comida, Remédio, Diário, Coleção, Velocidade**.
 - **Diário** (painel sobre o quarto): "Diário de {nome} · {Bebê|Jovem|Adulto}", idade (dias e horas),
   personalidade percebida ("Parece ser: brincalhão, curioso" ou "ainda observando..."), as 6 últimas observações,
   aviso de save automático. Na fase adulta: botão "Começar com um novo pet".
@@ -165,13 +165,44 @@ ao investigar, postura caída emburrado, tremor doente, pulsar ao evoluir. Vira 
 |---|---|---|
 | Carinho | clicar no pet | afeto +15 (carinhoso +22), diversão +3, pulinho e ♥; repetido em < 6 s: "não parece muito interessado"; dormindo: "se mexeu um pouco" (irritável acorda incomodado) |
 | Encher a tigela | clicar na tigela | 3 porções (som); se o pet está acordado e com fome < 70, vai comer |
-| Petisco | botão | fome +10, afeto +8, diversão +5; mais de 4 por dia ou fome > 95: saúde −2 e "não parece muito interessado" |
+| Comida | botão → bandeja com as comidas do catálogo → clicar numa | o pet cheira e reage pelo gosto (ver seção 7a); satisfeito (fome > 92): "não parece estar com fome agora" |
 | Jogar a bola | clicar na bola | a bola voa e rola; o pet corre atrás se tiver energia > 20, não estiver doente e diversão < 85 (brincalhão sempre); brinca 4 s: diversão +30, energia −8, afeto +5, "ficou animado!" |
 | Limpar | clicar na sujeira | uma nuvem de poeira (partículas); higiene +18; sem sujeira: "parece mais à vontade com o quarto limpo" |
 | Remédio | botão | doente: cura, saúde +25; saudável: "não parece muito interessado" |
 | Luz | clicar na lâmpada | acende/apaga; dormir no escuro recupera energia mais rápido; dormindo com luz à noite: "parece incomodado com a luz" |
 
 Os objetos clicáveis ficam numa camada acima do pet, então dá para clicar na tigela mesmo com o pet na frente.
+
+## 7a. Comidas (itens do catálogo, V0.7)
+
+O catálogo fica em `items/` (uma comida por arquivo): o que importa é **o que a comida é** (tags), não um bônus fixo.
+
+| Comida | Tags | Fome |
+|---|---|---|
+| 🥣 Ração (tigela) | crocante | +35 |
+| 🍎 Maçã | fruta, doce, fresco | +15 (energia +3) |
+| 🍌 Banana | fruta, doce, macio | +20 (energia +5) |
+| 🥛 Leite | laticínio, líquido | +12 (energia +4) |
+| 🧀 Queijo | laticínio, salgado | +18 |
+| 🐟 Peixe | proteína, salgado, cheiroso | +30 |
+| 🥕 Cenoura | vegetal, crocante, fresco | +12 |
+| 🍪 Biscoito | doce, crocante, petisco | +10 |
+
+Gosto de um pet por uma comida = 40% o gosto por ela mesma + 60% pelas tags, e nas tags pesa mais o sentimento mais
+forte (um cheiro odiado estraga qualquer comida cheirosa). As tags têm faixas largas, então cada pet costuma ter uma
+comida favorita (~60%) e uma que recusa (~35%), e dois pets discordam com frequência. Exemplos de pets novos: um adora
+maçã e odeia banana; outro adora queijo e odeia cenoura.
+
+| Gosto | Reação (depois de cheirar) | Efeito |
+|---|---|---|
+| adora | come rápido, ♥ ♥, pula; "parece ter adorado a maçã!" | fome cheia, afeto +10, diversão +5 |
+| gosta | come, ♥; "parece ter gostado da maçã." | fome cheia, afeto +5 |
+| neutro | come sem pressa; "comeu a maçã sem muito entusiasmo." | fome cheia |
+| não gosta | belisca e emburra; "comeu só um pouco da maçã. Não parece ter gostado muito." | metade da fome |
+| odeia | se vira e se afasta, a comida some no chão; "cheirou a maçã e se afastou." | nada (não é consumida) |
+
+Mais de 4 doces por dia: saúde −2 e "parece ter comido doce demais hoje". A ração da tigela também é um item: quem não
+gosta dela come devagar e só com mais fome. A bola é o item `bola` (brinquedo: ativo, rola).
 
 ## 8. Sistema de observação
 

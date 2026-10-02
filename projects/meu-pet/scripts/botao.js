@@ -1,4 +1,4 @@
-// Botão. props.acao: petisco | remedio | diario | velocidade | colecao | novoPet | voltar.
+// Botão. props.acao: comida | remedio | diario | velocidade | colecao | novoPet | voltar.
 const SPEEDS = [1, 60, 600];
 let confirmUntil = -1;
 let time = 0;
@@ -42,9 +42,11 @@ function onClick(self, game) {
   const api = pet && pet.state.api;
   game.playSound('sfx_clique');
   switch (self.props.acao) {
-    case 'petisco':
-      if (api) api.petisco();
+    case 'comida': {
+      const tray = game.entity('bandeja');
+      if (tray && tray.state.toggle) tray.state.toggle();
       break;
+    }
     case 'remedio':
       if (api) api.remedio();
       break;

@@ -20,6 +20,7 @@ import { fsmOf, StateMachineRunner, stateMs } from './fsm';
 import { aiOf, UtilityRunner } from './utility';
 import { NavRunner, snapshotNav } from './nav';
 import { affinityOf, IndividualRunner } from './individual';
+import { ItemCatalog } from './items';
 import { cooldownsLeft, type TimerInfo } from './timers';
 import type { TweenInfo } from './tweens';
 import { SoundDirector, soundOf } from './sound';
@@ -267,6 +268,8 @@ export class Game implements SlotHost {
   nav!: NavRunner;
   /** Individuals of the current scene (Traits, Preferences, Persist). */
   individuals!: IndividualRunner;
+  /** The item catalog (items/<id>.json). */
+  readonly items: ItemCatalog;
   /** Music asset playing (for the `music` event when a scene without music follows one with music). */
   private music: string | null = null;
 
@@ -279,7 +282,19 @@ export class Game implements SlotHost {
     this.storage = new GameStorage(options.storage, options.onStorageChange);
     this.saves = new GameSaves(options.slots, options.onSlotsChange);
     this.scripts = new ScriptLibrary(project.scripts ?? {});
+    this.items = new ItemCatalog(project.items ?? {});
     this.loadScene(options.scene ?? project.config.startScene, {});
+  }
+
+  /**
+   * Uses an item on an entity: emits "item_used" {item, target, by?, category, tags} and calls the
+   * target's onItem(self, item, game, by) hook. Returns whether a hook handled it and what it returned.
+   */
+  useItem(itemId: string, target: Entity, by?: Entity): { handled: boolean; result: unknown } {
+    const item = this.items.require(itemId);
+    if (!target.active) throw new Error(`useItem: entity "${target.id}" is not active`);
+    this.world.emit('item_used', { item: item.id, target: target.id, ...(by && { by: by.id }), category: item.category, tags: [...item.tags] });
+    return this.scriptRunner.itemUsed(target, item, by);
   }
 
   /** Validates raw JSON and creates a game; throws with every validation error listed. */

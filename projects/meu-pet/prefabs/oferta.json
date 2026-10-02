@@ -1,0 +1,13 @@
+{
+  "tags": ["oferta"],
+  "components": {
+    "Text": {
+      "text": "",
+      "fontSize": 34,
+      "font": "sans-serif",
+      "align": "center",
+      "screenSpace": false,
+      "layer": 9
+    }
+  }
+}

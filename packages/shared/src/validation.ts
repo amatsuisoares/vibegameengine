@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { COMPONENT_TYPES, type Components, type StateTransition } from './components';
 import { TWEEN_PROPS, type RuleAction } from './rules';
 import { expandPrefabs } from './prefabs';
+import { ITEM_ID } from './items';
 import { ProjectSchema, SceneSchema, type Project, type Scene, type SoundRef } from './project';
 
 export type ValidationResult<T> =
@@ -296,6 +297,12 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
     errors.push(...utilityErrors(c, at));
     errors.push(...individualErrors(c, at));
     errors.push(...animatorErrors(c, at, project));
+  }
+  for (const [id, item] of Object.entries(project.items)) {
+    const at = `items.${id}`;
+    if (!ITEM_ID.test(id)) errors.push(`${at}: invalid item id`);
+    if (item.asset && !assetIds.has(item.asset)) errors.push(`${at}.asset: asset "${item.asset}" does not exist`);
+    if (item.prefab && !project.prefabs[item.prefab]) errors.push(`${at}.prefab: prefab "${item.prefab}" does not exist`);
   }
   for (const [key, scene] of Object.entries(project.scenes)) {
     if (key !== scene.id) errors.push(`scenes.${key}: key does not match scene id "${scene.id}"`);

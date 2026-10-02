@@ -1,0 +1,7 @@
+{
+  "name": "Peixe",
+  "category": "comida",
+  "icon": "🐟",
+  "tags": ["proteina", "salgado", "cheiroso"],
+  "props": { "artigo": "o", "fome": 30 }
+}

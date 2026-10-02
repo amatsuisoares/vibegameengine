@@ -130,6 +130,21 @@
       "text": "Gostos calibrados no playtest: ~60-70% gostam de carinho/petisco/bola, ~10% não gostam; ração quase sempre neutra (motivo para comidas novas na fase 3)",
       "status": "open",
       "updatedAt": "2026-10-02T15:53:58.274Z"
+    },
+    {
+      "id": "f11",
+      "kind": "feature",
+      "text": "Comidas como itens (items/: ração, maçã, banana, leite, queijo, peixe, cenoura, biscoito) com tags; botão Comida abre a bandeja; o pet cheira e reage pelo gosto (adora/gosta/neutro/não gosta/odeia: come com vontade, sem entusiasmo, belisca, recusa e se afasta); satisfeito recusa; doce demais faz mal",
+      "status": "verified",
+      "evidence": "playbooks comida_maca_sim_peixe_nao e comida_peixe_sim_maca_nao; playtest com screenshots (bandeja, comendo cenoura, recusando peixe); 4 pets novos com favoritas e rejeições diferentes (Pipoca adora maçã e odeia banana; Nuvem adora queijo e odeia cenoura)",
+      "updatedAt": "2026-10-02T16:15:41.735Z"
+    },
+    {
+      "id": "n6",
+      "kind": "note",
+      "text": "Gostos de comida: subjectWeight 0.4, tagBlend 0.7, faixas largas nas tags (simulação: ~60% dos pets com favorita, ~35% com uma recusada). Playbooks precisam fixar TODAS as tags do item (a mais forte domina)",
+      "status": "open",
+      "updatedAt": "2026-10-02T16:15:41.735Z"
     }
   ],
   "plans": []

@@ -6,6 +6,7 @@ export * from './memory';
 export * from './rules';
 export * from './merge-patch';
 export * from './prefabs';
+export * from './items';
 export * from './assertions';
 export * from './playbook';
 export * from './editor';

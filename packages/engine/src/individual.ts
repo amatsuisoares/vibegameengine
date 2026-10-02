@@ -1,5 +1,6 @@
 import type { Components } from '@vibe/shared';
 import type { Entity } from './entity';
+import { itemTags } from './items';
 import { Rng } from './rng';
 import type { GameStorage } from './storage';
 import type { World } from './world';
@@ -69,8 +70,9 @@ export function affinityOf(e: Entity, subject: string): number {
 }
 
 /**
- * How the entity feels about something: the subject's own affinity weighted with the mean of its
- * tags' (Preferences.subjectWeight). Either side alone counts fully when the other is unknown.
+ * How the entity feels about something: the subject's own affinity weighted (subjectWeight) with its
+ * tags' — their mean, or blended toward the strongest feeling among them (tagBlend). Either side
+ * alone counts fully when the other is unknown.
  */
 export function evaluate(e: Entity, subject: string | null, tags: readonly string[] = []): Evaluation {
   const prefs = e.components.Preferences;
@@ -84,11 +86,17 @@ export function evaluate(e: Entity, subject: string | null, tags: readonly strin
     parts[t] = affinityOf(e, t);
     tagValues.push(parts[t]);
   }
-  const tagMean = tagValues.length ? tagValues.reduce((s, v) => s + v, 0) / tagValues.length : null;
+  let tagScore: number | null = null;
+  if (tagValues.length) {
+    const mean = tagValues.reduce((s, v) => s + v, 0) / tagValues.length;
+    const strongest = tagValues.reduce((a, v) => (Math.abs(v) > Math.abs(a) ? v : a), 0);
+    const b = prefs?.tagBlend ?? 0;
+    tagScore = (1 - b) * mean + b * strongest;
+  }
   const w = prefs?.subjectWeight ?? 0.6;
-  const score = own !== null && tagMean !== null ? w * own + (1 - w) * tagMean : (own ?? tagMean ?? 0);
+  const score = own !== null && tagScore !== null ? w * own + (1 - w) * tagScore : (own ?? tagScore ?? 0);
   const s = round3(score);
-  return { score: s, level: preferenceLevel(s), known: own !== null || tagMean !== null, parts };
+  return { score: s, level: preferenceLevel(s), known: own !== null || tagScore !== null, parts };
 }
 
 /**
@@ -103,6 +111,11 @@ export function learn(e: Entity, subject: string, outcome: number): number {
   v.learned = round3(clamp(v.learned + p.learnRate * clamp(outcome, -1, 1), -p.maxLearned, p.maxLearned));
   v.n++;
   return affinityOf(e, subject);
+}
+
+/** How the entity feels about an item: by its id, its category and its tags. */
+export function evaluateItem(e: Entity, item: { id: string; category: string; tags: readonly string[] }): Evaluation {
+  return evaluate(e, item.id, itemTags(item));
 }
 
 /** 32-bit string hash (FNV-1a) for deriving generator seeds. */

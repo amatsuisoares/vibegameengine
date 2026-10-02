@@ -4,7 +4,7 @@
 //
 // Quem o pet É fica nos componentes da entidade (scenes/quarto.json), não aqui:
 //   Traits       8 eixos de personalidade 0..1, sorteados ao nascer (self.traits.get('atividade'))
-//   Preferences  gostos por assunto (carinho, bola, petisco, ração, escuro...), inatos e puxados pelos traços
+//   Preferences  gostos por assunto: itens (maçã, bola...), tags (fruta, doce...) e contextos (carinho, escuro)
 //   Persist      os dois ficam em storage.petIndividuo e voltam em toda sessão
 // Aqui só se decide o que cada traço e cada gosto MUDA no comportamento.
 
@@ -377,12 +377,10 @@ function go(game, x, then) {
   mind = { act: 'walk', targetX: Math.max(MIN_X, Math.min(MAX_X, x)), then };
 }
 
-/** O que a ração da tigela parece ao pet (ela é crocante). */
-const racao = () => feel('racao', ['crocante']);
-/** A bola é um brinquedo de correr. */
-const bola = () => feel('bola', ['ativo']);
-/** O petisco é doce. */
-const petiscoGosto = () => feel('petisco', ['doce']);
+/** O que o pet acha da ração da tigela (item do catálogo: id, categoria e tags). */
+const racao = () => me.prefs.item('racao');
+/** A bola (item: brinquedo ativo). */
+const bola = () => me.prefs.item('bola');
 
 /**
  * Fome a partir da qual vai até a tigela: guloso vai antes; quem não gosta da ração espera
@@ -590,47 +588,6 @@ function makeApi(game, self) {
       game.playSound('sfx_tigela');
       if (awake() && pet.needs.fome < 70) go(game, spot(game, 'tigela') + 55, 'eat');
     },
-    petisco() {
-      const n = pet.needs;
-      if (pet.asleep) {
-        observe(game, 'petiscoDormindo', '{n} está dormindo.', 1);
-        return;
-      }
-      const day = Math.floor((game.clock.now + localOffset) / DAY);
-      if (pet.treats.day !== day) pet.treats = { day, n: 0 };
-      pet.treats.n++;
-      if (pet.treats.n > 4 || n.fome > 95) {
-        n.saude = clamp(n.saude - 2);
-        observe(game, 'petiscoDemais', '{n} não parece muito interessado.', 2);
-        return;
-      }
-      const g = petiscoGosto();
-      if (g.level === 'hate') {
-        // Recusa: cheira e se afasta. Não come, não perde nada.
-        pet.treats.n--;
-        observe(game, 'petiscoRecusa', '{n} cheirou o petisco e se afastou.', 2);
-        go(game, self.x + (self.x < 480 ? -1 : 1) * 100, 'idle');
-        return;
-      }
-      n.fome = clamp(n.fome + 10);
-      pet.care.petiscos++;
-      game.playSound('sfx_comer');
-      if (g.level === 'love' || g.level === 'like') {
-        n.afeto = clamp(n.afeto + (g.level === 'love' ? 12 : 8));
-        n.diversao = clamp(n.diversao + 5);
-        emote(game, self, '♥', '#ff8fab');
-        reveal('apetite', 'alto');
-        observe(game, 'petisco', g.level === 'love' ? '{n} parece ter adorado o petisco.' : '{n} parece ter gostado do petisco.', 2);
-        mind = { act: 'happy', t: 1.2 };
-      } else if (g.level === 'neutral') {
-        n.afeto = clamp(n.afeto + 3);
-        observe(game, 'petisco', '{n} comeu o petisco sem muito entusiasmo.', 2);
-        mind = { act: 'idle', t: 1.2 };
-      } else {
-        observe(game, 'petisco', '{n} comeu o petisco, mas não parece ter gostado muito.', 2);
-        mind = { act: 'sulk', t: 1.5 };
-      }
-    },
     remedio() {
       if (!pet.sick) {
         observe(game, 'remedioSemDoenca', '{n} não parece muito interessado.', 2);
@@ -727,6 +684,100 @@ function diaryText(game) {
   lines.push('');
   lines.push('O jogo é salvo automaticamente.  (clique no diário para fechar)');
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------- comida oferecida (itens)
+
+const DOCES_POR_DIA = 4;
+// "a maçã", "da maçã" (props.artigo do item: "a" ou "o").
+const nomeDe = (item) => item.name.toLowerCase();
+const oItem = (item) => `${item.props.artigo || 'o'} ${nomeDe(item)}`;
+const doItem = (item) => `d${item.props.artigo || 'o'} ${nomeDe(item)}`;
+
+/** A comida no chão some aos poucos. */
+function sumir(food, s) {
+  food.tween('opacity', 0, s * 1000, { onDone: () => food.destroy() });
+}
+
+/**
+ * Alguém ofereceu um item (game.useItem). O pet cheira e reage pelo que acha dele (id, categoria e
+ * tags): adora → come rápido, ♥ e pula; gosta → come e ♥; neutro → come sem pressa; não gosta →
+ * belisca e emburra; odeia → recusa e se afasta. Sem punição: não gostar só rende menos.
+ * Devolve {consumed, level} a quem ofereceu (a loja/inventário vão usar).
+ */
+function onItem(self, item, game) {
+  if (item.category !== 'comida') return { consumed: false, reason: 'naoComida' };
+  if (pet.asleep) {
+    observe(game, 'ofertaDormindo', '{n} está dormindo.', 1);
+    return { consumed: false, reason: 'dormindo' };
+  }
+  if (pet.needs.fome > 92) {
+    observe(game, 'semFome', '{n} não parece estar com fome agora.', 1);
+    return { consumed: false, reason: 'satisfeito' };
+  }
+  const r = me.prefs.item(item.id);
+  const dir = self.get('Sprite').flipX ? -1 : 1;
+  const food = game.spawn('oferta', self.x + dir * 70, FEET_Y - 12);
+  food.get('Text').text = item.icon || '•';
+  // Primeiro cheira (inclina a cabeça); a reação vem depois.
+  mind = { act: 'investigate', t: 0.9, then: () => react(game, self, item, r.level, food, dir) };
+  game.emit('reacao', { item: item.id, level: r.level });
+  return { consumed: r.level !== 'hate', level: r.level };
+}
+
+function react(game, self, item, level, food, dir) {
+  const n = pet.needs;
+  if (level === 'hate') {
+    observe(game, `comida:${item.id}`, `{n} cheirou ${oItem(item)} e se afastou.`);
+    sumir(food, 1.5);
+    go(game, self.x - dir * 140, 'idle');
+    return;
+  }
+  const eatFor = { love: 1.3, like: 2, neutral: 2.6, dislike: 1.4 }[level];
+  mind = {
+    act: 'eat',
+    t: eatFor,
+    then: () => {
+      sumir(food, 0.3);
+      const part = level === 'dislike' ? 0.5 : 1;
+      n.fome = clamp(n.fome + (Number(item.props.fome) || 10) * part);
+      n.energia = clamp(n.energia + (Number(item.props.energia) || 0) * part);
+      pet.care.petiscos++;
+      game.playSound('sfx_comer');
+      if (level === 'love') {
+        n.afeto = clamp(n.afeto + 10);
+        n.diversao = clamp(n.diversao + 5);
+        emote(game, self, '♥', '#ff8fab');
+        self.after(300, () => emote(game, self, '♥', '#ff8fab'));
+        reveal('apetite', 'alto');
+        observe(game, `comida:${item.id}`, `{n} parece ter adorado ${oItem(item)}!`);
+        mind = { act: 'happy', t: 1.4 };
+      } else if (level === 'like') {
+        n.afeto = clamp(n.afeto + 5);
+        emote(game, self, '♥', '#ff8fab');
+        observe(game, `comida:${item.id}`, `{n} parece ter gostado ${doItem(item)}.`);
+        mind = { act: 'happy', t: 0.9 };
+      } else if (level === 'neutral') {
+        observe(game, `comida:${item.id}`, `{n} comeu ${oItem(item)} sem muito entusiasmo.`);
+        mind = { act: 'idle', t: 1 };
+      } else {
+        observe(game, `comida:${item.id}`, `{n} comeu só um pouco ${doItem(item)}. Não parece ter gostado muito.`);
+        mind = { act: 'sulk', t: 1.5 };
+      }
+      if (item.tags.includes('doce')) comeuDoce(game);
+    },
+  };
+}
+
+/** Doce demais num dia faz mal (um pouco). */
+function comeuDoce(game) {
+  const day = Math.floor((game.clock.now + localOffset) / DAY);
+  if (pet.treats.day !== day) pet.treats = { day, n: 0 };
+  pet.treats.n++;
+  if (pet.treats.n > DOCES_POR_DIA) {
+    pet.needs.saude = clamp(pet.needs.saude - 2);
+    observe(game, 'doceDemais', '{n} parece ter comido doce demais hoje.', 60);
+  }
 }
 
 // ---------------------------------------------------------------- ciclo de vida do script

@@ -1,0 +1,7 @@
+{
+  "name": "Ração",
+  "category": "comida",
+  "icon": "🥣",
+  "tags": ["crocante"],
+  "props": { "artigo": "a", "fome": 35 }
+}

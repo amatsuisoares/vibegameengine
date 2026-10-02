@@ -236,3 +236,21 @@ describe('Persist reset with a preset', () => {
     expect((g.storage.get('villager') as { traits: Record<string, number> }).traits.bravery).toBe(1);
   });
 });
+
+describe('Preferences tagBlend and wide ranges', () => {
+  it('tagBlend moves the tag part from their mean toward the strongest feeling; ranges past ±1 are clamped draws', () => {
+    const values = { stew: { innate: 0 }, warm: { innate: 0.3 }, fishy: { innate: -0.9 }, salty: { innate: 0.3 } };
+    const at = (tagBlend: number) => {
+      const g = game([villager({ Preferences: { values, subjectWeight: 0.5, tagBlend } })]);
+      g.step(1);
+      return evaluate(g.entity('npc')!, 'stew', ['warm', 'fishy', 'salty']).score;
+    };
+    expect(at(0)).toBe(-0.05); // 0.5 × 0 + 0.5 × mean(0.3, -0.9, 0.3)
+    expect(at(1)).toBe(-0.45); // 0.5 × strongest (-0.9)
+    expect(at(0.5)).toBe(-0.25);
+
+    const g = game([villager({ Preferences: { generate: { thunder: { min: 1.5, max: 2 }, mud: { min: -2, max: -1.2 } } } })]);
+    g.step(1);
+    expect(snap(g).prefs).toMatchObject({ thunder: 1, mud: -1 });
+  });
+});

@@ -32,7 +32,7 @@ UTILITY AI (choosing what to do: eat, sleep, play, flee, explore...)
 
 INDIVIDUALS (Traits, Preferences, Persist: what makes two NPCs/pets with the same components different)
 - Traits {values: {axis: 0..1}, generate: {axis: {min, max}}}: personality axes; missing ones are drawn (seeded) before the first onStart. Stable.
-- Preferences {values: {subject: {innate, learned, n}}, generate: {subject: {min, max, traits: {axis: weight}}}, subjectWeight 0.6, learnRate 0.05, maxLearned 0.5}: affinity -1..1 per subject (item id, tag, context); innate can lean on traits.
+- Preferences {values: {subject: {innate, learned, n}}, generate: {subject: {min, max, traits: {axis: weight}}}, subjectWeight 0.6, tagBlend 0 (0 = mean of the tags, 1 = their strongest feeling), learnRate 0.05, maxLearned 0.5}; generate ranges may exceed ±1 (draws are clamped → strong feelings more common): affinity -1..1 per subject (item id, tag, context); innate can lean on traits.
 - Persist {key}: both kept in game.storage[key] across sessions/scenes (loaded, missing ones drawn, saved at frame end). A new game version only draws the new axes/subjects.
 - Scripts: self.traits.get/set/has/all; self.prefs.of(s), evaluate(subject, tags) -> {score, level: love|like|neutral|dislike|hate, known, parts}, learn(s, outcome -1..1), set, all; self.persist.save() / reset({traits?}) (a new individual).
 - Expressions: trait('axis') / likes('subject') for self, trait('id','axis') / likes('id','subject') anywhere. inspect_game_state shows traits and prefs. Event "individual" {entity, loaded, drawn}.
@@ -74,6 +74,11 @@ GEOMETRY AND PHYSICS
 - Gravity default 1400 px/s^2. Jump height = jumpSpeed^2/(2*gravity): default 560 -> 112 px. Default walk speed 180 px/s; a default jump spans about 140 px horizontally.
 - Solids can be thin: movement is swept (fast bodies stop at the first solid they cross, and pick up triggers/coins on their path). isTrigger for pickups/goals/checkpoints; oneWay for jump-through platforms.
 - The camera follows camera.follow, clamped to the scene; the viewport is config.width x config.height.
+
+ITEMS (the catalog: foods, toys, furniture, keys... as data in items/<id>.json)
+- list_items / create_item {id, item: {name, category, tags, props, icon?, asset?, prefab?, price?, consumable, description?}} / modify_item / delete_item.
+- Describe what an item IS with tags (fruit, sweet, noisy, soft), not fixed bonuses: each individual reacts by its Preferences.
+- Scripts: game.items.get(id) / list({category, tag}); game.useItem(item, target, by?) -> event "item_used" + target's onItem(self, item, game, by), whose return value comes back ({handled, result}). self.prefs.item(item) evaluates it (id + category + tags). Expressions: item('id').price, likes('itemId').
 
 PREFABS (reusable entities)
 - create_prefab (from data, or from an existing entity with link=true) writes prefabs/<id>.json. Instances: create_game_object {"id":"enemy3","prefab":"walker","transform":{"x":900,"y":406}} — they store only overrides; modify_prefab changes all of them. Spawn at runtime with the rule action spawn {prefab, x, y, at?} or game.spawn(prefab, x, y) in scripts.

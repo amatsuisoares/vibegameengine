@@ -55,6 +55,43 @@ Convenções:
 
 Id inexistente sugere ids parecidos (`Did you mean: enemy1, enemy2?`).
 
+## Itens (`items/<id>.json`)
+
+Implementado na V0.7 (`shared/src/items.ts`, `engine/src/items.ts`, `tools/item-tools.ts`). O catálogo do jogo: comidas,
+brinquedos, móveis, chaves, poções... Um item é **dado**, não entidade: o que ele faz é decidido por quem o recebe. Tags e
+propriedades dizem **o que ele é**, para cada indivíduo reagir do seu jeito (em vez de um bônus fixo).
+
+```json
+{ "name": "Maçã", "category": "comida", "tags": ["fruta", "doce", "fresco"], "props": { "fome": 15, "artigo": "a" }, "icon": "🍎", "price": 3 }
+```
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `name` | — | nome exibido |
+| `category` | — | tipo (`comida`, `brinquedo`, `movel`...); conta como tag ao avaliar preferências |
+| `tags` | `[]` | como ele é (`fruta`, `barulhento`, `macio`) |
+| `props` | `{}` | propriedades do jogo (número, texto ou booleano); a engine não interpreta |
+| `icon` / `asset` | — | glifo/emoji ou imagem (asset) para menus |
+| `prefab` | — | prefab que representa o item no mundo |
+| `price` | — | preço (lojas) |
+| `consumable` | `true` | some ao ser usado (comida) ou fica (brinquedo, móvel) |
+| `description` | — | texto livre |
+
+| Tool | Parâmetros | Observação |
+|---|---|---|
+| `list_items` | `category?, tag?` | catálogo com os padrões preenchidos e as categorias existentes |
+| `create_item` | `id, item` | erro se já existe; validado antes de gravar |
+| `modify_item` | `id, patch` | merge patch (listas são substituídas) |
+| `delete_item` | `id` | |
+
+- **Scripts:** `game.items.get(id)` (cópia com `id`, ou `null`), `has(id)`, `list({category?, tag?})`;
+  `game.useItem(item, alvo, por?)` emite `item_used {item, target, by?, category, tags}` e chama o hook do alvo
+  `onItem(self, item, game, by)`; devolve `{handled, result}` (`result` = o que o hook retornou, em JSON).
+- **Gostos:** `self.prefs.item(item)` avalia pelo id, pela categoria e pelas tags (`{score, level, known, parts}`).
+  Nas expressões, `likes('maca')` faz o mesmo quando `maca` é um item; `item('maca').price` lê o catálogo.
+- O `ProjectStore` valida cada arquivo de item em toda escrita (forma, asset e prefab existentes) e o entrega às runs, ao
+  screenshot e à página (`rawProject().items`).
+
 ## Prefabs
 
 Implementado na Etapa 8 (`shared/src/prefabs.ts`, `tools/prefab-tools.ts`). Um prefab é uma entidade sem `id` em
@@ -252,8 +289,9 @@ sentido aos eixos e aos assuntos.
 | `Traits.values` | eixos de personalidade 0..1 (0,5 = médio). Estáveis: só scripts mudam |
 | `Traits.generate` | eixos sorteados em [min, max] quando faltam (e não há nada salvo) |
 | `Preferences.values` | afinidade por assunto (id de item, tag, contexto): `{innate, learned, n}`, -1..1 |
-| `Preferences.generate` | afinidades inatas sorteadas em [min, max] + `traits` (peso × (traço − 0,5) × 2), limitadas a -1..1 |
-| `subjectWeight` | `0.6`: peso do próprio assunto contra a média das tags em `evaluate` |
+| `Preferences.generate` | afinidades inatas sorteadas em [min, max] (pode passar de ±1: o sorteio é limitado, então faixas largas tornam sentimentos fortes mais comuns) + `traits` (peso × (traço − 0,5) × 2), limitadas a -1..1 |
+| `subjectWeight` | `0.6`: peso do próprio assunto contra as tags em `evaluate` |
+| `tagBlend` | `0`: como as tags se combinam — `0` a média; `1` o sentimento mais forte entre elas (um cheiro odiado estraga qualquer comida cheirosa); entre os dois, mistura |
 | `learnRate` / `maxLearned` | `0.05` / `0.5`: cada experiência move `learned` em `learnRate × resultado`, nunca além de ±`maxLearned` |
 | `Persist.key` | chave do `game.storage` onde os valores ficam entre sessões e cenas |
 
@@ -263,7 +301,7 @@ sentido aos eixos e aos assuntos.
 - **Sorteio:** gerador próprio a partir da seed, do id da entidade e do relógio do jogo: reproduzível nas runs, diferente
   para um indivíduo criado depois na mesma sessão, e não muda a sequência de `game.random()`.
 - **Níveis:** `≥ 0,6` love · `≥ 0,2` like · `> −0,2` neutral · `> −0,6` dislike · resto hate.
-- **`evaluate(assunto, tags)`:** `subjectWeight × assunto + (1 − subjectWeight) × média(tags conhecidas)`; um lado
+- **`evaluate(assunto, tags)`:** `subjectWeight × assunto + (1 − subjectWeight) × tags`, onde tags = `(1 − tagBlend) × média + tagBlend × mais forte` (só as conhecidas); um lado
   sozinho conta inteiro; nada conhecido = 0 (`known: false`).
 - **Scripts:** `self.traits.get/set/has/all` (eixo desconhecido é erro, não "médio"); `self.prefs.of(assunto)`,
   `known`, `evaluate(assunto, tags?)` → `{score, level, known, parts}`, `level(score)`,

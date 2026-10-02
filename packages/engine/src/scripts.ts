@@ -8,7 +8,8 @@ import { findPath, pathOptionsFor, type NavStatus, type PathResult, type Point }
 import type { Ease, TweenInfo } from './tweens';
 import type { EmitterOptions } from './particles';
 import { aiOf, type UtilityRunner } from './utility';
-import { affinityOf, evaluate, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
+import { ItemCatalog, type ItemFilter, type ItemInfo } from './items';
+import { affinityOf, evaluate, evaluateItem, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
 import type { GameStorage } from './storage';
@@ -29,6 +30,7 @@ import { FIXED_DT, type GameEvent, type World } from './world';
  *   function onInteract(self, by, game, info) {}  // self (an Interactable) was used; by = actor or null, info = { action, via }
  *   function onStateChange(self, change, game) {} // self's StateMachine changed state: change = { from, to } (from null at start)
  *   function onDecision(self, decision, game) {}  // self's UtilityAI chose something new: { choice, from, scores }
+ *   function onItem(self, item, game, by) {}      // an item was used on self (game.useItem); its return value goes back to the caller
  *
  * Top-level variables are per entity (each entity runs its own copy of the script).
  * Scripts only see `self`, `game`, `console` and a deterministic `Math` (Math.random is
@@ -44,9 +46,10 @@ export interface ScriptHooks {
   onInteract?: (self: ScriptEntity, by: ScriptEntity | null, game: ScriptGame, info: { action: string; via: InteractVia }) => void;
   onStateChange?: (self: ScriptEntity, change: { from: string | null; to: string }, game: ScriptGame) => void;
   onDecision?: (self: ScriptEntity, decision: { choice: string; from: string | null; scores: Record<string, number | null> }, game: ScriptGame) => void;
+  onItem?: (self: ScriptEntity, item: ItemInfo, game: ScriptGame, by: ScriptEntity | null) => unknown;
 }
 
-const HOOKS = ['onStart', 'onUpdate', 'onCollision', 'onClick', 'onEvent', 'onInteract', 'onStateChange', 'onDecision'] as const;
+const HOOKS = ['onStart', 'onUpdate', 'onCollision', 'onClick', 'onEvent', 'onInteract', 'onStateChange', 'onDecision', 'onItem'] as const;
 
 /** What scripts reach beyond the world: the calendar clock, the saved data, interactions and state machines. */
 export interface ScriptHost extends SlotHost {
@@ -56,6 +59,8 @@ export interface ScriptHost extends SlotHost {
   readonly stateMachines: StateMachineRunner;
   readonly utility: UtilityRunner;
   readonly individuals: IndividualRunner;
+  readonly items: ItemCatalog;
+  useItem(itemId: string, target: Entity, by?: Entity): { handled: boolean; result: unknown };
 }
 
 /** self.traits: the entity's personality axes (Traits), 0..1. */
@@ -82,6 +87,8 @@ export interface ScriptPrefs {
   learn(subject: string, outcome: number): number;
   /** Sets the innate affinity of a subject (-1..1), keeping what was learned. */
   set(subject: string, innate: number): void;
+  /** How it feels about an item (id or item): its id, category and tags. */
+  item(item: string | ItemInfo): Evaluation;
   /** Affinity per subject. */
   all(): Record<string, number>;
 }
@@ -346,6 +353,10 @@ export interface ScriptGame {
   emitParticles(x: number, y: number, count: number, options?: EmitterOptions): number;
   /** Enabled interactables that `actor` may use and is in range of, nearest first. */
   nearbyInteractables(actor: string | ScriptEntity): NearbyInteractable[];
+  /** The item catalog: get(id) (null if unknown), has(id), list({category?, tag?}). */
+  readonly items: { get(id: string): ItemInfo | null; has(id: string): boolean; list(filter?: ItemFilter): ItemInfo[] };
+  /** Uses an item on an entity: event "item_used" and its onItem hook; returns {handled, result}. */
+  useItem(item: string | ItemInfo, target: string | ScriptEntity, by?: string | ScriptEntity): { handled: boolean; result: unknown };
 }
 
 /** Builds the `self`/`game` objects scripts see, bound to one world. */
@@ -487,6 +498,17 @@ class ScriptApi {
       },
       emitParticles: (x, y, count, options) => w.particles.emitAt(x, y, count, options),
       nearbyInteractables: (actor) => host.interactions.nearby(resolve(actor, 'game.nearbyInteractables')),
+      items: {
+        get: (id) => host.items.get(String(id)),
+        has: (id) => host.items.has(String(id)),
+        list: (filter = {}) => host.items.list({ category: filter.category, tag: filter.tag }),
+      },
+      useItem: (item, target, by) =>
+        host.useItem(
+          typeof item === 'string' ? item : String(item?.id),
+          resolve(target, 'game.useItem target'),
+          by === undefined ? undefined : resolve(by, 'game.useItem by'),
+        ),
     };
   }
 
@@ -632,6 +654,10 @@ class ScriptApi {
         return evaluate(e, subject === null ? null : String(subject), tags.map(String));
       },
       level: (score) => preferenceLevel(finite(score, 'score')),
+      item: (item) => {
+        prefsData();
+        return evaluateItem(e, host.items.require(typeof item === 'string' ? item : item?.id));
+      },
       learn: (subject, outcome) => {
         prefsData();
         const v = learn(e, String(subject), finite(outcome, 'outcome'));
@@ -900,6 +926,17 @@ export class ScriptRunner {
     if (inst && !inst.failed && inst.hooks.onStateChange && e.active) {
       this.call(e, inst, 'onStateChange', () => inst.hooks.onStateChange!(this.api.entity(e), { ...change }, this.api.game));
     }
+  }
+
+  /** onItem of the entity an item was used on: whether a hook ran, and what it returned (JSON). */
+  itemUsed(target: Entity, item: ItemInfo, by: Entity | undefined): { handled: boolean; result: unknown } {
+    const inst = this.instance(target);
+    if (!inst || inst.failed || !inst.hooks.onItem || !target.active) return { handled: false, result: undefined };
+    let result: unknown;
+    this.call(target, inst, 'onItem', () => {
+      result = inst.hooks.onItem!(this.api.entity(target), structuredClone(item), this.api.game, by ? this.api.entity(by) : null);
+    });
+    return { handled: true, result: result === undefined ? undefined : JSON.parse(JSON.stringify(result)) };
   }
 
   /** onInteract of an interactable that was used. */

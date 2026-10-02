@@ -157,6 +157,34 @@ describe('meu-pet (regression)', () => {
     expect(Number(lively.vars.fome)).toBeLessThan(Number(calm.vars.fome)); // and a greedy one gets hungry sooner
   });
 
+  it('foods: a pet saved before the catalog only gets the new tastes drawn; the tray lists the foods; a full pet refuses without eating', () => {
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const pet = {
+      version: 2, name: 'Mimi', born: t, stage: 'bebe', needs: { fome: 95, energia: 80, diversao: 70, higiene: 90, saude: 100, afeto: 60 }, sick: false,
+      asleep: false, lightOn: true, bowl: 0, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 70, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, notes: [], lastSeen: t,
+    };
+    const old = { version: 1, traits: { atividade: 0.5, sociabilidade: 0.5, curiosidade: 0.5, independencia: 0.5, sensibilidade: 0.5, apetite: 0.5, paciencia: 0.5, brincadeira: 0.5 }, preferences: { carinho: { innate: 0.42, learned: 0, n: 0 } } };
+    const game = new Game(load(), { seed: 2, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z' }, storage: { pet, petIndividuo: old } });
+    game.step(2);
+    const drawn = game.events(0, 'individual')[0].drawn as string[];
+    expect(drawn).toEqual(expect.arrayContaining(['fruta', 'laticinio', 'maca', 'peixe']));
+    expect(drawn).not.toContain('carinho');
+    expect(game.getState({ ids: ['pet'] }).entities[0].prefs!.carinho).toBe(0.42);
+
+    game.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
+    const cards = game.world.withTag('carta');
+    expect(cards.map((c) => c.components.Script!.props.item)).toEqual(['banana', 'biscoito', 'cenoura', 'leite', 'maca', 'peixe', 'queijo']);
+    expect(cards.map((c) => c.components.Text!.text)).toContain('🍎\nMaçã');
+    game.perform([{ type: 'click', x: 315, y: 435 }, { type: 'wait', ms: 3000 }]); // the apple card
+    expect(game.world.withTag('carta')).toEqual([]); // the tray closed
+    expect(game.events(0, 'item_used').at(-1)).toMatchObject({ item: 'maca', target: 'pet', category: 'comida' });
+    expect(game.events(0, 'observacao').at(-1)!.text).toBe('Mimi não parece estar com fome agora.');
+    expect(game.events(0, 'reacao')).toEqual([]);
+    expect(game.world.withTag('oferta')).toEqual([]);
+    expect(game.console.read(0, 'error')).toEqual([]);
+  });
+
   it('verify_game plays a scenario of the real game and reports PASS per check', async () => {
     const store = new ProjectStore(MEU_PET);
     const r = await createAgentTools().call(

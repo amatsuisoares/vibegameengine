@@ -138,7 +138,7 @@ reabrir) → docs (ARCHITECTURE, AGENT_TOOLS, FEATURES do jogo) → TODO → com
 |---|---|---|
 | 1 ✅ | análise e arquitetura (este documento) | — |
 | 2 ✅ | `Traits`, `Preferences` (inato, avaliação, níveis), `Persist`, funções `trait()`/`likes()` | 8 eixos de personalidade; migração do save v1; os multiplicadores viram leitura dos eixos |
-| 3 | catálogo de itens, `useItem` + `onItem` + `item_used` | comidas e brinquedos com tags; reação por preferência (aproximar/afastar, emote, animação); fim do petisco único |
+| 3 ✅ | catálogo de itens, `useItem` + `onItem` + `item_used` | comidas e brinquedos com tags; reação por preferência (aproximar/afastar, emote, animação); fim do petisco único |
 | 4 | inventário, moeda, loja (`buy`), ações/expressões | tela de inventário e loja; renda pequena (cuidado diário) |
 | 5 | `UtilityAI` com alvos, `Routine` | decisão sem prioridades fixas; conflito de necessidades decidido pela personalidade; rotina individual |
 | 6 | `Memory`, `Notifier` | lembra experiências boas/ruins e procura de novo; observações migram para o Notifier |

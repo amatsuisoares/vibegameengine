@@ -1,0 +1,8 @@
+{
+  "name": "Bola",
+  "category": "brinquedo",
+  "icon": "⚽",
+  "tags": ["ativo", "rola"],
+  "consumable": false,
+  "props": { "artigo": "a" }
+}

@@ -1,0 +1,110 @@
+{
+  "scenario": "um pet que adora fruta come a maçã feliz e recusa o peixe",
+  "tags": ["interacao", "pet", "individuo", "comida"],
+  "steps": [
+    { "type": "wait", "ms": 500 },
+    { "type": "click", "entity": "botaoPetisco" },
+    { "type": "wait", "ms": 100 },
+    { "type": "click", "x": 315, "y": 435 },
+    { "type": "wait", "ms": 2500 },
+    {
+      "type": "assert",
+      "check": { "assert": "state", "id": "pet", "is": "happy" },
+      "name": "adora maca: fica feliz"
+    },
+    { "type": "assert", "check": { "assert": "variable", "var": "fome", "gt": 50 }, "name": "comeu maca" },
+    { "type": "wait", "ms": 2000 },
+    { "type": "click", "entity": "botaoPetisco" },
+    { "type": "wait", "ms": 100 },
+    { "type": "click", "x": 425, "y": 435 },
+    { "type": "wait", "ms": 1300 },
+    {
+      "type": "assert",
+      "check": { "assert": "state", "id": "pet", "is": "walk" },
+      "name": "recusa peixe: se afasta"
+    }
+  ],
+  "assertions": [
+    {
+      "assert": "eventOccurred",
+      "event": "item_used",
+      "match": { "item": "maca", "target": "pet" },
+      "name": "ofereceu maca"
+    },
+    {
+      "assert": "eventOccurred",
+      "event": "reacao",
+      "match": { "item": "maca", "level": "love" },
+      "name": "reação de amor a maca"
+    },
+    {
+      "assert": "eventOccurred",
+      "event": "reacao",
+      "match": { "item": "peixe", "level": "hate" },
+      "name": "reação de ódio a peixe"
+    },
+    {
+      "assert": "eventOccurred",
+      "event": "observacao",
+      "match": { "kind": "comida:peixe" },
+      "name": "observação da recusa"
+    },
+    { "assert": "variable", "var": "fome", "lt": 70, "name": "não comeu peixe" }
+  ],
+  "screenshot": true,
+  "annotate": false,
+  "allowErrors": false,
+  "scene": "quarto",
+  "clock": { "start": "2026-03-10T10:00:00Z", "speed": 600 },
+  "storage": {
+    "pet": {
+      "version": 2,
+      "name": "Bolinha",
+      "born": 1773136800000,
+      "stage": "bebe",
+      "needs": { "fome": 40, "energia": 80, "diversao": 70, "higiene": 90, "saude": 100, "afeto": 60 },
+      "sick": false,
+      "asleep": false,
+      "lightOn": true,
+      "bowl": 0,
+      "dirt": 0,
+      "care": {
+        "brincadeiras": 0,
+        "carinhos": 0,
+        "petiscos": 0,
+        "refeicoes": 0,
+        "sonecas": 0,
+        "limpezas": 0
+      },
+      "wellbeing": 70,
+      "treats": { "day": -1, "n": 0 },
+      "revealed": {},
+      "cooldowns": {},
+      "notes": [],
+      "lastSeen": 1773136800000
+    },
+    "petIndividuo": {
+      "version": 1,
+      "traits": {
+        "atividade": 0.5,
+        "sociabilidade": 0.5,
+        "curiosidade": 0.5,
+        "independencia": 0.5,
+        "sensibilidade": 0.5,
+        "apetite": 0.5,
+        "paciencia": 0.7,
+        "brincadeira": 0.5
+      },
+      "preferences": {
+        "maca": { "innate": 0.9, "learned": 0, "n": 0 },
+        "fruta": { "innate": 0.9, "learned": 0, "n": 0 },
+        "doce": { "innate": 0.5, "learned": 0, "n": 0 },
+        "fresco": { "innate": 0.5, "learned": 0, "n": 0 },
+        "peixe": { "innate": -0.9, "learned": 0, "n": 0 },
+        "cheiroso": { "innate": -1, "learned": 0, "n": 0 },
+        "proteina": { "innate": 0, "learned": 0, "n": 0 },
+        "salgado": { "innate": 0, "learned": 0, "n": 0 }
+      }
+    }
+  }
+}

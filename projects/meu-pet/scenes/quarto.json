@@ -212,8 +212,27 @@
             "doce": { "min": -0.3, "max": 0.9, "traits": { "apetite": 0.3 } },
             "racao": { "min": -0.4, "max": 0.7 },
             "crocante": { "min": -0.5, "max": 0.6 },
-            "escuro": { "min": -0.5, "max": 0.7, "traits": { "sensibilidade": 0.4 } }
-          }
+            "escuro": { "min": -0.5, "max": 0.7, "traits": { "sensibilidade": 0.4 } },
+            "fruta": { "min": -1.1, "max": 1.98 },
+            "fresco": { "min": -0.88, "max": 1.32 },
+            "macio": { "min": -0.88, "max": 1.32 },
+            "laticinio": { "min": -1.54, "max": 1.76 },
+            "liquido": { "min": -0.88, "max": 1.1 },
+            "salgado": { "min": -1.32, "max": 1.54 },
+            "proteina": { "min": -0.3, "max": 0.9, "traits": { "apetite": 0.3 } },
+            "cheiroso": { "min": -1.54, "max": 1.54, "traits": { "sensibilidade": -0.3 } },
+            "vegetal": { "min": -1.76, "max": 1.1 },
+            "rola": { "min": -0.3, "max": 0.6 },
+            "maca": { "min": -0.8, "max": 0.8 },
+            "banana": { "min": -0.8, "max": 0.8 },
+            "leite": { "min": -0.8, "max": 0.8 },
+            "queijo": { "min": -0.8, "max": 0.8 },
+            "peixe": { "min": -0.8, "max": 0.8 },
+            "cenoura": { "min": -0.8, "max": 0.8 },
+            "biscoito": { "min": -0.8, "max": 0.8 }
+          },
+          "subjectWeight": 0.4,
+          "tagBlend": 0.7
         },
         "Persist": { "key": "petIndividuo" }
       }
@@ -279,8 +298,8 @@
       "prefab": "botao",
       "transform": { "x": 468, "y": 516 },
       "components": {
-        "Text": { "text": "Petisco" },
-        "Script": { "props": { "acao": "petisco" } },
+        "Text": { "text": "Comida" },
+        "Script": { "props": { "acao": "comida" } },
         "Sprite": { "width": 96 }
       }
     },
@@ -357,6 +376,15 @@
         "Sprite": { "width": 250, "height": 38, "color": "#2f7d4f", "layer": 72 },
         "Text": { "text": "Começar com um novo pet", "layer": 73 },
         "Script": { "props": { "acao": "novoPet" } }
+      }
+    },
+    {
+      "id": "bandeja",
+      "tags": ["ui"],
+      "transform": { "x": 480, "y": 392 },
+      "components": {
+        "Sprite": { "width": 470, "height": 196, "color": "#3a3355", "opacity": 0.92, "layer": 65 },
+        "Script": { "src": "scripts/bandeja.js" }
       }
     }
   ]

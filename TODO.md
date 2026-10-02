@@ -260,7 +260,13 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
   petisco, ração, bola e luz reagem pelo gosto (se afastar, recusar, comer devagar, só olhar); diário com 16 descrições;
   migração do save v1 (testada com o save real); 2 playbooks novos de pets opostos; calibração pelo playtest
 - [x] 421 testes unitários (antes 406) + 6 playbooks do meu-pet
-- [ ] **Fase 3 — Itens + tags + reações**: catálogo `items/`, `useItem`/`onItem`/`item_used`
+- [x] **Fase 3 — Itens + tags + reações**: catálogo `items/<id>.json` (nome, categoria, tags, props, ícone, preço,
+  consumível) validado pelo `ProjectStore` e entregue às runs e à página; tools `list/create/modify/delete_item`;
+  `game.items`, `game.useItem` → `item_used` + hook `onItem` (retorno volta a quem usou); `self.prefs.item`,
+  `likes(item)`, `item()`; `Preferences.tagBlend` (sentimento mais forte entre as tags) e faixas de sorteio além de ±1
+- [x] meu-pet: 8 comidas com tags + bola como item; botão Comida abre a bandeja; o pet cheira e reage pelo gosto
+  (come com vontade / sem entusiasmo / belisca / recusa e se afasta); gostos calibrados por simulação (cada pet com
+  favoritas e rejeições); 2 playbooks de pets com gostos opostos; 428 testes unitários + 26 e2e + 8 playbooks
 - [ ] **Fase 4 — Inventário + loja + moeda**
 - [ ] **Fase 5 — Utility AI com alvos + rotina**
 - [ ] **Fase 6 — Memória + observações (`Notifier`)**

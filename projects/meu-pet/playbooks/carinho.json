@@ -69,7 +69,8 @@
       "preferences": {
         "carinho": { "innate": 0.8, "learned": 0, "n": 0 },
         "bola": { "innate": 0.7, "learned": 0, "n": 0 },
-        "ativo": { "innate": 0.4, "learned": 0, "n": 0 }
+        "ativo": { "innate": 0.4, "learned": 0, "n": 0 },
+        "rola": { "innate": 0.5, "learned": 0, "n": 0 }
       }
     }
   }

@@ -29,3 +29,4 @@ export { contactBox } from './systems/interactions';
 export * from './audio-source';
 export * from './saves';
 export * from './individual';
+export * from './items';

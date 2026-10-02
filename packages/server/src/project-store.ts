@@ -46,10 +46,12 @@ export interface Snapshot {
   scripts: Record<string, string>;
   /** prefabs/<id>.json files (id = file name). */
   prefabs: SceneFile[];
+  /** items/<id>.json files (id = file name). */
+  items: SceneFile[];
 }
 
 /** The project as stored: config, scenes by id and script sources (not validated). */
-export type RawProjectData = { config: unknown; scenes: Record<string, unknown>; scripts: Record<string, string>; prefabs: Record<string, unknown> };
+export type RawProjectData = { config: unknown; scenes: Record<string, unknown>; scripts: Record<string, string>; prefabs: Record<string, unknown>; items: Record<string, unknown> };
 
 export interface ValidationStatus {
   ok: boolean;
@@ -70,10 +72,11 @@ export function normalizeRel(rel: string) {
 
 const SCENE_FILE = /^scenes\/[^/]+\.json$/;
 const PREFAB_FILE = /^prefabs\/[A-Za-z][A-Za-z0-9_-]*\.json$/;
+const ITEM_FILE = /^items\/[A-Za-z][A-Za-z0-9_-]*\.json$/;
 
-/** Files that make up the game itself (validated before every write): config, scenes, scripts and prefabs. */
+/** Files that make up the game itself (validated before every write): config, scenes, scripts, prefabs and items. */
 export function isProjectDataFile(rel: string) {
-  return rel === PROJECT_FILE || SCENE_FILE.test(rel) || SCRIPT_PATH.test(rel) || PREFAB_FILE.test(rel);
+  return rel === PROJECT_FILE || SCENE_FILE.test(rel) || SCRIPT_PATH.test(rel) || PREFAB_FILE.test(rel) || ITEM_FILE.test(rel);
 }
 
 /**
@@ -209,6 +212,11 @@ export class ProjectStore {
     return this.filesMatching('prefabs', PREFAB_FILE, changes);
   }
 
+  /** Item files (items/<id>.json) on disk, with pending changes applied on top. */
+  itemFiles(changes: Changes = new Map()): string[] {
+    return this.filesMatching('items', ITEM_FILE, changes);
+  }
+
   /** Playbook files (playbooks/<id>.json) on disk. */
   playbookFiles(): string[] {
     return this.filesMatching('playbooks', PLAYBOOK_FILE, new Map());
@@ -245,7 +253,7 @@ export class ProjectStore {
 
   snapshot(changes: Changes = new Map()): Snapshot {
     const read = (f: string) => (changes.has(f) ? changes.get(f)! : this.readText(f));
-    const snap: Snapshot = { scenes: [], scripts: {}, prefabs: [] };
+    const snap: Snapshot = { scenes: [], scripts: {}, prefabs: [], items: [] };
     const configText = read(PROJECT_FILE);
     if (configText === null) snap.configError = `${PROJECT_FILE} is missing`;
     else {
@@ -260,6 +268,7 @@ export class ProjectStore {
     }
     for (const file of this.scriptFiles(changes)) snap.scripts[file] = read(file) ?? '';
     for (const file of this.prefabFiles(changes)) snap.prefabs.push({ file, id: basename(file, '.json'), ...parseJsonText(file, read(file) ?? '') });
+    for (const file of this.itemFiles(changes)) snap.items.push({ file, id: basename(file, '.json'), ...parseJsonText(file, read(file) ?? '') });
     return snap;
   }
 
@@ -280,10 +289,11 @@ export class ProjectStore {
       const err = checkScriptSyntax(file, source);
       if (err) errors.push(err);
     }
-    for (const p of snap.prefabs) if (p.error) errors.push(p.error);
+    for (const p of [...snap.prefabs, ...snap.items]) if (p.error) errors.push(p.error);
     if (errors.length) return { ok: false, errors, warnings: [] };
     const prefabs = Object.fromEntries(snap.prefabs.map((p) => [p.id, p.data]));
-    const r = parseProject({ config: snap.config, scenes, scripts: snap.scripts, prefabs });
+    const items = Object.fromEntries(snap.items.map((p) => [p.id, p.data]));
+    const r = parseProject({ config: snap.config, scenes, scripts: snap.scripts, prefabs, items });
     if (!r.ok) return { ok: false, errors: r.errors, warnings: r.warnings };
     const exprErrors = expressionErrors(r.value);
     if (exprErrors.length) return { ok: false, errors: exprErrors, warnings: r.warnings };
@@ -294,16 +304,17 @@ export class ProjectStore {
     return { ok: true, project: r.value, errors: [], warnings };
   }
 
-  /** Raw `{ config, scenes, scripts, prefabs }` as stored on disk (not validated); throws if a file is not valid JSON. */
+  /** Raw `{ config, scenes, scripts, prefabs, items }` as stored on disk (not validated); throws if a file is not valid JSON. */
   rawProject(): RawProjectData {
     const snap = this.snapshot();
-    const errors = [snap.configError, ...snap.scenes.map((s) => s.error), ...snap.prefabs.map((p) => p.error)].filter((e): e is string => !!e);
+    const errors = [snap.configError, ...snap.scenes.map((s) => s.error), ...snap.prefabs.map((p) => p.error), ...snap.items.map((p) => p.error)].filter((e): e is string => !!e);
     if (errors.length) throw new ToolError('Project files contain invalid JSON', errors);
     return {
       config: snap.config,
       scenes: Object.fromEntries(snap.scenes.map((s) => [s.id, s.data])),
       scripts: snap.scripts,
       prefabs: Object.fromEntries(snap.prefabs.map((p) => [p.id, p.data])),
+      items: Object.fromEntries(snap.items.map((p) => [p.id, p.data])),
     };
   }
 

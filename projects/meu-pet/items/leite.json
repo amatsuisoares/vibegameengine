@@ -1,0 +1,7 @@
+{
+  "name": "Leite",
+  "category": "comida",
+  "icon": "🥛",
+  "tags": ["laticinio", "liquido"],
+  "props": { "artigo": "o", "fome": 12, "energia": 4 }
+}

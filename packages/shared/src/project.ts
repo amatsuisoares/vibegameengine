@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ComponentsSchema } from './components';
 import { RuleSchema } from './rules';
+import { ItemSchema } from './items';
 
 export const IdSchema = z
   .string()
@@ -98,6 +99,7 @@ export const ProjectSchema = z.strictObject({
   scenes: z.record(z.string(), SceneSchema),
   scripts: z.record(z.string(), z.string()).default(() => ({})).describe('Script sources by project-relative path (scripts/*.js).'),
   prefabs: z.record(z.string(), PrefabSchema).default(() => ({})).describe('Entity templates by id (prefabs/<id>.json).'),
+  items: z.record(z.string(), ItemSchema).default(() => ({})).describe('Item catalog by id (items/<id>.json).'),
 });
 
 export type Transform = z.output<typeof TransformSchema>;

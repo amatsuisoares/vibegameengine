@@ -322,8 +322,8 @@ export const PreferencesSchema = z
       .record(
         z.string(),
         z.strictObject({
-          min: Affinity.default(-1),
-          max: Affinity.default(1),
+          min: z.number().min(-2).max(2).default(-1).describe('May go past -1/1: draws are clamped, so a wider range makes strong feelings more common.'),
+          max: z.number().min(-2).max(2).default(1),
           traits: z
             .record(z.string(), z.number().min(-2).max(2))
             .default(() => ({}))
@@ -332,7 +332,13 @@ export const PreferencesSchema = z
       )
       .default(() => ({}))
       .describe('Innate affinities drawn (seeded, uniform in [min, max] + trait influence, clamped to -1..1) for subjects without a value.'),
-    subjectWeight: z.number().min(0).max(1).default(0.6).describe('evaluate(subject, tags): weight of the subject itself vs the mean of its tags.'),
+    subjectWeight: z.number().min(0).max(1).default(0.6).describe('evaluate(subject, tags): weight of the subject itself vs its tags.'),
+    tagBlend: z
+      .number()
+      .min(0)
+      .max(1)
+      .default(0)
+      .describe('How the tags combine: 0 = their mean; 1 = the strongest feeling among them (a hated smell spoils any smelly food); in between blends both.'),
     learnRate: z.number().min(0).max(1).default(0.05).describe('learn(subject, outcome): learned moves by learnRate × outcome (outcome -1..1).'),
     maxLearned: z.number().min(0).max(1).default(0.5).describe('Bound of |learned|: experience shifts a preference, never rewrites it.'),
   })

@@ -56,7 +56,7 @@ Project
 ```
 
 Em disco: `projects/<nome>/project.json` (config) + `scenes/<id>.json` + `scripts/**/*.js` + `prefabs/<id>.json`
-(+ `playbooks/<id>.json`: cenários de verificação, fora do jogo em si).
++ `items/<id>.json` (catálogo de itens, V0.7) (+ `playbooks/<id>.json`: cenários de verificação, fora do jogo em si).
 Memória do agente em `.vibe/memory.json`: itens (features, todos, issues, notas) e **planos** (V0.6, `update_plan`).
 Um plano tem objetivo, tarefas em ordem com status, nota e evidência, e `verifyWith`, os playbooks que o provam. O
 `verify` reusa `runPlaybooks`, o mesmo de `run_playbooks`, e só marca `verified` com todas as tarefas feitas e os
@@ -153,7 +153,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   moeda, gatilho, dano ou objetivo entre dois frames. Teleporte (script ou regra mudando a posição) não é caminho.
   Dois corpos rápidos se cruzando no mesmo frame não são varridos um contra o outro.
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed, particles, individual, persist_error` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed, particles, individual, persist_error, item_used` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -261,6 +261,10 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   criado mais tarde na mesma sessão (o `Rng` do mundo recomeça a cada cena) e sem mexer em `game.random()`.
   `evaluate(assunto, tags)` combina a afinidade do assunto com a média das tags; `learn` move só a parte aprendida,
   com limite. Expressões: `trait()` e `likes()`.
+- **Itens** (V0.7, `engine/src/items.ts`): `Project.items` (de `items/<id>.json`) vira um `ItemCatalog` só de leitura no
+  `Game`. `Game.useItem(item, alvo, por?)` emite `item_used` e chama `ScriptRunner.itemUsed` → hook `onItem` do alvo,
+  devolvendo o retorno do hook (clonado como JSON). A engine não interpreta o item: o alvo decide, normalmente pelo
+  `evaluateItem` das suas `Preferences` (id + categoria + tags, combinadas por `subjectWeight` e `tagBlend`).
 - **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
   conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).
@@ -433,7 +437,7 @@ Agent ─tool call─▶ ToolRegistry ─▶ RuntimeHost
 
 ```
 Claude Code ──stdio──▶ main.ts ─▶ createVibeMcpServer(workspace)
-                                   tools/list  → 3 tools de workspace + 62 do ToolRegistry (com annotations)
+                                   tools/list  → 3 tools de workspace + 66 do ToolRegistry (com annotations)
                                    tools/call  → workspace.require() → ToolRegistry.call(..., author: 'agent')
                                                  → texto (JSON compacto; diff em texto puro) + imagens (PNG)
 ```

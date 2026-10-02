@@ -21,7 +21,7 @@ export interface LiveRun {
   frame?: number;
   status?: string;
   /** The exact project the run started from (the files on disk may have changed since). */
-  raw?: { config: unknown; scenes: Record<string, unknown>; scripts?: Record<string, string>; prefabs?: Record<string, unknown> };
+  raw?: { config: unknown; scenes: Record<string, unknown>; scripts?: Record<string, string>; prefabs?: Record<string, unknown>; items?: Record<string, unknown> };
   /** GameOps applied so far (`{ op: 'keyDown' | 'keyUp' | 'step' | ... }`). */
   ops?: unknown[];
 }
