@@ -310,7 +310,14 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
   "talvez / parece / é"; brinquedo preferido; hábitos da rotina; histórias com "Dia N" (primeira comida, primeiro
   carinho, susto, primeira bola, pedido, evolução, doença, esqueceu o susto); sinais antigos e comidas já provadas
   migram; coleção usa o que você percebeu
-- [ ] **Fase 8 — Ambiente + sono** (`Ambient`, `env()`)
+- [x] **Fase 8 — Ambiente + sono**: componente `Ambient` (emissores com alcance linear/plano ou cena toda, liga/desliga),
+  `game.env(x, y | entidade)` e `env()` nas expressões (escolher lugar com alvos), `ambient` no estado
+- [x] meu-pet: lâmpada e janela emitem luz, cama e **cestinha fofa** (loja) conforto, **caixinha de música** (loja; clique
+  liga/desliga, notas ♪ e melodia) música e ruído; dorme no lugar de que mais gosta; qualidade do sono pela luz, ruído,
+  música, conforto e jeito — visível (z devagar ou "~" se revirando; "dormindo mal: incomodado com a luz" / "dormindo
+  tranquilo na cestinha") e recupera mais ou menos energia; cochilo de dia (50–80 de energia; de dia só dorme de verdade
+  abaixo de 50); dança com a música ou se afasta dela; coisa nova no quarto é conferida na hora; "Coisas" guarda
+  brinquedos e móveis; loja em 6 colunas com quebra de linha
 - [ ] **Fase 9 — Preferências dinâmicas + histórico**
 - [ ] **Fase 10 — Evolução por histórico**
 - [ ] **Fase 11 — Minigames** (`startMinigame`/`endMinigame` + 1–2 minigames)

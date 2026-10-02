@@ -197,6 +197,8 @@ export interface EntitySnapshot {
   habits?: Record<string, number>;
   /** Memory: the strongest memories now (up to 8). */
   memories?: { type: string; subject?: string; valence: number; strength: number; count: number }[];
+  /** Ambient: what the entity emits (and whether it is on). */
+  ambient?: { emits: Record<string, number>; enabled: boolean; radius?: number };
   /** Knowledge: level of each key the player has some evidence of. */
   knowledge?: Record<string, string>;
   /** Journal: how many entries and the 3 newest texts. */
@@ -706,6 +708,8 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean, clockHour:
     const top = recall(e, clockNow, { limit: 8 }, undefined, true).map((m) => ({ type: m.type, ...(m.subject !== undefined && { subject: m.subject }), valence: m.valence, strength: m.strength, count: m.count }));
     if (top.length) s.memories = top;
   }
+  const amb = e.components.Ambient;
+  if (amb) s.ambient = { emits: { ...amb.emits }, enabled: amb.enabled, ...(amb.radius !== undefined && { radius: amb.radius }) };
   const k = e.components.Knowledge;
   if (k) {
     const known = Object.entries(k.values).map(([key, v]) => [key, KNOWLEDGE_LEVELS[levelIndex(k, v.evidence)]] as const).filter(([, l]) => l !== 'unknown');

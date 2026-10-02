@@ -1,4 +1,5 @@
 // Janela: o céu acompanha a hora do relógio do jogo; à noite o quarto escurece (menos com a luz acesa).
+// De dia a janela também ilumina o quarto (componente Ambient: luz que o pet sente).
 // Também atualiza o relógio no canto da tela.
 
 /** Quão "noite" está: 0 de dia, 1 de madrugada, com transições ao entardecer e amanhecer. */
@@ -20,6 +21,9 @@ function onUpdate(self, game) {
   const h = game.clock.hour;
   const n = nightness(h);
   self.get('Sprite').color = mix('#8fd3ff', '#14183a', n);
+  // A janela é luz no quarto (Ambient) durante o dia.
+  const amb = self.get('Ambient');
+  if (amb) amb.emits.light = Math.round((1 - n) * 80) / 100;
 
   const astro = game.entity('astro');
   if (astro) {

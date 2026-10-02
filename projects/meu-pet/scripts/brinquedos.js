@@ -1,4 +1,5 @@
-// Arrumação dos brinquedos: todo brinquedo que você TEM (inventário, categoria "brinquedo") fica no quarto
+// Arrumação do quarto: todo brinquedo e toda coisa do quarto que você TEM (inventário, categorias "brinquedo" e
+// "ambiente": cestinha, caixinha de música) fica no quarto
 // ou guardado na caixa, e cada um no seu lugar. O arranjo fica em storage.quarto ({ brinquedos: { id:
 // { guardado, x } } }) e volta em toda sessão. O prefab de cada um vem do catálogo (items/: a bola rola,
 // os outros ficam no chão e podem ser arrastados). A bola vem com o quarto: na primeira vez, entra no inventário.
@@ -9,6 +10,9 @@ const Y = 452;
 const MIN_X = 70;
 const MAX_X = 890;
 
+const CATEGORIAS = ['brinquedo', 'ambiente'];
+/** O que você tem que fica no chão do quarto: brinquedos e coisas do quarto. */
+const objetos = (game) => CATEGORIAS.flatMap((category) => game.inventory().list({ category }));
 const arranjo = (game) => game.storage.get('quarto') || { brinquedos: {} };
 const lugar = (a, id) => a.brinquedos[id] || (a.brinquedos[id] = {});
 
@@ -33,7 +37,7 @@ function onStart(self, game) {
     if (!game.inventory().has('bola')) game.inventory().add('bola', 1, 'quarto');
     a.bolaDada = true;
   }
-  for (const e of game.inventory().list({ category: 'brinquedo' })) if (!lugar(a, e.item.id).guardado) colocar(game, e.item, a);
+  for (const e of objetos(game)) if (!lugar(a, e.item.id).guardado) colocar(game, e.item, a);
   game.storage.set('quarto', a);
 
   self.state.alternar = (id) => {
@@ -43,6 +47,7 @@ function onStart(self, game) {
     if (toy) {
       l.x = Math.round(toy.x);
       l.guardado = true;
+      if (toy.props.tocando) b.musica = false; // guardada, a caixinha para de tocar
       toy.destroy();
     } else if (game.inventory().has(id)) {
       l.guardado = false;
@@ -62,7 +67,7 @@ function onStart(self, game) {
 function onEvent(self, ev, game) {
   if (ev.type !== 'purchase') return;
   const item = game.items.get(String(ev.item));
-  if (!item || item.category !== 'brinquedo') return;
+  if (!item || !CATEGORIAS.includes(item.category)) return;
   const a = arranjo(game);
   lugar(a, item.id).guardado = false;
   colocar(game, item, a);

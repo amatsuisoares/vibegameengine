@@ -1,0 +1,11 @@
+{
+  "name": "Caixinha de música",
+  "category": "ambiente",
+  "icon": "🎶",
+  "tags": ["musica"],
+  "consumable": false,
+  "price": 16,
+  "prefab": "caixinha",
+  "description": "Clique para tocar ou parar. Uns adoram dançar; outros preferem silêncio.",
+  "props": { "artigo": "a", "lugar": 820, "musica": 1, "ruido": 0.35, "raio": 520 }
+}

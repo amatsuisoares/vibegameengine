@@ -204,7 +204,7 @@ describe('meu-pet (regression)', () => {
     // Shop: 7 foods for sale; buy a fish (8) and two carrots (2 each); then not enough for cheese (6 > 3).
     game.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 50 }]);
     const shop = game.world.withTag('cartaLoja');
-    expect(shop.map((c) => c.components.Script!.props.item)).toEqual(['banana', 'biscoito', 'cenoura', 'chocalho', 'leite', 'maca', 'peixe', 'pelucia', 'queijo']);
+    expect(shop.map((c) => c.components.Script!.props.item)).toEqual(['banana', 'biscoito', 'caixinhaMusica', 'cenoura', 'cestinha', 'chocalho', 'leite', 'maca', 'peixe', 'pelucia', 'queijo']);
     const at = (id: string) => shop.find((c) => c.components.Script!.props.item === id)!;
     for (const id of ['peixe', 'cenoura', 'cenoura', 'queijo']) game.perform([{ type: 'click', x: at(id).x, y: at(id).y }, { type: 'wait', ms: 50 }]);
     expect(game.getState().wallet).toEqual({ moedas: 3 });
@@ -564,6 +564,75 @@ describe('meu-pet (regression)', () => {
     expect(game.getState({ ids: ['pet'] }).entities[0].knowledge).toMatchObject({ 'gosto:maca:love': 'confirmed', 'gosto:peixe:hate': 'possible' });
     expect(game.events(0, 'discovery').length).toBeGreaterThan(3);
     expect(game.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('ambient and sleep: it sleeps in the cosiest spot, sleeps badly with the light on if it likes the dark (and you can see it), naps by day, dances to music or walks away from it', () => {
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const petAt = (iso: string, needs: Record<string, number>, extra: Record<string, unknown> = {}) => {
+      const t = Date.parse(iso);
+      return {
+        version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 90, energia: 80, diversao: 80, higiene: 95, saude: 100, afeto: 80, ...needs }, sick: false,
+        asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+        wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t, ...extra,
+      };
+    };
+    const calm = { atividade: 0.1, sociabilidade: 0.3, curiosidade: 0.2, independencia: 0.6, sensibilidade: 0.85, apetite: 0.4, paciencia: 0.8, brincadeira: 0.1 };
+    const lively = { atividade: 0.9, sociabilidade: 0.6, curiosidade: 0.5, independencia: 0.4, sensibilidade: 0.2, apetite: 0.5, paciencia: 0.6, brincadeira: 0.8 };
+    const project = load();
+    const start = (iso: string, pet: unknown, traits: Record<string, number>, preferences: Record<string, unknown>, bag: Record<string, number>, quarto: Record<string, unknown> = {}) =>
+      new Game(project, {
+        seed: 3, scene: 'quarto', clock: { start: iso },
+        storage: { pet, petIndividuo: { version: 1, traits, preferences }, 'vibe.inventory': { default: bag }, quarto: { bolaDada: true, brinquedos: {}, ...quarto }, economia: { cesta: true, dia: Math.floor(Date.parse(iso) / 86_400_000) } },
+      });
+    const kinds = (g: Game) => g.events(0, 'notification').map((e) => String(e.kind));
+    const petOf = (g: Game) => g.getState({ ids: ['pet'] }).entities[0];
+
+    // Night, tired, a dark-loving sensitive pet that likes soft things: it goes to the basket and, with the lamp on, sleeps badly.
+    const night = start('2026-03-10T23:30:00Z', petAt('2026-03-10T23:30:00Z', { energia: 30 }), calm, { escuro: p(1), macio: p(0.8), cestinha: p(0.6), aconchego: p(0.5) }, { cestinha: 1, bola: 1 });
+    night.perform([{ type: 'wait', ms: 20000 }]);
+    const basket = night.entity('cestinha')!;
+    expect(petOf(night).state).toBe('sleep');
+    expect(Math.abs(night.entity('pet')!.x - basket.x)).toBeLessThan(60); // lies down by its side
+    night.perform([{ type: 'wait', ms: 3000 }]);
+    expect(kinds(night)).toContain('dormeMal');
+    expect(night.events(0, 'notification').find((e) => e.kind === 'dormeMal')!.text).toContain('a luz');
+    const restless = night.events(0, 'spawn').filter((e) => e.prefab === 'emote').length;
+    expect(restless).toBeGreaterThan(1);
+    // Turn the lamp off: it sleeps well (and recovers faster).
+    const e0 = night.world.vars.energia as number;
+    night.perform([{ type: 'wait', ms: 60_000 }]);
+    const litGain = (night.world.vars.energia as number) - e0;
+    night.perform([{ type: 'click', entity: 'lampada' }, { type: 'wait', ms: 3000 }]);
+    const e1 = night.world.vars.energia as number;
+    night.perform([{ type: 'wait', ms: 60_000 }]);
+    expect((night.world.vars.energia as number) - e1).toBeGreaterThan(litGain * 1.4);
+    expect(kinds(night)).toContain('dormeBem');
+    expect(petOf(night).journal!.last.join(' ')).toContain('Dormiu pela primeira vez na cestinha fofa.');
+
+    // Day: a calm, somewhat tired pet naps in the basket within a few real minutes at 1x.
+    const day = start('2026-03-10T14:00:00Z', petAt('2026-03-10T14:00:00Z', { energia: 55 }), calm, { macio: p(0.8), cestinha: p(0.6) }, { cestinha: 1 });
+    let napped = false;
+    for (let s = 0; s < 240 && !napped; s++) {
+      day.perform([{ type: 'wait', ms: 1000 }]);
+      napped = petOf(day).state === 'nap';
+    }
+    expect(napped).toBe(true);
+    expect(Math.abs(day.entity('pet')!.x - day.entity('cestinha')!.x)).toBeLessThan(60);
+
+    // Music: a lively music lover dances by the box; a sensitive one that dislikes it walks away.
+    const box = (prefs: Record<string, unknown>, traits: Record<string, number>) => {
+      const g = start('2026-03-10T15:00:00Z', petAt('2026-03-10T15:00:00Z', {}), traits, prefs, { caixinhaMusica: 1 });
+      g.perform([{ type: 'wait', ms: 500 }, { type: 'click', entity: 'caixinhaMusica' }, { type: 'wait', ms: 6000 }]);
+      return g;
+    };
+    const fan = box({ musica: p(1), caixinhaMusica: p(0.8) }, lively);
+    expect(kinds(fan)).toContain('musicaSim');
+    expect(petOf(fan).state).toBe('dance');
+    expect(fan.entity('caixinhaMusica')!.components.Ambient!.enabled).toBe(true);
+    const shy = box({ musica: p(-1), caixinhaMusica: p(-0.6) }, calm);
+    expect(kinds(shy)).toContain('musicaNao');
+    expect(Math.abs(shy.entity('pet')!.x - shy.entity('caixinhaMusica')!.x)).toBeGreaterThan(400);
+    for (const g of [night, day, fan, shy]) expect(g.console.read(0, 'error')).toEqual([]);
   });
 
   it('verify_game plays a scenario of the real game and reports PASS per check', async () => {

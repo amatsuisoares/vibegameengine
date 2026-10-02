@@ -206,6 +206,14 @@
       "status": "verified",
       "evidence": "teste 'diary:' (nada antes de ver; maçã talvez→adora em 3 refeições; banana nunca vista não aparece; primeira vez escrita uma vez); migração v1 vira knowledge; playtest com screenshots das 3 abas",
       "updatedAt": "2026-10-02T21:32:50.250Z"
+    },
+    {
+      "id": "f17",
+      "kind": "feature",
+      "text": "Ambiente e sono: Ambient (lâmpada, janela, cama, cestinha fofa, caixinha de música); dorme no lugar preferido; qualidade do sono visível (z / ~ se revirando, motivo) e afeta a energia; cochilo de dia; dança ou se afasta da música; coisas novas conferidas",
+      "status": "verified",
+      "evidence": "teste 'ambient and sleep' (noite: cestinha, dorme mal com luz, apagar = dorme bem e recupera > 1,4×; cochilo em < 4 min a 1x; fã dança, sensível se afasta); playtest com screenshots (sono com luz, escuro, dança, loja 6 colunas)",
+      "updatedAt": "2026-10-02T22:04:06.790Z"
     }
   ],
   "plans": []

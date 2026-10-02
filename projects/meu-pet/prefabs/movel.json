@@ -1,0 +1,16 @@
+{
+  "tags": ["movel", "draggable", "lugarDeDormir"],
+  "components": {
+    "Text": {
+      "text": "",
+      "fontSize": 60,
+      "font": "sans-serif",
+      "align": "center",
+      "screenSpace": false,
+      "layer": 4
+    },
+    "Collider": { "width": 70, "height": 60, "isTrigger": true },
+    "Ambient": { "emits": {}, "radius": 90, "falloff": "none" },
+    "Script": { "src": "scripts/brinquedo.js", "props": { "item": "" } }
+  }
+}

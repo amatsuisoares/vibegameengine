@@ -1,0 +1,11 @@
+{
+  "name": "Cestinha fofa",
+  "category": "ambiente",
+  "icon": "🧺",
+  "tags": ["macio", "aconchego"],
+  "consumable": false,
+  "price": 14,
+  "prefab": "movel",
+  "description": "Um cantinho macio para dormir e cochilar.",
+  "props": { "artigo": "a", "lugar": 620, "conforto": 0.9, "raio": 75 }
+}

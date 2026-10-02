@@ -274,6 +274,9 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   meia-vida por tipo, a partir de `last`); reforço por tipo + assunto; esquecimento (abaixo da força mínima e acima da
   capacidade) só em `remember`/`recall`, com evento `memory_forgotten`. O snapshot usa uma consulta só de leitura.
   Persistida pelo `IndividualRunner` (com validação de cada entrada ao carregar).
+- **Ambiente** (V0.7, `engine/src/ambient.ts`): `envAt(world, x, y)` soma, por propriedade, `emits × alcance` dos
+  `Ambient` ligados (alcance linear ou plano até `radius`; sem raio = cena toda). Calculado sob demanda (O(emissores)),
+  sem estado próprio: ligar/desligar é mexer no componente.
 - **Conhecimento e crônica** (V0.7, `engine/src/knowledge.ts`, `journal.ts`): `Knowledge.values` = evidência por chave
   (nível calculado pelos limites do componente, evento `discovery` ao subir) e `Journal.entries` (deduplicação por chave,
   corte pela menor importância). Ambos persistidos pelo `IndividualRunner`. A engine não sabe o que é "gosto" ou "jeito":

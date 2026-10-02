@@ -1,5 +1,5 @@
-// Caixa de brinquedos: o botão "Brinquedos" abre uma carta por brinquedo que você tem; clicar numa carta
-// guarda o brinquedo (sai do quarto) ou põe de volta (brinquedos.js). A caixa fica aberta para arrumar
+// Caixa de coisas: o botão "Coisas" abre uma carta por brinquedo ou coisa do quarto que você tem; clicar numa
+// carta guarda (sai do quarto) ou põe de volta (brinquedos.js). A caixa fica aberta para arrumar
 // vários; clicar no painel fecha. Como a bandeja, acha as cartas pela tag e começa fechada.
 const COLS = 4;
 const TAG = 'cartaBrinquedo';
@@ -26,7 +26,7 @@ function atualizar(game) {
 
 function abrir(self, game) {
   self.get('Sprite').visible = true;
-  game.inventory().list({ category: 'brinquedo' }).forEach((e, i) => {
+  [...game.inventory().list({ category: 'brinquedo' }), ...game.inventory().list({ category: 'ambiente' })].forEach((e, i) => {
     const c = game.spawn('cartaBrinquedo', self.x - 165 + (i % COLS) * 110, self.y - 50 + Math.floor(i / COLS) * 86);
     c.props.item = e.item.id;
   });

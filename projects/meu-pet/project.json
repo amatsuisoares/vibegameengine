@@ -23,7 +23,10 @@
     { "id": "sfx_limpar", "type": "audio", "path": "sfx/sfx_limpar.wav" },
     { "id": "sfx_clique", "type": "audio", "path": "sfx/sfx_clique.wav" },
     { "id": "sfx_evolucao", "type": "audio", "path": "sfx/sfx_evolucao.wav" },
-    { "id": "sfx_guizo", "type": "audio", "path": "sfx/sfx_guizo.wav" }
+    { "id": "sfx_guizo", "type": "audio", "path": "sfx/sfx_guizo.wav" },
+    { "id": "sfx_nota1", "type": "audio", "path": "sfx/sfx_nota1.wav" },
+    { "id": "sfx_nota2", "type": "audio", "path": "sfx/sfx_nota2.wav" },
+    { "id": "sfx_nota3", "type": "audio", "path": "sfx/sfx_nota3.wav" }
   ],
   "gravity": 0,
   "pixelArt": false,

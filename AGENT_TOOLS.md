@@ -385,6 +385,26 @@ vai primeiro. A engine nunca decide o que vale lembrar: o jogo decide.
   subject?, valence, importance, count}` (base do diário: o que marcou antes de sumir).
 - **Estado:** `memories` = as 8 mais fortes agora. Nada roda por frame: a força é calculada quando pedida.
 
+## Ambiente (`Ambient`)
+
+Implementado na V0.7 (`engine/src/ambient.ts`). Entidades **põem propriedades no ambiente** — a luz de uma lâmpada, o
+ruído e a música de um rádio, o conforto de uma almofada — com um alcance, e o comportamento pode depender de **onde**
+a entidade está. A engine não sabe o que cada propriedade significa: o jogo dá os nomes.
+
+| Campo | Padrão | Significado |
+|---|---|---|
+| `emits` | `{}` | o que emite, ex. `{"light": 1, "noise": 0.4, "comfort": 0.8}` |
+| `radius` | — | alcance em px a partir do centro; sem ele, vale para a cena inteira |
+| `falloff` | `"linear"` | `linear`: inteiro no centro, 0 no raio; `none`: inteiro até o raio (uma cama: está nela ou não) |
+| `enabled` | `true` | desligado não emite (lâmpada apagada, música parada) |
+
+- **Ambiente num lugar:** a soma, por propriedade, do que chega ali de cada emissor ligado. Scripts:
+  `game.env(x, y)` ou `game.env(entidade)` → `{light: 0.8, noise: 0.2}` (só o que chega). Expressões: `env('noise')`
+  (na própria entidade), `env('comfort', target)` / `env('light', 'id')` (numa entidade) ou `env('light', x, y)`; 0 se
+  nada chega. Com alvos na Utility AI, escolhe o lugar: `"score": "env('comfort', target) - env('noise', target)"`.
+- Scripts ligam/desligam e mudam a emissão mexendo no componente (`self.get('Ambient').enabled = false`,
+  `.emits.light = 0.3`). Estado: `ambient: {emits, enabled, radius?}` nos emissores. Nada roda por frame.
+
 ## Conhecimento do jogador (`Knowledge`) e crônica (`Journal`)
 
 Implementado na V0.7 (`engine/src/knowledge.ts`, `engine/src/journal.ts`). A base de um diário que **não revela nada de
@@ -815,7 +835,7 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
   uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
-  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `knows([id,] chave)` (0..3), `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
+  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `knows([id,] chave)` (0..3), `env(prop, [id | x, y])`, `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").

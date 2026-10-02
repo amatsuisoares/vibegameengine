@@ -111,7 +111,7 @@ gostarem (a surpresa a descobrir); a ração é quase sempre neutra.
 | petisco | ♥, afeto +12/+8, "parece ter adorado/gostado" | "comeu o petisco sem muito entusiasmo" | "não parece ter gostado muito" (emburra); odeia: cheira, recusa e se afasta (não conta no limite diário) |
 | ração | come mais rápido, ♥ se adora, "comeu a ração com muita vontade" | "comeu da tigela" | come devagar e só com mais fome, "comeu a ração, mas sem muita vontade" |
 | bola jogada | corre atrás; brincar rende diversão ×1,5 ("ficou animado!") | corre e "brincou um pouco com a bola" | afinidade ≤ −0,3: só olha a bola passar, "não parece muito interessado nela" |
-| luz à noite | quem gosta de escuro dorme pior com a luz acesa e melhor no escuro ("parece incomodado com a luz") | | quem não gosta de escuro dorme pior no escuro e não se incomoda com a luz |
+| luz à noite | quem gosta de escuro dorme pior com a luz acesa e melhor no escuro ("dormindo mal: parece incomodado com a luz") — seção 6b | | quem não gosta de escuro quase não se incomoda com a luz |
 
 **Revelação:** cada comportamento típico de um traço **forte** (> 0,65 ou < 0,35) é meio ponto de evidência no
 `Knowledge` ("jeito:atividade:alto"...). Com 1 ponto o diário diz "Talvez seja bastante ativo.", com 3 "Parece ser…",
@@ -163,13 +163,44 @@ pulinhos; com um neutro, ~2 s e "mexeu um pouco no chocalho e logo perdeu o inte
 cheira, "…" e se afasta ("cheirou o chocalho e se afastou. Não parece ter gostado."); muito sensível com o chocalho → "!"
 e foge ("se assustou com o barulho do chocalho"). Sem energia ou doente: só olha.
 
-**Caixa de brinquedos** (botão **Brinquedos**, `scripts/caixa.js`): uma carta por brinquedo que você tem; clicar guarda
+**Caixa de coisas** (botão **Coisas**, `scripts/caixa.js`): uma carta por brinquedo ou coisa do quarto que você tem; clicar guarda
 (sai do quarto, continua seu) ou põe de volta. **Arrastar** a pelúcia e o chocalho muda o lugar deles (tag `draggable`;
 o clique só conta ao soltar sem arrastar; ao soltar volta para o chão). Arranjo salvo em `storage.quarto`
 (`{bolaDada, brinquedos: {id: {guardado, x}}}`, `scripts/brinquedos.js`).
 
 **Sono pelo jeito do pet:** à noite vai dormir abaixo do seu limite de energia (o ativo aguenta mais) e de manhã levanta
-mais cedo se for ativo (menos descansado) e mais tarde se for calmo.
+mais cedo se for ativo (menos descansado) e mais tarde se for calmo. De dia só dorme de verdade com energia < 50; entre
+50 e 80, **cochila** (seção 6b).
+
+## 6b. Ambiente e sono (V0.7: componente `Ambient`)
+
+Cada coisa do quarto põe algo no ambiente (`Ambient`, com alcance), e o pet sente pelo lugar onde está (`game.env`):
+
+| Emissor | Emite | Alcance |
+|---|---|---|
+| lâmpada (acesa) | luz 1 | quarto todo |
+| janela | luz 0,8 de dia → 0 à noite (segue o céu) | quarto todo |
+| cama | conforto 0,6 | 100 px, plano |
+| **cestinha fofa** 🧺 (loja, 14; macia, aconchego) | conforto 0,9 | 75 px, plano |
+| **caixinha de música** 🎶 (loja, 16; clique liga/desliga) | música 1 e ruído 0,35 (notas ♪ e uma melodia de 3 notas enquanto toca) | 520 px |
+
+- **Onde dorme** (`lugarDeDormir`: cama, cestinha): o de maior conforto + gosto pelo item − ruído × sensibilidade. Na
+  cestinha ele deita ao lado dela (ela aparece atrás). Primeira vez num lugar novo: "Dormiu pela primeira vez na
+  cestinha fofa." no diário.
+- **Qualidade do sono** (0..1) = 0,45 + conforto × 0,45 − luz × (0,12 + gosto por escuro × 0,45 + sensibilidade acima de 0,5
+  × 0,4) (+ um pouco para quem gosta de claridade) − ruído × (0,2 + sensibilidade × 0,7) + música × gosto por música ×
+  0,25. A energia recuperada por hora vai de ×0,55 a ×1,35. **Dá para ver:** bem (≥ 0,7) = "z" devagar e "{n} está
+  dormindo tranquilo na cestinha fofa."; mal (< 0,4) = "~", balança e vira de lado, "{n} está dormindo mal: parece
+  incomodado com a luz / o barulho." (vira evidência de gosto por escuro e de sensibilidade no diário).
+- **Cochilo** (UtilityAI `cochilar`, alvo um lugar de dormir, de dia, energia < 80, 90 s de intervalo): nota =
+  (1,3 − atividade) × cansaço × (0,4 + conforto do lugar) × (1 − ruído × sensibilidade). Cochila 20–60 s reais (o
+  calmo mais), recupera energia como dormindo e "{n} tirou um cochilo na cestinha fofa.".
+- **Música**: ligar a caixinha → quem gosta se anima e vai dançar perto dela (pula, balança, ♪ ♫; "se animou todo com
+  a música!"); neutro só olha; quem não gosta (ou é muito sensível) mostra "…" e vai para o outro lado ("não parece
+  gostar da música"). Enquanto toca: `dancar` (alvo a caixinha tocando) e `afastar` (se a música chega até ele e
+  incomoda). Primeira dança vai para o diário; "música" entra nos gostos.
+- **Coisa nova no quarto** (comprada ou tirada da caixa): ele vai conferir; um lugar de dormir de que gosta ele
+  experimenta na hora ("deitou na cestinha fofa para experimentar. Parece ter gostado!").
 
 **Rotina** (`Routine`, 8 faixas de 3 h, meia-vida de 4 dias, salva com o indivíduo): cada decisão e cada hora de sono são
 registradas na faixa do dia em que acontecem. A rotina vira um viés (`habit`) nas notas, então o pet tende a repetir o

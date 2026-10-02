@@ -2,7 +2,7 @@
 // compra uma unidade com moedas (game.shop.buy) e ela vai para o inventário. Clicar no painel fecha.
 // Como a bandeja, acha as cartas pela tag no mundo: ao começar (também depois de um hot reload), fecha.
 const MOEDA = 'moedas';
-const COLS = 5;
+const COLS = 6;
 const TAG = 'cartaLoja';
 
 function onStart(self, game) {
@@ -25,7 +25,7 @@ function info(game, msg) {
 function abrir(self, game) {
   self.get('Sprite').visible = true;
   game.shop.list().forEach((item, i) => {
-    const c = game.spawn('cartaLoja', self.x - 240 + (i % COLS) * 120, self.y - 65 + Math.floor(i / COLS) * 90);
+    const c = game.spawn('cartaLoja', self.x - 262 + (i % COLS) * 105, self.y - 65 + Math.floor(i / COLS) * 90);
     c.get('Text').text = texto(game, item);
     c.props.item = item.id;
   });

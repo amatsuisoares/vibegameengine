@@ -391,6 +391,16 @@ export const MemorySchema = z.strictObject({
   entries: z.array(MemoryEntrySchema).default(() => []).describe('The memories (filled by self.memory.remember; kept by Persist).'),
 });
 
+export const AmbientSchema = z.strictObject({
+  emits: z
+    .record(z.string(), z.number())
+    .default(() => ({}))
+    .describe('What the entity puts in the environment, e.g. {"light": 1, "noise": 0.4, "comfort": 0.8}. The game names the properties.'),
+  radius: z.number().positive().optional().describe('Reach in px from the entity center; without it the emission fills the whole scene.'),
+  falloff: z.enum(['linear', 'none']).default('linear').describe('linear: full at the center, 0 at the radius; none: full up to the radius.'),
+  enabled: z.boolean().default(true).describe('Off = emits nothing (a lamp turned off, a music box stopped).'),
+});
+
 export const KnowledgeSchema = z
   .strictObject({
     possible: z.number().positive().default(1).describe('Evidence for "possible" (a first hint).'),
@@ -450,6 +460,7 @@ export const ComponentSchemas = {
   Preferences: PreferencesSchema,
   Routine: RoutineSchema,
   Memory: MemorySchema,
+  Ambient: AmbientSchema,
   Knowledge: KnowledgeSchema,
   Journal: JournalSchema,
   Persist: PersistSchema,
@@ -485,6 +496,7 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Preferences: 'Likes and dislikes per subject (item, tag, context): innate (optionally from traits) + slowly learned; evaluate(subject, tags) gives a score and a level (love..hate).',
   Routine: 'Habits: what the entity tends to do at each time of day, learned from what it does (self.routine.record), fading with time; habit() biases decisions, patterns() lists stable habits.',
   Memory: 'Episodic memory: experiences (type, subject, valence, importance) that fade with game-clock time and get stronger when repeated; feeling(subject) / memory() in expressions bias decisions.',
+  Ambient: 'Environment emitter: light, noise, comfort, music... with a radius (or the whole scene); env(prop) / game.env(x, y) sums what reaches a point, so behavior can depend on the place.',
   Knowledge: 'What the PLAYER knows about the entity: evidence per key (e.g. "likes:apple") that grows into possible / observed / confirmed (event discovery); knows() in expressions. Nothing is revealed for free.',
   Journal: 'A chronicle of the entity: entries with category, text, importance and a dedup key ("first time it..."), capped by dropping the least important; the base of a diary.',
   Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory, Knowledge, Journal) in game.storage under a key: loaded before onStart, saved when it changes.',
@@ -518,6 +530,7 @@ export const ComponentsSchema = z.strictObject({
   Preferences: PreferencesSchema.optional(),
   Routine: RoutineSchema.optional(),
   Memory: MemorySchema.optional(),
+  Ambient: AmbientSchema.optional(),
   Knowledge: KnowledgeSchema.optional(),
   Journal: JournalSchema.optional(),
   Persist: PersistSchema.optional(),

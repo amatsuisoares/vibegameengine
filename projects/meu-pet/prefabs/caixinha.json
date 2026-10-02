@@ -1,0 +1,16 @@
+{
+  "tags": ["movel", "draggable", "musica"],
+  "components": {
+    "Text": {
+      "text": "",
+      "fontSize": 40,
+      "font": "sans-serif",
+      "align": "center",
+      "screenSpace": false,
+      "layer": 4
+    },
+    "Collider": { "width": 60, "height": 48, "isTrigger": true },
+    "Ambient": { "emits": {}, "radius": 520, "enabled": false },
+    "Script": { "src": "scripts/brinquedo.js", "props": { "item": "" } }
+  }
+}

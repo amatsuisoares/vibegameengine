@@ -13,6 +13,7 @@ import { habitOf, patternsOf, peakOf, recordActivity, type Habit } from './routi
 import { feelingOf, forget, recall, remember, type MemoryView, type RecallQuery, type RememberInput } from './memory';
 import type { NotificationEntry, Notifier, NotifyOptions } from './notifier';
 import { knowledgeLevel, listKnowledge, observeKnowledge, type KnowledgeLevel, type KnowledgeView } from './knowledge';
+import { envAt } from './ambient';
 import { addEntry, hasEntry, journalEntries, removeEntry, type JournalAdd, type JournalEntry } from './journal';
 import type { BuyOptions, BuyResult, Economy, Inventory, Wallet } from './economy';
 import { affinityOf, evaluate, evaluateItem, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
@@ -415,6 +416,8 @@ export interface ScriptGame {
   emitParticles(x: number, y: number, count: number, options?: EmitterOptions): number;
   /** Enabled interactables that `actor` may use and is in range of, nearest first. */
   nearbyInteractables(actor: string | ScriptEntity): NearbyInteractable[];
+  /** Environment (Ambient emitters) at a point or an entity: {light, noise, ...} = what reaches it. */
+  env(x: number | string | ScriptEntity, y?: number): Record<string, number>;
   /** The item catalog: get(id) (null if unknown), has(id), list({category?, tag?}). */
   readonly items: { get(id: string): ItemInfo | null; has(id: string): boolean; list(filter?: ItemFilter): ItemInfo[] };
   /** An inventory (default "default"): count, has, add, remove, list({category, tag}), size. Kept in storage. */
@@ -573,6 +576,11 @@ class ScriptApi {
         return findPath(w, a.point, b.point, { ...base, ...options, ignore: [...(base.ignore ?? []), ...(b.entity ? [b.entity] : [])] });
       },
       emitParticles: (x, y, count, options) => w.particles.emitAt(x, y, count, options),
+      env: (x, y) => {
+        if (typeof x === 'number') return envAt(w, x, finite(y, 'y'));
+        const at = resolve(x, 'game.env');
+        return envAt(w, at.x, at.y);
+      },
       nearbyInteractables: (actor) => host.interactions.nearby(resolve(actor, 'game.nearbyInteractables')),
       items: {
         get: (id) => host.items.get(String(id)),

@@ -4,6 +4,7 @@ import { stackAt } from './mouse';
 import { affinityOf, evaluateItem, traitOf } from './individual';
 import { habitOf } from './routine';
 import { feelingOf } from './memory';
+import { envAt } from './ambient';
 import { KNOWLEDGE_LEVELS, knowledgeLevel } from './knowledge';
 import { screenToWorld } from './systems/camera';
 
@@ -18,6 +19,7 @@ import { screenToWorld } from './systems/camera';
  *                trait([entity,] axis) likes([entity,] subject or item id)   (one argument = self)   item(id)
  *                itemCount(id [, inventory]) currency([name]) habit([entity,] activity)
  *                memory(subject [, type]) / memory(entity, subject, type)  knows([entity,] key) 0..3
+ *                env(prop [, entity | x, y]) (what reaches that place; 0 if nothing)
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
  * Field access on null yields null (the assertion then fails and shows the null).
  */
@@ -288,6 +290,24 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
           const type = args[three ? 2 : 1];
           return feelingOf(me, game.clock.now, subject, type === undefined || type === null ? undefined : String(type));
         }
+        case 'env': {
+          // Environment at self, at an entity (id, or target), or at a point.
+          if (args.length < 1 || args.length > 3) throw new ExprError('env() takes 1 to 3 arguments (prop [, entity | x, y])', src);
+          let x: number;
+          let y: number;
+          if (args.length === 3) {
+            x = Number(args[1]);
+            y = Number(args[2]);
+          } else {
+            const eid = args.length === 2 ? idOf(args[1]) : (scope.self ?? null);
+            if (eid === null) throw new ExprError("env() with one argument needs \"self\"; pass the entity: env(prop, 'id')", src);
+            const at = game.entity(eid);
+            if (!at) return null;
+            x = at.x;
+            y = at.y;
+          }
+          return envAt(game.world, x, y)[String(args[0])] ?? 0;
+        }
         case 'knows': {
           // What the player knows: 0 unknown, 1 possible, 2 observed, 3 confirmed.
           if (args.length !== 1 && args.length !== 2) throw new ExprError('knows() takes 1 or 2 arguments ([entity,] key)', src);
@@ -330,7 +350,7 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'max':
           return Math.max(...args.map(Number));
         default:
-          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, habit, memory, knows, item, itemCount, currency)`, src);
+          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, habit, memory, knows, env, item, itemCount, currency)`, src);
       }
     }
     case 'unary': {
