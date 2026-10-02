@@ -81,21 +81,45 @@ Variação **por hora de jogo**:
 - **Sujeira:** aparece conforme a higiene cai — 1 mancha abaixo de 70, 2 abaixo de 45, 3 abaixo de 25. Só some quando
   o jogador limpa. Cada limpeza dá +18 de higiene (e no mínimo o nível que corresponde às manchas restantes).
 
-## 5. Personalidade (escondida)
+## 5. Quem o pet é: personalidade e gostos (escondidos)
 
-Ao nascer o pet sorteia 1 traço e, com 60% de chance, um segundo: **brincalhão, preguiçoso, carinhoso, curioso,
-irritável**.
+Desde a V0.7 cada pet é um **indivíduo**: componentes `Traits`, `Preferences` e `Persist` da engine na entidade `pet`
+(`scenes/quarto.json`). Os valores ficam em `storage.petIndividuo` e voltam em toda sessão; um pet novo é sorteado de novo.
+O jogador nunca vê números: só comportamento, reações e observações.
 
-| Traço | Efeitos |
+**Personalidade** — 8 eixos de 0 a 1, sorteados ao nascer (entre 0,05 e 0,95) e estáveis:
+
+| Eixo | Efeito no jogo |
 |---|---|
-| brincalhão | diversão cai 1,5× mais rápido; anda 25% mais rápido e saltitando mais; procura a bola com mais frequência; aceita brincar mesmo satisfeito |
-| preguiçoso | energia cai 1,4× mais rápido; anda 30% mais devagar; fica parado mais tempo e com mais frequência |
-| carinhoso | afeto cai 1,5× mais rápido; vem até o jogador com frequência; carinho dá +22 de afeto (normal +15) e a mensagem "parece adorar o carinho" |
-| curioso | diversão cai 1,2× mais rápido; investiga janela, lâmpada, planta e cama com frequência; às vezes "parece estar procurando alguma coisa" |
-| irritável | fica emburrado quando entediado; rejeita carinho com energia < 40 ou carinho repetido em < 6 s (afeto −3, "não parece gostar disso agora"); se acordado com carinho, acorda incomodado |
+| atividade | energia cai mais rápido acordado (×0,8–1,3) mas recupera mais rápido dormindo (dorme menos); anda mais rápido (×0,7–1,3) e saltita mais; passeia mais e fica parado menos (e por menos tempo) |
+| sociabilidade | afeto cai mais rápido sozinho (×0,4–1,6); vem até você com mais frequência (e quando tem fome e a tigela está vazia); brincar com você rende mais afeto |
+| curiosidade | investiga janela/lâmpada/planta/cama com mais frequência e por mais tempo; "parece estar procurando alguma coisa" |
+| independência | afeto cai mais devagar (×1,25–0,65); brincar sozinho com a bola diverte mais; pesa contra gostar de carinho |
+| sensibilidade | mais propenso a gostar de escuro; muito sensível se incomoda com a luz acesa ao dormir |
+| apetite | fome cai mais rápido (×0,75–1,3); vai comer mais cedo; mais propenso a gostar de doce |
+| paciência | baixa (< 0,35): emburra quando entediado, rejeita carinho cansado ou repetido, acorda irritado com carinho |
+| brincadeira | diversão cai mais rápido; procura a bola; aceita brincar mesmo satisfeito (> 0,65) |
 
-**Revelação:** cada comportamento típico de um traço que o pet tem conta 1 "sinal". Com 3 sinais o diário passa a
-dizer "Parece ser: …". O jogador nunca vê a lista sorteada.
+**Gostos** (afinidade −1..1 → adora / gosta / neutro / não gosta / odeia), inatos e puxados pelos traços:
+carinho (sociabilidade +, independência −), bola e `ativo` (brincadeira, atividade), petisco e `doce` (apetite), ração e
+`crocante`, escuro (sensibilidade). Calibrados para ~60–70% dos pets gostarem de carinho, petisco e bola e ~10% não
+gostarem (a surpresa a descobrir); a ração é quase sempre neutra.
+
+| Interação | Adora / gosta | Neutro | Não gosta / odeia |
+|---|---|---|---|
+| carinho | ♥, pulinho, afeto +22/+15, "parece adorar/gostar do carinho" | afeto +8, "aceitou o carinho, sem muita empolgação" | se afasta, afeto +2, "se afastou um pouco. Parece preferir o próprio espaço." |
+| petisco | ♥, afeto +12/+8, "parece ter adorado/gostado" | "comeu o petisco sem muito entusiasmo" | "não parece ter gostado muito" (emburra); odeia: cheira, recusa e se afasta (não conta no limite diário) |
+| ração | come mais rápido, ♥ se adora, "comeu a ração com muita vontade" | "comeu da tigela" | come devagar e só com mais fome, "comeu a ração, mas sem muita vontade" |
+| bola jogada | corre atrás; brincar rende diversão ×1,5 ("ficou animado!") | corre e "brincou um pouco com a bola" | afinidade ≤ −0,3: só olha a bola passar, "não parece muito interessado nela" |
+| luz à noite | quem gosta de escuro dorme pior com a luz acesa e melhor no escuro ("parece incomodado com a luz") | | quem não gosta de escuro dorme pior no escuro e não se incomoda com a luz |
+
+**Revelação:** cada comportamento típico de um traço **forte** (> 0,65 ou < 0,35) conta um sinal ("atividade:alto",
+"paciencia:baixo"...). Com 3 sinais o diário diz "Parece ser: bastante ativo, impaciente…" (16 descrições possíveis).
+
+**Save antigo (v1):** traços sim/não viram eixos (brincalhão → brincadeira 0,85 e atividade 0,7; preguiçoso → atividade
+0,15; carinhoso → sociabilidade 0,85 e independência 0,2; curioso → curiosidade 0,85; irritável → paciência 0,15 e
+sensibilidade 0,7); o resto é sorteado e os gostos seguem esses eixos. Sinais já vistos, necessidades, idade e notas são
+mantidos.
 
 ## 6. Comportamento autônomo
 
@@ -115,16 +139,17 @@ Ordem da escolha:
    expressões sobre as necessidades e os traços que o `pet.js` coloca em `self.props`; as notas de cada opção aparecem
    no estado do jogo em `ai.scores`):
 
-| Atividade | Peso |
+| Atividade | Peso (expressão da `UtilityAI`; `trait()` 0..1, `likes()` −1..1) |
 |---|---|
-| passear (anda até um ponto aleatório) | 3 |
-| ficar parado (2–5 s; preguiçoso até 8 s) | 2 (preguiçoso 4; doente +6) |
-| investigar janela/lâmpada/planta/cama | 0,7 (curioso 3) |
-| vir até o jogador (centro do quarto) | 0,8 (carinhoso 2,5) +2 se afeto < 40 |
-| ir até a bola e empurrar | 1 (brincalhão 2,5) +1,5 se diversão < 40; só com energia > 30 |
-| ficar emburrado | 1,2 se irritável e diversão < 50 |
+| passear (anda até um ponto aleatório) | 1 + atividade × 2 + curiosidade |
+| ficar parado (2–6 s, mais para os calmos) | 0,6 + (1 − atividade) × 3 + doente × 6 |
+| investigar janela/lâmpada/planta/cama | 0,2 + curiosidade × 3 |
+| vir até o jogador (centro do quarto) | 0,2 + sociabilidade × 2,5 × (1,2 − independência) + (afeto < 40) × 2 × sociabilidade |
+| ir até a bola e empurrar (sozinho) | 0,3 + brincadeira × 2,5 + max(0, gosto pela bola) × 1,5 + (diversão < 40) × 1,5; só com energia > 30 |
+| ficar emburrado | 1,5 × (1 − paciência), só com paciência < 0,35 e diversão < 50 |
 
-Velocidade base 90 px/s (brincalhão ×1,25, preguiçoso ×0,7, doente ×0,5, energia < 25 ×0,7).
+Velocidade base 90 px/s × 0,7–1,3 pela atividade (doente ×0,5, energia < 25 ×0,7).
+Comida: vai à tigela quando a fome passa de um limite próprio (45 ± apetite ± gosto pela ração, entre 30 e 60).
 
 **Animações** (os sprites só têm a pose parada): a alternância dos 2 quadros de idle é um clipe do `Animator` (quadros
 da forma atual, mais lento doente ou dormindo); o resto é procedural: respiração (escala),

@@ -109,6 +109,21 @@ export function utilityErrors(c: Components, at: string): string[] {
   return errors;
 }
 
+/** Trait influences on preferences need those axes; Persist needs something to keep. */
+export function individualErrors(c: Components, at: string): string[] {
+  const errors: string[] = [];
+  const axes = c.Traits ? new Set([...Object.keys(c.Traits.values), ...Object.keys(c.Traits.generate)]) : null;
+  for (const [subject, g] of Object.entries(c.Preferences?.generate ?? {})) {
+    for (const axis of Object.keys(g.traits)) {
+      const p = `${at}.components.Preferences.generate.${subject}.traits.${axis}`;
+      if (!axes) errors.push(`${p}: the entity has no Traits`);
+      else if (!axes.has(axis)) errors.push(`${p}: trait "${axis}" does not exist (traits: ${[...axes].join(', ') || 'none'})`);
+    }
+  }
+  if (c.Persist && !c.Traits && !c.Preferences) errors.push(`${at}.components.Persist: nothing to keep (add Traits or Preferences)`);
+  return errors;
+}
+
 /** Clip references (next, states, frame events) and assets; `project` enables the asset checks. */
 export function animatorErrors(c: Components, at: string, project?: Project): string[] {
   const a = c.Animator;
@@ -224,6 +239,7 @@ export function checkScene(scene: Scene, project?: Project): { errors: string[];
     if (project && c.Interactable) warnings.push(...interactableWarnings(c.Interactable, project, ep));
     if (c.StateMachine) errors.push(...stateMachineErrors(c.StateMachine, `${ep}.components.StateMachine`, ids, project));
     errors.push(...utilityErrors(c, ep));
+    errors.push(...individualErrors(c, ep));
     errors.push(...animatorErrors(c, ep, project));
     const nav = c.NavAgent?.target;
     if (typeof nav === 'string' && !ids.has(nav)) errors.push(`${ep}.components.NavAgent.target: entity "${nav}" does not exist`);
@@ -278,6 +294,7 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
     if (c.FollowTarget?.targetId) warnings.push(`${at}.components.FollowTarget.targetId: prefabs should target by tag (ids differ per scene)`);
     if (c.StateMachine) errors.push(...stateMachineErrors(c.StateMachine, `${at}.components.StateMachine`, null, project));
     errors.push(...utilityErrors(c, at));
+    errors.push(...individualErrors(c, at));
     errors.push(...animatorErrors(c, at, project));
   }
   for (const [key, scene] of Object.entries(project.scenes)) {

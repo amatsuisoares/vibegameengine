@@ -232,6 +232,50 @@ horário (`clock.hour`), variáveis, estado, cooldown... quem define é o jogo.
 - **Validação ao gravar:** `state` precisa existir na `StateMachine` da entidade; expressões com erro de sintaxe são
   recusadas.
 
+## Indivíduos (`Traits`, `Preferences`, `Persist`)
+
+Implementado na V0.7 (`packages/engine/src/individual.ts`). O que faz duas entidades com os mesmos componentes serem
+**diferentes** — e continuarem diferentes entre sessões. A engine não sabe o que é um pet, fome ou maçã: o jogo dá
+sentido aos eixos e aos assuntos.
+
+```json
+"Traits": { "generate": { "coragem": {}, "ganancia": { "min": 0.2, "max": 0.6 } }, "values": { "honestidade": 0.9 } },
+"Preferences": {
+  "values": { "ouro": { "innate": 0.8 } },
+  "generate": { "perigo": { "min": -0.2, "max": 0.2, "traits": { "coragem": 1 } }, "peixe": {} }
+},
+"Persist": { "key": "aldeao" }
+```
+
+| Componente / campo | Significado |
+|---|---|
+| `Traits.values` | eixos de personalidade 0..1 (0,5 = médio). Estáveis: só scripts mudam |
+| `Traits.generate` | eixos sorteados em [min, max] quando faltam (e não há nada salvo) |
+| `Preferences.values` | afinidade por assunto (id de item, tag, contexto): `{innate, learned, n}`, -1..1 |
+| `Preferences.generate` | afinidades inatas sorteadas em [min, max] + `traits` (peso × (traço − 0,5) × 2), limitadas a -1..1 |
+| `subjectWeight` | `0.6`: peso do próprio assunto contra a média das tags em `evaluate` |
+| `learnRate` / `maxLearned` | `0.05` / `0.5`: cada experiência move `learned` em `learnRate × resultado`, nunca além de ±`maxLearned` |
+| `Persist.key` | chave do `game.storage` onde os valores ficam entre sessões e cenas |
+
+- **Quando:** antes do primeiro `onStart` da entidade, os valores salvos são carregados e o que falta é sorteado (evento
+  `individual {entity, key?, loaded, drawn}`). Mudanças feitas por scripts são gravadas no fim do frame. Uma versão nova
+  do jogo que acrescenta eixos ou assuntos sorteia **só** os novos.
+- **Sorteio:** gerador próprio a partir da seed, do id da entidade e do relógio do jogo: reproduzível nas runs, diferente
+  para um indivíduo criado depois na mesma sessão, e não muda a sequência de `game.random()`.
+- **Níveis:** `≥ 0,6` love · `≥ 0,2` like · `> −0,2` neutral · `> −0,6` dislike · resto hate.
+- **`evaluate(assunto, tags)`:** `subjectWeight × assunto + (1 − subjectWeight) × média(tags conhecidas)`; um lado
+  sozinho conta inteiro; nada conhecido = 0 (`known: false`).
+- **Scripts:** `self.traits.get/set/has/all` (eixo desconhecido é erro, não "médio"); `self.prefs.of(assunto)`,
+  `known`, `evaluate(assunto, tags?)` → `{score, level, known, parts}`, `level(score)`,
+  `learn(assunto, resultado)`, `set(assunto, inato)`, `all()`; `self.persist.key`, `save()`,
+  `reset(preset?)` (esquece o indivíduo: valores do arquivo voltam, os gerados são sorteados de novo e salvos;
+  `preset.traits` fixa eixos antes do sorteio, e os gostos que dependem deles acompanham — herança, migração de save).
+- **Expressões:** `trait('eixo')` / `likes('assunto')` (da própria entidade, em `UtilityAI`/`StateMachine`/
+  `Interactable`) e `trait('id', 'eixo')` / `likes('id', 'assunto')` em qualquer lugar.
+- **Estado:** `inspect_game_state` mostra `traits` e `prefs` (afinidade efetiva) da entidade.
+- **Validação ao gravar:** influência de traço precisa de um eixo existente; `Persist` precisa de `Traits` ou
+  `Preferences`; `min ≤ max`.
+
 ## Animação (`Animator`)
 
 Atualizado na V0.2 (`packages/engine/src/systems/animation.ts`). Basta o estado do jogo mudar (`state = "walk"`) para o
@@ -616,7 +660,7 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
   uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
-  `abs`, `min`, `max`, `clamp(x, min, max)`
+  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)` (sem id = `self`)
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").

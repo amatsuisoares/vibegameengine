@@ -8,6 +8,7 @@ import { findPath, pathOptionsFor, type NavStatus, type PathResult, type Point }
 import type { Ease, TweenInfo } from './tweens';
 import type { EmitterOptions } from './particles';
 import { aiOf, type UtilityRunner } from './utility';
+import { affinityOf, evaluate, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
 import { emitSound } from './sound';
 import type { GameStorage } from './storage';
@@ -54,6 +55,45 @@ export interface ScriptHost extends SlotHost {
   readonly interactions: InteractionRunner;
   readonly stateMachines: StateMachineRunner;
   readonly utility: UtilityRunner;
+  readonly individuals: IndividualRunner;
+}
+
+/** self.traits: the entity's personality axes (Traits), 0..1. */
+export interface ScriptTraits {
+  /** Value of an axis (throws for an unknown axis). */
+  get(axis: string): number;
+  /** Sets an axis (clamped to 0..1; saved with Persist). */
+  set(axis: string, value: number): void;
+  has(axis: string): boolean;
+  all(): Record<string, number>;
+}
+
+/** self.prefs: the entity's likes and dislikes (Preferences). */
+export interface ScriptPrefs {
+  /** Affinity -1..1 for a subject (0 = neutral or unknown). */
+  of(subject: string): number;
+  /** Whether the subject has an affinity at all. */
+  known(subject: string): boolean;
+  /** How it feels about a subject with tags: {score, level (love|like|neutral|dislike|hate), known, parts}. */
+  evaluate(subject: string | null, tags?: string[]): Evaluation;
+  /** Level of a score. */
+  level(score: number): PreferenceLevel;
+  /** One experience (outcome -1..1): shifts the learned part slowly; returns the new affinity. */
+  learn(subject: string, outcome: number): number;
+  /** Sets the innate affinity of a subject (-1..1), keeping what was learned. */
+  set(subject: string, innate: number): void;
+  /** Affinity per subject. */
+  all(): Record<string, number>;
+}
+
+/** self.persist: where the individual data is kept (Persist). */
+export interface ScriptPersist {
+  /** Storage key, or null without Persist. */
+  readonly key: string | null;
+  /** Saves now (changes are also saved at the end of the frame). */
+  save(): void;
+  /** Forgets the individual: authored values back, generated ones drawn again, saved; preset.traits fixes axes first. */
+  reset(preset?: { traits?: Record<string, number> }): void;
 }
 
 type PlaceRef = string | ScriptEntity | Point;
@@ -206,6 +246,12 @@ export interface ScriptEntity {
   readonly nav: ScriptNav;
   /** The entity's ParticleEmitter: burst(count?) now, emitting on/off, alive count. */
   readonly particles: { burst(count?: number): number; emitting: boolean; readonly alive: number };
+  /** The entity's Traits. */
+  readonly traits: ScriptTraits;
+  /** The entity's Preferences. */
+  readonly prefs: ScriptPrefs;
+  /** The entity's Persist. */
+  readonly persist: ScriptPersist;
   /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
   after(ms: number, fn: () => void, id?: string): string;
   /** Runs fn every ms of game time until cancelled. */
@@ -555,6 +601,61 @@ class ScriptApi {
         animator().speed = Math.max(0, finite(v, 'anim.speed'));
       },
     };
+    const individuals = host.individuals;
+    const traitsData = () => {
+      const t = e.components.Traits;
+      if (!t) throw new Error(`entity "${e.id}" has no Traits`);
+      individuals.ensure(e);
+      return t;
+    };
+    const prefsData = () => {
+      const p = e.components.Preferences;
+      if (!p) throw new Error(`entity "${e.id}" has no Preferences`);
+      individuals.ensure(e);
+      return p;
+    };
+    const traits: ScriptTraits = {
+      get: (axis) => (traitsData(), traitOf(e, String(axis))),
+      set: (axis, v) => {
+        traitsData().values[String(axis)] = Math.min(1, Math.max(0, finite(v, 'trait')));
+        individuals.touch(e);
+      },
+      has: (axis) => Object.hasOwn(traitsData().values, String(axis)),
+      all: () => ({ ...traitsData().values }),
+    };
+    const prefs: ScriptPrefs = {
+      of: (subject) => (prefsData(), affinityOf(e, String(subject))),
+      known: (subject) => Object.hasOwn(prefsData().values, String(subject)),
+      evaluate: (subject, tags = []) => {
+        prefsData();
+        if (!Array.isArray(tags)) throw new Error('prefs.evaluate: tags must be an array');
+        return evaluate(e, subject === null ? null : String(subject), tags.map(String));
+      },
+      level: (score) => preferenceLevel(finite(score, 'score')),
+      learn: (subject, outcome) => {
+        prefsData();
+        const v = learn(e, String(subject), finite(outcome, 'outcome'));
+        individuals.touch(e);
+        return v;
+      },
+      set: (subject, innate) => {
+        const p = prefsData();
+        const v = (p.values[String(subject)] ??= { innate: 0, learned: 0, n: 0 });
+        v.innate = Math.min(1, Math.max(-1, finite(innate, 'innate')));
+        individuals.touch(e);
+      },
+      all: () => {
+        const p = prefsData();
+        return Object.fromEntries(Object.keys(p.values).map((k) => [k, affinityOf(e, k)]));
+      },
+    };
+    const persist: ScriptPersist = {
+      get key() {
+        return e.components.Persist?.key ?? null;
+      },
+      save: () => individuals.save(e),
+      reset: (preset) => individuals.reset(e, preset ?? {}),
+    };
     api = {
       id: e.id,
       name: e.name,
@@ -562,6 +663,9 @@ class ScriptApi {
         return [...e.tags];
       },
       hasTag: (t) => e.hasTag(t),
+      traits,
+      prefs,
+      persist,
       get x() {
         return e.x;
       },

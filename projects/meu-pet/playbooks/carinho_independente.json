@@ -1,5 +1,5 @@
 {
-  "scenario": "um pet apegado que adora carinho fica feliz com ele",
+  "scenario": "um pet independente que não gosta de carinho se afasta (sem punição)",
   "tags": ["interacao", "pet", "individuo"],
   "steps": [
     { "type": "wait", "ms": 500 },
@@ -13,14 +13,14 @@
       "match": { "entity": "pet", "action": "carinho" },
       "name": "o pet recebeu o carinho"
     },
-    { "assert": "state", "id": "pet", "is": "happy", "name": "o pet ficou feliz" },
+    { "assert": "state", "id": "pet", "is": "walk", "name": "o pet se afasta" },
     {
       "assert": "eventOccurred",
       "event": "observacao",
-      "match": { "kind": "carinho", "text": "Bolinha parece adorar o carinho." },
-      "name": "observação de que adora"
+      "match": { "kind": "carinhoAfasta" },
+      "name": "observação de que prefere o próprio espaço"
     },
-    { "assert": "variable", "var": "afeto", "gt": 75, "name": "afeto subiu bastante" }
+    { "assert": "variable", "var": "afeto", "gte": 60, "name": "afeto não caiu" }
   ],
   "screenshot": true,
   "annotate": false,
@@ -57,19 +57,19 @@
     "petIndividuo": {
       "version": 1,
       "traits": {
-        "atividade": 0.6,
-        "sociabilidade": 0.9,
-        "curiosidade": 0.5,
-        "independencia": 0.1,
+        "atividade": 0.4,
+        "sociabilidade": 0.15,
+        "curiosidade": 0.6,
+        "independencia": 0.9,
         "sensibilidade": 0.5,
         "apetite": 0.5,
-        "paciencia": 0.7,
-        "brincadeira": 0.8
+        "paciencia": 0.6,
+        "brincadeira": 0.2
       },
       "preferences": {
-        "carinho": { "innate": 0.8, "learned": 0, "n": 0 },
-        "bola": { "innate": 0.7, "learned": 0, "n": 0 },
-        "ativo": { "innate": 0.4, "learned": 0, "n": 0 }
+        "carinho": { "innate": -0.7, "learned": 0, "n": 0 },
+        "bola": { "innate": -0.6, "learned": 0, "n": 0 },
+        "ativo": { "innate": -0.5, "learned": 0, "n": 0 }
       }
     }
   }

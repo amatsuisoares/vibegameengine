@@ -247,6 +247,30 @@ Um sistema por vez; só depois que os anteriores estão funcionando.
 - [x] meu-pet: um plano verificado pelos 4 playbooks do pet (numa cópia, sem tocar na memória real)
 - [x] 406 testes unitários + 26 e2e
 
+## V0.7 — Indivíduos (em andamento)
+Pets que parecem indivíduos: personalidade contínua, preferências descobertas, itens com tags, memória, diário vivo.
+Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engine; frases e números do pet no jogo.
+- [x] **Fase 1 — Análise e arquitetura**: sistemas existentes, divisão engine × jogo, riscos, desempenho, migração
+  do save v1, fases
+- [x] **Fase 2 — Personalidade + preferências**: componentes `Traits` (eixos 0..1 sorteados pela seed), `Preferences`
+  (afinidade por assunto = inato puxado pelos traços + aprendido limitado; `evaluate` com tags; níveis love..hate) e
+  `Persist` (storage entre sessões; versão nova sorteia só o que falta); `self.traits/prefs/persist`, `trait()`/`likes()`
+  nas expressões, `traits`/`prefs` no estado, evento `individual`
+- [x] meu-pet: 8 eixos mudam necessidades, sono, velocidade e decisões (UtilityAI com `trait()`/`likes()`); carinho,
+  petisco, ração, bola e luz reagem pelo gosto (se afastar, recusar, comer devagar, só olhar); diário com 16 descrições;
+  migração do save v1 (testada com o save real); 2 playbooks novos de pets opostos; calibração pelo playtest
+- [x] 421 testes unitários (antes 406) + 6 playbooks do meu-pet
+- [ ] **Fase 3 — Itens + tags + reações**: catálogo `items/`, `useItem`/`onItem`/`item_used`
+- [ ] **Fase 4 — Inventário + loja + moeda**
+- [ ] **Fase 5 — Utility AI com alvos + rotina**
+- [ ] **Fase 6 — Memória + observações (`Notifier`)**
+- [ ] **Fase 7 — Diário individual** (`Knowledge`, `Journal`, `Text.maxWidth`)
+- [ ] **Fase 8 — Ambiente + sono** (`Ambient`, `env()`)
+- [ ] **Fase 9 — Preferências dinâmicas + histórico**
+- [ ] **Fase 10 — Evolução por histórico**
+- [ ] **Fase 11 — Minigames** (`startMinigame`/`endMinigame` + 1–2 minigames)
+- [ ] **Fase 12 — Polimento, balanceamento e avaliação das 10 perguntas de qualidade**
+
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.
 

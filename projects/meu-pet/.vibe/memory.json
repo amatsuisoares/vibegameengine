@@ -29,10 +29,10 @@
     {
       "id": "f4",
       "kind": "feature",
-      "text": "Personalidade: 1-2 traços sorteados que mudam ritmos, preferências e reações; o diário revela os traços percebidos",
-      "status": "done",
-      "evidence": "traços sorteados (curioso+carinhoso na seed 1) alteram reações ('parece adorar o carinho'); diário revela após 3 sinais — falta jogar mais para ver cada traço revelado",
-      "updatedAt": "2026-10-01T14:04:16.956Z"
+      "text": "Personalidade: 8 eixos contínuos (Traits) + gostos individuais (Preferences) persistidos em storage.petIndividuo (Persist); mudam necessidades, sono, decisões (UtilityAI com trait()/likes()) e reações a carinho, petisco, ração, bola e luz; diário revela traços fortes após 3 sinais",
+      "status": "verified",
+      "evidence": "playbooks carinho/carinho_independente/bola/bola_desinteressado (pares opostos); regressão: pet ativo vs calmo em 2,5 h (18 vs 10 escolhas de se mexer); playtest: Faisca/Nuvem/Pipoca com reações e rotinas diferentes; reabrir carrega o mesmo indivíduo",
+      "updatedAt": "2026-10-02T15:53:58.274Z"
     },
     {
       "id": "f5",
@@ -115,6 +115,22 @@
       "text": "Correções pedidas pela usuária (2026-10-01): pet andava de costas (desenhos olham para a direita → flipX quando vai para a esquerda); save precisa sobreviver a fechar o VS Code (agora em .vibe/save.json pelo dev server)",
       "status": "open",
       "updatedAt": "2026-10-01T14:33:40.192Z"
+    },
+    {
+      "id": "f10",
+      "kind": "feature",
+      "text": "Migração do save v1 (traços sim/não) para v2 (eixos): mantém nome, necessidades, idade, notas e sinais",
+      "status": "verified",
+      "evidence": "save real da usuária (3232, curioso) migrado sem erro: curiosidade 0,85, demais eixos sorteados; teste de regressão com save v1",
+      "updatedAt": "2026-10-02T15:53:58.274Z"
+    },
+    {
+      "id": "n5",
+      "kind": "note",
+      "text": "Gostos calibrados no playtest: ~60-70% gostam de carinho/petisco/bola, ~10% não gostam; ração quase sempre neutra (motivo para comidas novas na fase 3)",
+      "status": "open",
+      "updatedAt": "2026-10-02T15:53:58.274Z"
     }
-  ]
+  ],
+  "plans": []
 }

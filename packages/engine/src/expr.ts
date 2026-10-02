@@ -1,6 +1,7 @@
 import type { Game } from './game';
 import { findPath, pathOptionsFor } from './nav';
 import { stackAt } from './mouse';
+import { affinityOf, traitOf } from './individual';
 import { screenToWorld } from './systems/camera';
 
 /**
@@ -11,6 +12,7 @@ import { screenToWorld } from './systems/camera';
  *   literals     12  1.5  'text'  "text"  true  false  null
  *   names        status  frame  time  scene  vars  camera  clock  mouse  self (StateMachine/Interactable conditions)
  *   functions    entity(id) exists(id) hasSlot(name) count(tag) events(type) distance(a,b) pathDistance(a,b) abs(x) min(a,b) max(a,b) clamp(x,lo,hi)
+ *                trait([entity,] axis) likes([entity,] subject)   (one argument = self)
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
  * Field access on null yields null (the assertion then fails and shows the null).
  */
@@ -245,6 +247,22 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
           const opts = pathOptionsFor(a, a.components.NavAgent);
           return findPath(game.world, { x: a.x, y: a.y }, { x: b.x, y: b.y }, { ...opts, ignore: [a, b] })?.length ?? null;
         }
+        case 'trait':
+        case 'likes': {
+          if (args.length !== 1 && args.length !== 2) throw new ExprError(`${n.fn}() takes 1 or 2 arguments ([entity,] name)`, src);
+          const id = args.length === 2 ? idOf(args[0]) : (scope.self ?? null);
+          if (id === null) throw new ExprError(`${n.fn}() with one argument needs "self"; pass the entity: ${n.fn}('id', ...)`, src);
+          const e = game.entity(id);
+          if (!e) return null;
+          game.individuals.ensure(e);
+          const name = String(args[args.length - 1]);
+          if (n.fn === 'likes') return affinityOf(e, name);
+          try {
+            return traitOf(e, name);
+          } catch (err) {
+            throw new ExprError((err as Error).message, src);
+          }
+        }
         case 'clamp': {
           arity(3);
           const [x, lo, hi] = args.map(Number);
@@ -258,7 +276,7 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'max':
           return Math.max(...args.map(Number));
         default:
-          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp)`, src);
+          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes)`, src);
       }
     }
     case 'unary': {

@@ -19,6 +19,7 @@ import { mouseTarget, type LastClick, type MouseTarget } from './mouse';
 import { fsmOf, StateMachineRunner, stateMs } from './fsm';
 import { aiOf, UtilityRunner } from './utility';
 import { NavRunner, snapshotNav } from './nav';
+import { affinityOf, IndividualRunner } from './individual';
 import { cooldownsLeft, type TimerInfo } from './timers';
 import type { TweenInfo } from './tweens';
 import { SoundDirector, soundOf } from './sound';
@@ -182,6 +183,10 @@ export interface EntitySnapshot {
   tweens?: TweenInfo[];
   /** Animator: clip showing and its frame index. */
   anim?: { clip: string | null; frame: number };
+  /** Traits: personality axes (0..1). */
+  traits?: Record<string, number>;
+  /** Preferences: affinity per subject (innate + learned, -1..1). */
+  prefs?: Record<string, number>;
   /** AudioSource: clip, whether it plays (a loop sounding / a one-shot about to play), and volume / pan as heard now. */
   audio?: { clip: string; loop: boolean; playing: boolean; volume: number; pan: number };
   components?: Record<string, unknown>;
@@ -244,7 +249,8 @@ export class Game implements SlotHost {
   readonly saves: GameSaves;
   /** Slot to load at the end of the current frame. */
   private pendingSlot: string | null = null;
-  private readonly seed: number;
+  /** Seed of the game's random generator. */
+  readonly seed: number;
   private readonly scripts: ScriptLibrary;
   private scriptRunner!: ScriptRunner;
   private ruleRunner!: RuleRunner;
@@ -259,6 +265,8 @@ export class Game implements SlotHost {
   utility!: UtilityRunner;
   /** NavAgents of the current scene. */
   nav!: NavRunner;
+  /** Individuals of the current scene (Traits, Preferences, Persist). */
+  individuals!: IndividualRunner;
   /** Music asset playing (for the `music` event when a scene without music follows one with music). */
   private music: string | null = null;
 
@@ -310,6 +318,7 @@ export class Game implements SlotHost {
     this.nav = new NavRunner(this.world);
     this.utility = new UtilityRunner(this.world, this, this.scriptRunner, this.stateMachines);
     this.soundDirector = new SoundDirector(this.world);
+    this.individuals = new IndividualRunner(this.world, this);
     const music = scene.music ? soundOf(scene.music) : null;
     if (music) this.world.emit('music', music);
     else if (this.music) this.world.emit('music', { asset: null });
@@ -406,6 +415,7 @@ export class Game implements SlotHost {
           e.prevX = e.x;
           e.prevY = e.y;
         }
+        this.individuals.init();
         this.scriptRunner.start();
         controllerSystem(w, dt);
         moverSystem(w, dt);
@@ -429,6 +439,7 @@ export class Game implements SlotHost {
         audioSourceSystem(w);
         this.soundDirector.run();
         this.scriptRunner.events();
+        this.individuals.flush();
         w.flushDestroyed();
       } catch (err) {
         w.status = 'crashed';
@@ -631,6 +642,8 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean): EntitySna
   if (e.components.Animator) s.anim = { clip: e.animName, frame: Math.max(0, animFrameIndex(e)) };
   const audio = e.components.AudioSource;
   if (audio) s.audio = { clip: audio.clip, loop: audio.loop, playing: audio.playing && e.active, ...audioMix(w, e) };
+  if (e.components.Traits) s.traits = { ...e.components.Traits.values };
+  if (e.components.Preferences) s.prefs = Object.fromEntries(Object.keys(e.components.Preferences.values).map((k) => [k, affinityOf(e, k)]));
   const props = e.components.Script?.props;
   if (props && Object.keys(props).length) s.props = { ...props };
   if (withComponents) s.components = structuredClone(e.components) as Record<string, unknown>;

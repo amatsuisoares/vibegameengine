@@ -103,6 +103,9 @@ playbooks passando. É memória operacional: a engine não planeja.
 | `NavAgent` | anda até um alvo (entidade ou ponto) por um caminho A* em grade, desviando de sólidos (visão de cima) |
 | `ParticleEmitter` | partículas visuais (taxa contínua e rajadas, gravidade, arrasto, fade, cores, glifos) |
 | `AudioSource` | som da entidade: `clip`, `volume`, `loop`, `playing`, `spatial`, `falloff` (loop contínuo ou som único repetível; posicional) |
+| `Traits` | personalidade: eixos 0..1 fixos ou sorteados pela seed; estáveis |
+| `Preferences` | gostos por assunto (item, tag, contexto): inato (pode depender dos traços) + aprendido devagar; níveis love..hate |
+| `Persist` | guarda `Traits`/`Preferences` no `game.storage` entre sessões e cenas |
 | `Script` | comportamento em JavaScript (`scripts/*.js`): `onStart/onUpdate/onCollision` com API restrita |
 | `Mover` | segue waypoints (vaivém ou loop, pausa); com Body kinematic vira plataforma móvel/elevador |
 
@@ -113,7 +116,8 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
  └── World ── entidades, vars, status (running|won|lost|crashed), eventos, câmera, checkpoints
       Passo fixo (1/60 s), nesta ordem:
         1. Input.beginFrame()        latch de teclas pressionadas entre frames
-        2. ScriptRunner.start         onStart dos scripts que ainda não começaram (antes de qualquer outro hook)
+        2. IndividualRunner.init      Traits/Preferences: carrega o que está salvo (Persist) e sorteia o que falta
+           ScriptRunner.start         onStart dos scripts que ainda não começaram (antes de qualquer outro hook)
            controllerSystem           PlatformerController, Patrol, FollowTarget
            moverSystem                Mover: velocidade dos kinematic rumo ao próximo waypoint
            NavRunner.run              NavAgent: planeja/replaneja (A*) e anda (posição, ou velocidade do Body)
@@ -132,6 +136,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
            ParticleSystem.run         emissores (rajada inicial, taxa) e movimento/vida das partículas
            animationSystem            flip; clipe do Animator (script > estado > auto > base), quadro, eventos de quadro
            SoundDirector.run          eventos com som em config.sounds → evento sound
+           IndividualRunner.flush     grava no storage os indivíduos que mudaram
         7. flushDestroyed, cameraSystem
 ```
 
@@ -148,7 +153,7 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   moeda, gatilho, dano ou objetivo entre dois frames. Teleporte (script ou regra mudando a posição) não é caminho.
   Dois corpos rápidos se cruzando no mesmo frame não são varridos um contra o outro.
 - **Eventos:** `jump, collect, damage, stomp, death, fell, respawn, checkpoint, goal, goal_blocked, win,
-  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed, particles` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
+  lose, scene_loaded, crash, script_error, click, interact, interact_blocked, state_change, state_error, ai_choice, ai_error, anim_end, timer_error, tween_end, nav_arrived, nav_failed, particles, individual, persist_error` (e os eventos de quadro do `Animator`) e os que scripts emitem — registrados com o frame, consultáveis por
   `game.events()`.
 - **Erros:** exceções dentro de um passo são capturadas, vão para o console com stack e o status vira
   `crashed` (o agente lê e corrige).
@@ -247,6 +252,15 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   partículas (posição, velocidade, idade/vida, tamanho, cor, forma/glifo, gravidade, arrasto, camada, emissor). RNG
   própria (`reseed(seed)` a cada cena), então efeitos não mudam a RNG do jogo. `buildDrawList` converte partículas
   visíveis em `SpriteCmd`/`TextCmd` (id `particle`), com tamanho e opacidade interpolados pela idade.
+- **Indivíduos** (V0.7, `engine/src/individual.ts`): `Traits` (eixos 0..1), `Preferences` (afinidade -1..1 por assunto =
+  inato + aprendido) e `Persist` (chave do storage). `IndividualRunner` por mundo: no começo do frame, antes de qualquer
+  `onStart`, carrega os valores salvos e sorteia o que falta (`ensure`, também chamado sob demanda por scripts e
+  expressões, para entidades que surgem no meio do frame); no fim do frame grava as entidades marcadas. Os valores
+  sorteados vão para os próprios dados do componente, então snapshot, hot reload e save slots os veem como qualquer
+  campo. O sorteio usa um `Rng` próprio (hash de seed + id + `clock.now`): reproduzível, diferente para um indivíduo
+  criado mais tarde na mesma sessão (o `Rng` do mundo recomeça a cada cena) e sem mexer em `game.random()`.
+  `evaluate(assunto, tags)` combina a afinidade do assunto com a média das tags; `learn` move só a parte aprendida,
+  com limite. Expressões: `trait()` e `likes()`.
 - **Ações data-driven** (`engine/src/actions.ts`): `runAction` executa as ações de regras e de estados (mesmo
   conjunto: setVar, emit, modify, spawn...); a origem (`rule`/`state`) vai nos eventos e logs.
 - **Fim de jogo:** com status `won`/`lost` a simulação congela (câmera continua).

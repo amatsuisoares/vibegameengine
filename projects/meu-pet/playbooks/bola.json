@@ -1,10 +1,7 @@
 {
-  "scenario": "jogar a bola faz o pet correr atrás",
-  "tags": ["interacao", "pet"],
+  "scenario": "um pet brincalhão corre atrás da bola",
+  "tags": ["interacao", "pet", "individuo"],
   "steps": [
-    { "type": "type", "text": "Bolinha" },
-    { "type": "click", "entity": "botaoComecar" },
-    { "type": "assert", "check": { "assert": "scene", "is": "quarto" }, "name": "entrou no quarto" },
     { "type": "wait", "ms": 300 },
     { "type": "click", "entity": "bola" },
     { "type": "wait", "ms": 200 }
@@ -21,5 +18,52 @@
   "screenshot": true,
   "annotate": false,
   "allowErrors": false,
-  "clock": { "speed": 600 }
+  "scene": "quarto",
+  "clock": { "start": "2026-03-10T10:00:00Z", "speed": 600 },
+  "storage": {
+    "pet": {
+      "version": 2,
+      "name": "Bolinha",
+      "born": 1773136800000,
+      "stage": "bebe",
+      "needs": { "fome": 70, "energia": 80, "diversao": 70, "higiene": 90, "saude": 100, "afeto": 60 },
+      "sick": false,
+      "asleep": false,
+      "lightOn": true,
+      "bowl": 0,
+      "dirt": 0,
+      "care": {
+        "brincadeiras": 0,
+        "carinhos": 0,
+        "petiscos": 0,
+        "refeicoes": 0,
+        "sonecas": 0,
+        "limpezas": 0
+      },
+      "wellbeing": 70,
+      "treats": { "day": -1, "n": 0 },
+      "revealed": {},
+      "cooldowns": {},
+      "notes": [],
+      "lastSeen": 1773136800000
+    },
+    "petIndividuo": {
+      "version": 1,
+      "traits": {
+        "atividade": 0.6,
+        "sociabilidade": 0.9,
+        "curiosidade": 0.5,
+        "independencia": 0.1,
+        "sensibilidade": 0.5,
+        "apetite": 0.5,
+        "paciencia": 0.7,
+        "brincadeira": 0.8
+      },
+      "preferences": {
+        "carinho": { "innate": 0.8, "learned": 0, "n": 0 },
+        "bola": { "innate": 0.7, "learned": 0, "n": 0 },
+        "ativo": { "innate": 0.4, "learned": 0, "n": 0 }
+      }
+    }
+  }
 }

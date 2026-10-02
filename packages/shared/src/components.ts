@@ -290,6 +290,61 @@ export const ScriptSchema = z.strictObject({
     .describe('Per-entity values the script reads as self.props (e.g. speed).'),
 });
 
+const Unit = z.number().min(0).max(1);
+const Affinity = z.number().min(-1).max(1);
+
+export const TraitsSchema = z
+  .strictObject({
+    values: z
+      .record(z.string(), Unit)
+      .default(() => ({}))
+      .describe('Personality axes, 0..1 (0.5 = average), e.g. {"activity": 0.8}. Stable: scripts may set them, nothing drifts them.'),
+    generate: z
+      .record(z.string(), z.strictObject({ min: Unit.default(0), max: Unit.default(1) }))
+      .default(() => ({}))
+      .describe('Axes drawn from the seeded RNG (uniform in [min, max]) when the entity starts without a value (and none is persisted).'),
+  })
+  .refine((t) => Object.values(t.generate).every((g) => g.min <= g.max), 'generate: min must be <= max');
+
+export const PreferenceValueSchema = z.strictObject({
+  innate: Affinity.default(0).describe('Born-with affinity, -1 (hates) .. 1 (loves).'),
+  learned: Affinity.default(0).describe('Shift from experiences (learn), bounded by maxLearned.'),
+  n: z.number().int().min(0).default(0).describe('Experiences learned from.'),
+});
+
+export const PreferencesSchema = z
+  .strictObject({
+    values: z
+      .record(z.string(), PreferenceValueSchema)
+      .default(() => ({}))
+      .describe('Affinity per subject (an item id, a tag like "fruit", a context like "dark"): innate + learned, -1..1.'),
+    generate: z
+      .record(
+        z.string(),
+        z.strictObject({
+          min: Affinity.default(-1),
+          max: Affinity.default(1),
+          traits: z
+            .record(z.string(), z.number().min(-2).max(2))
+            .default(() => ({}))
+            .describe('Trait influence: adds weight × (trait − 0.5) × 2, e.g. {"sensitivity": -0.6} → sensitive individuals dislike it.'),
+        }),
+      )
+      .default(() => ({}))
+      .describe('Innate affinities drawn (seeded, uniform in [min, max] + trait influence, clamped to -1..1) for subjects without a value.'),
+    subjectWeight: z.number().min(0).max(1).default(0.6).describe('evaluate(subject, tags): weight of the subject itself vs the mean of its tags.'),
+    learnRate: z.number().min(0).max(1).default(0.05).describe('learn(subject, outcome): learned moves by learnRate × outcome (outcome -1..1).'),
+    maxLearned: z.number().min(0).max(1).default(0.5).describe('Bound of |learned|: experience shifts a preference, never rewrites it.'),
+  })
+  .refine((p) => Object.values(p.generate).every((g) => g.min <= g.max), 'generate: min must be <= max');
+
+export const PersistSchema = z.strictObject({
+  key: z
+    .string()
+    .min(1)
+    .describe('game.storage key where the entity keeps its individual data (Traits and Preferences values) across sessions and scenes.'),
+});
+
 /** Registry of all built-in components. Add new component types here. */
 export const ComponentSchemas = {
   Sprite: SpriteSchema,
@@ -313,6 +368,9 @@ export const ComponentSchemas = {
   NavAgent: NavAgentSchema,
   ParticleEmitter: ParticleEmitterSchema,
   AudioSource: AudioSourceSchema,
+  Traits: TraitsSchema,
+  Preferences: PreferencesSchema,
+  Persist: PersistSchema,
   Script: ScriptSchema,
 } as const;
 
@@ -341,6 +399,9 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   NavAgent: 'Walks to a target (entity or point) along a grid path (A*) around solid colliders, re-planning as things move (top-down).',
   ParticleEmitter: 'Light visual particles (smoke, dust, hearts, stars, confetti, sparks): continuous rate and/or bursts, gravity, fade; seeded.',
   AudioSource: 'Sound attached to an entity: a loop (ambient, footsteps, machines) or a one-shot replayed by setting playing; optionally positional (fades with distance, pans).',
+  Traits: 'Personality of an individual: named axes 0..1, fixed or drawn from ranges by the seed; read by expressions (trait()) and scripts (self.traits).',
+  Preferences: 'Likes and dislikes per subject (item, tag, context): innate (optionally from traits) + slowly learned; evaluate(subject, tags) gives a score and a level (love..hate).',
+  Persist: 'Keeps the individual data of the entity (Traits, Preferences) in game.storage under a key: loaded before onStart, saved when it changes.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -367,6 +428,9 @@ export const ComponentsSchema = z.strictObject({
   NavAgent: NavAgentSchema.optional(),
   ParticleEmitter: ParticleEmitterSchema.optional(),
   AudioSource: AudioSourceSchema.optional(),
+  Traits: TraitsSchema.optional(),
+  Preferences: PreferencesSchema.optional(),
+  Persist: PersistSchema.optional(),
   Script: ScriptSchema.optional(),
 });
 

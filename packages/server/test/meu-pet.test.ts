@@ -29,6 +29,10 @@ describe('meu-pet (regression)', () => {
     const light = (game.storage.get('pet') as { lightOn: boolean }).lightOn;
     game.perform([{ type: 'click', entity: 'lampada' }, { type: 'wait', ms: 100 }]);
     expect((game.storage.get('pet') as { lightOn: boolean }).lightOn).toBe(!light);
+    // Reactions depend on who the pet is: this one is made to love being petted.
+    const me = game.entity('pet')!;
+    Object.assign(me.components.Traits!.values, { sociabilidade: 0.9, independencia: 0.1, paciencia: 0.8 });
+    me.components.Preferences!.values.carinho = { innate: 0.9, learned: 0, n: 0 };
     game.perform([{ type: 'click', entity: 'bola' }, { type: 'wait', ms: 100 }, { type: 'click', entity: 'pet' }, { type: 'wait', ms: 100 }]);
     const events = game.events(from);
     expect(pick(events, 'click').map((e) => e.entity)).toEqual(['tigela', 'lampada', 'bola', 'pet']);
@@ -68,8 +72,9 @@ describe('meu-pet (regression)', () => {
     expect(visited.size).toBeGreaterThan(2);
 
     // Its weighted choice of activities is a UtilityAI fed by self.props (needs and traits).
-    expect(pet.ai!.scores.passear).toBe(3);
-    expect(pet.props).toMatchObject({ fome: expect.any(Number), brincalhao: expect.any(Boolean) });
+    expect(pet.ai!.scores.passear).toBeCloseTo(1 + pet.traits!.atividade * 2 + pet.traits!.curiosidade, 2); // trait() in the scores
+    expect(pet.props).toMatchObject({ fome: expect.any(Number) });
+    expect(Object.keys(pet.traits!).sort()).toEqual(['apetite', 'atividade', 'brincadeira', 'curiosidade', 'independencia', 'paciencia', 'sensibilidade', 'sociabilidade']);
     expect(game.events(0, 'ai_choice').filter((e) => e.entity === 'pet').length).toBeGreaterThan(1);
 
     // Observations and saving run on engine timers.
@@ -86,6 +91,70 @@ describe('meu-pet (regression)', () => {
     const form = String(game.world.vars.estagio); // it grew up during the day away
     expect(form).toMatch(/^juvenil/);
     expect([...seen].sort()).toEqual([`${form}_1`, `${form}_2`]);
+  });
+
+
+  it('a v1 save (yes/no traits) is migrated: traits become axes, signals and everything else are kept', () => {
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const v1 = {
+      version: 1, name: 'Kuro', born: t - 5 * 3_600_000, stage: 'bebe', traits: ['brincalhao', 'preguicoso'],
+      needs: { fome: 66, energia: 77, diversao: 55, higiene: 88, saude: 99, afeto: 44 }, sick: false, asleep: false, lightOn: true, bowl: 2, dirt: 0,
+      care: { brincadeiras: 4, carinhos: 1, petiscos: 0, refeicoes: 3, sonecas: 1, limpezas: 0 }, wellbeing: 70, treats: { day: -1, n: 0 },
+      revealed: { brincalhao: 3, irritavel: 1 }, cooldowns: {}, notes: [{ t, text: 'Kuro chegou! Observe com atenção.' }], lastSeen: t,
+    };
+    const colecao = { formas: { bebe: { nome: 'Kuro', em: t } }, pets: [] };
+    const game = new Game(load(), { seed: 5, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z' }, storage: { pet: v1, colecao } });
+    game.step(2);
+    const pet = game.storage.get('pet') as Record<string, unknown>;
+    expect(pet).toMatchObject({ version: 2, name: 'Kuro', stage: 'bebe', bowl: 2, care: v1.care, revealed: { 'brincadeira:alto': 3, 'paciencia:baixo': 1 } });
+    expect(pet.traits).toBeUndefined();
+    expect((pet.needs as Record<string, number>).fome).toBeCloseTo(66, 0);
+    const individual = game.storage.get('petIndividuo') as { traits: Record<string, number>; preferences: Record<string, unknown> };
+    expect(individual.traits).toMatchObject({ brincadeira: 0.85, atividade: 0.15 }); // preguiçoso wins over brincalhão's 0.7
+    expect(Object.keys(individual.preferences)).toEqual(expect.arrayContaining(['carinho', 'bola', 'racao', 'escuro']));
+    expect(game.storage.get('colecao')).toEqual(colecao);
+    game.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 100 }]);
+    expect(game.entity('diarioTexto')!.components.Text!.text).toContain('Parece ser: brincalhão');
+    expect(game.console.read(0, 'error')).toEqual([]);
+
+    // The next session loads the same individual (no new draw).
+    const next = new Game(load(), { seed: 9, scene: 'quarto', clock: { start: '2026-03-10T10:05:00Z' }, storage: game.storage.snapshot() });
+    next.step(2);
+    expect(next.getState({ ids: ['pet'] }).entities[0].traits).toEqual(individual.traits);
+    expect(next.events(0, 'individual')[0]).toMatchObject({ loaded: true, drawn: [] });
+  });
+
+  it('a new pet is a new individual, and two different individuals live their day differently', () => {
+    const named = new Game(load(), { seed: 3, clock: { start: '2026-03-10T10:00:00Z' } });
+    named.perform([{ type: 'wait', ms: 200 }, { type: 'type', text: 'Mimi\n' }, { type: 'wait', ms: 500 }]);
+    const first = named.getState({ ids: ['pet'] }).entities[0].traits!;
+    expect((named.storage.get('petIndividuo') as { traits: object }).traits).toEqual(first);
+
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const pet = (name: string) => ({
+      version: 2, name, born: t, stage: 'bebe', needs: { fome: 90, energia: 95, diversao: 80, higiene: 95, saude: 100, afeto: 80 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, notes: [], lastSeen: t,
+    });
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const live = (name: string, traits: Record<string, number>, preferences: Record<string, unknown>) => {
+      const g = new Game(load(), { seed: 11, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z', speed: 60 }, storage: { pet: pet(name), petIndividuo: { version: 1, traits, preferences } } });
+      g.advance(150_000); // 2.5 h of game time, nobody around
+      const choices: Record<string, number> = {};
+      for (const e of g.events(0, 'ai_choice')) if (e.entity === 'pet') choices[String(e.choice)] = (choices[String(e.choice)] ?? 0) + 1;
+      const states = new Set(g.events(0, 'state_change').filter((e) => e.entity === 'pet').map((e) => String(e.to)));
+      return { choices, states, vars: g.world.vars, errors: g.console.read(0, 'error') };
+    };
+    const lively = live('Faísca', { atividade: 0.9, sociabilidade: 0.8, curiosidade: 0.9, independencia: 0.2, sensibilidade: 0.3, apetite: 0.8, paciencia: 0.7, brincadeira: 0.9 }, { bola: p(0.8), carinho: p(0.6) });
+    const calm = live('Sereno', { atividade: 0.1, sociabilidade: 0.2, curiosidade: 0.1, independencia: 0.9, sensibilidade: 0.6, apetite: 0.2, paciencia: 0.8, brincadeira: 0.1 }, { bola: p(-0.6), carinho: p(-0.2) });
+    expect(lively.errors).toEqual([]);
+    expect(calm.errors).toEqual([]);
+    const moving = (c: Record<string, number>) => (c.passear ?? 0) + (c.investigar ?? 0) + (c.brincar ?? 0);
+    // ai_choice counts changes of choice (seed 11: lively moves 18 times and idles once; calm 10 and 11).
+    expect(moving(lively.choices)).toBeGreaterThan(moving(calm.choices) * 1.5);
+    expect(calm.choices.parado ?? 0).toBeGreaterThan((lively.choices.parado ?? 0) * 3);
+    expect(Number(lively.vars.afeto)).toBeLessThan(Number(calm.vars.afeto)); // a sociable pet misses you sooner
+    expect(Number(lively.vars.fome)).toBeLessThan(Number(calm.vars.fome)); // and a greedy one gets hungry sooner
   });
 
   it('verify_game plays a scenario of the real game and reports PASS per check', async () => {

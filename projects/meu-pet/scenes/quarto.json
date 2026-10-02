@@ -166,22 +166,56 @@
           "select": "weighted",
           "intervalMs": 0,
           "options": {
-            "passear": { "score": 3 },
-            "parado": { "score": "2 + self.props.preguicoso * 2 + self.props.doente * 6" },
-            "investigar": { "score": "0.7 + self.props.curioso * 2.3" },
-            "cumprimentar": { "score": "0.8 + self.props.carinhoso * 1.7 + (self.props.afeto < 40) * 2" },
+            "passear": { "score": "1 + trait('atividade') * 2 + trait('curiosidade')" },
+            "parado": { "score": "0.6 + (1 - trait('atividade')) * 3 + self.props.doente * 6" },
+            "investigar": { "score": "0.2 + trait('curiosidade') * 3" },
+            "cumprimentar": {
+              "score": "0.2 + trait('sociabilidade') * 2.5 * (1.2 - trait('independencia')) + (self.props.afeto < 40) * 2 * trait('sociabilidade')"
+            },
             "brincar": {
-              "score": "1 + self.props.brincalhao * 1.5 + (self.props.diversao < 40) * 1.5",
+              "score": "0.3 + trait('brincadeira') * 2.5 + max(0, likes('bola')) * 1.5 + (self.props.diversao < 40) * 1.5",
               "when": "self.props.temBola && self.props.energia > 30"
             },
-            "emburrar": { "score": 1.2, "when": "self.props.irritavel && self.props.diversao < 50" }
+            "emburrar": {
+              "score": "1.5 * (1 - trait('paciencia'))",
+              "when": "trait('paciencia') < 0.35 && self.props.diversao < 50"
+            }
           }
         },
         "Animator": {
           "initial": "idle",
           "auto": false,
           "animations": { "idle": { "frames": ["bebe_1", "bebe_2"], "fps": 2 } }
-        }
+        },
+        "Traits": {
+          "generate": {
+            "atividade": { "min": 0.05, "max": 0.95 },
+            "sociabilidade": { "min": 0.05, "max": 0.95 },
+            "curiosidade": { "min": 0.05, "max": 0.95 },
+            "independencia": { "min": 0.05, "max": 0.95 },
+            "sensibilidade": { "min": 0.05, "max": 0.95 },
+            "apetite": { "min": 0.05, "max": 0.95 },
+            "paciencia": { "min": 0.05, "max": 0.95 },
+            "brincadeira": { "min": 0.05, "max": 0.95 }
+          }
+        },
+        "Preferences": {
+          "generate": {
+            "carinho": {
+              "min": -0.2,
+              "max": 0.9,
+              "traits": { "sociabilidade": 0.35, "independencia": -0.25 }
+            },
+            "bola": { "min": -0.4, "max": 0.9, "traits": { "brincadeira": 0.4 } },
+            "ativo": { "min": -0.4, "max": 0.6, "traits": { "atividade": 0.5, "sensibilidade": -0.2 } },
+            "petisco": { "min": -0.3, "max": 1 },
+            "doce": { "min": -0.3, "max": 0.9, "traits": { "apetite": 0.3 } },
+            "racao": { "min": -0.4, "max": 0.7 },
+            "crocante": { "min": -0.5, "max": 0.6 },
+            "escuro": { "min": -0.5, "max": 0.7, "traits": { "sensibilidade": 0.4 } }
+          }
+        },
+        "Persist": { "key": "petIndividuo" }
       }
     },
     {
