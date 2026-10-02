@@ -187,8 +187,12 @@ Complementa o Claude Code (fluxo IA-first continua), sem virar um editor tipo Un
   volta ao padrão, adicionar/remover componente, valores ao vivo; edições pelo `ProjectStore` como `user`
   (`modify_game_object`, histórico, undo), inválidas rejeitadas sem gravar; histórico compartilhado entre processos
 - [x] meu-pet: as 48 entidades abrem no inspector sem erro
-- [x] 359 testes unitários + 21 e2e
-- [ ] Viewport (seleção, posição, bounding box, câmera, gizmos básicos)
+- [x] **Viewport**: modo edição (jogo pausado e sem input, reinicia na cena como está no arquivo), câmera de edição
+  (zoom na roda, pan, `F` centraliza, `0` volta à câmera do jogo), clique seleciona (mesma seleção da hierarquia e
+  de `get_selection`), arrastar/setas movem (prévia sem tocar a simulação; grava `move` como `user`, uma entrada
+  no histórico), gizmos: limites da cena, quadro da câmera do jogo, contorno, cruz da posição com coordenadas e Δ
+- [x] meu-pet: playbooks passando; entidades da cena inicial selecionáveis pelo clique
+- [x] 366 testes unitários + 22 e2e
 - [ ] Asset browser (imagens, spritesheets, áudio, prefabs, scripts)
 
 ## ~~Etapa 9 — Teste final~~ — descartada

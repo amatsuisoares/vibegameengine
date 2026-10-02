@@ -7,3 +7,4 @@ export * from './api';
 export * from './live';
 export * from './audio';
 export * from './hierarchy';
+export * from './viewport';

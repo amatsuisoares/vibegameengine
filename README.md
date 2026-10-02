@@ -15,7 +15,8 @@ Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa,
 > mouse (duplo clique, arrastar, pressionar/soltar; tag `draggable`).
 > Em andamento: **V0.5** (editor amigável) — prontos a **hierarquia** (cenas e entidades na página do jogo; a entidade
 > selecionada é lida pelo agente com `get_selection`) e o **inspector** (componentes da entidade selecionada, editados
-> pelo `ProjectStore` com histórico e undo).
+> pelo `ProjectStore` com histórico e undo) e o **viewport** (modo edição: câmera própria com zoom e pan, clicar
+> seleciona, arrastar move a entidade gravando na cena, gizmos de limites, câmera do jogo e posição).
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
 ## Requisitos

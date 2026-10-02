@@ -783,6 +783,25 @@ cor (seletor + texto), caixas para listas de opções (`Interactable.via`), text
 - Edições do agente aparecem no inspector aberto. O agente vê as do usuário em `get_history` e pode desfazê-las com
   `undo` (o histórico é compartilhado entre o servidor MCP e o dev server).
 
+### Editor: viewport
+
+Implementado na V0.5. Botão **Editar** na barra (só na página jogada, não em "Seguir agente" nem nas de host):
+
+- **Modo edição:** o jogo reinicia na cena atual como está no arquivo e fica pausado. Mouse e teclado não vão para o
+  jogo. O canvas mostra a cena por uma **câmera de edição** própria: a roda do mouse dá zoom no ponto do cursor
+  (10%–800%), arrastar o fundo (ou com o botão do meio ou o direito) move a vista, `F` centraliza a seleção e `0`
+  volta à câmera do jogo. Sair do modo edição retoma o jogo. A câmera do jogo não muda.
+- **Seleção:** clicar seleciona a entidade de cima sob o cursor; é a mesma seleção da hierarquia, do inspector e de
+  `get_selection`. Clicar no vazio ou `Esc` limpa a seleção. Uma entidade desativada (não desenhada) selecionada na
+  hierarquia ainda pode ser agarrada pelo contorno.
+- **Mover:** arrastar a entidade mostra uma prévia (sem mexer na simulação). Ao soltar, grava a nova posição como
+  edição **do usuário**, um `modify_game_object` com motivo `Viewport: move coin1 by (60, -20) to (460, 370)`. É uma
+  só entrada no histórico, com x e y, e pode ser desfeita. O deslocamento é em pixels inteiros, somado à posição
+  guardada (ou à do prefab). As setas movem 1 px (`Shift` = 10 px) e gravam juntas quando param. Entidades criadas
+  durante o jogo não estão no arquivo e não podem ser movidas.
+- **Gizmos:** limites da cena (`cena <id> L×A`), o quadro da câmera do jogo, o contorno da seleção, a cruz da posição
+  (`x`, `y`) com as coordenadas e, ao arrastar, o deslocamento `Δ`, e o zoom atual.
+
 ## Runtime no browser (`window.__vibe`)
 
 Implementado na Etapa 2. É a superfície que o RuntimeHost (Etapa 4) vai usar via Playwright

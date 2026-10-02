@@ -297,5 +297,77 @@ describe('runtime page (Chromium)', () => {
     expect(errors).toEqual([]);
     await page.close();
   });
+
+  it('selects and moves entities in the viewport edit mode, through the store', async () => {
+    cpSync(repo('test-fixtures/demo-platformer/scenes/level1.json'), `${TMP_PROJECT}/scenes/level1.json`);
+    rmSync(`${TMP_PROJECT}/.vibe/selection.json`, { force: true });
+    const { page, errors } = await open('project=e2e-tmp');
+    const frame = () => vibe(page, (api) => api.getState().frame);
+    /** Client position of a viewport point (the canvas may be scaled by CSS). */
+    const client = async (x: number, y: number) => {
+      const r = (await page.locator('canvas').boundingBox())!;
+      return { x: r.x + (x * r.width) / 800, y: r.y + (y * r.height) / 450 };
+    };
+    const sceneFile = `${TMP_PROJECT}/scenes/level1.json`;
+    const coin = () => JSON.parse(readFileSync(sceneFile, 'utf8')).entities.find((e: { id: string }) => e.id === 'coin1');
+    const selection = () => JSON.parse(readFileSync(`${TMP_PROJECT}/.vibe/selection.json`, 'utf8'));
+
+    await page.locator('#toggleEdit').click();
+    // The game restarts in the scene as authored, paused.
+    const f0 = await frame();
+    await page.waitForTimeout(300);
+    expect(await frame()).toBe(f0);
+    const cam = await vibe(page, (api) => api.getState().camera);
+    const at = { x: 400 - cam.x, y: 390 - cam.y };
+
+    // A click selects (the hierarchy, the inspector and the agent see it).
+    let p = await client(at.x, at.y);
+    await page.mouse.click(p.x, p.y);
+    await expect.poll(() => page.locator('#hierarchy [data-entity="coin1"]').getAttribute('class')).toMatch(/selected/);
+    await expect.poll(() => selection().entity).toBe('coin1');
+    await page.locator('#inspector [data-section="Sprite"]').waitFor({ timeout: 10_000 });
+
+    // A drag moves it: saved to the scene file as the user, and the game reloads with it.
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.down();
+    const to = await client(at.x + 60, at.y - 20);
+    await page.mouse.move(to.x, to.y, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(() => coin().transform.x, { timeout: 5000 }).not.toBe(400);
+    expect(Math.abs(coin().transform.x - 460)).toBeLessThanOrEqual(1);
+    expect(Math.abs(coin().transform.y - 370)).toBeLessThanOrEqual(1);
+    const moved = coin().transform;
+    await page.waitForFunction((x) => window.__vibe!.getState({ ids: ['coin1'] }).entities[0]?.x === x, moved.x, { timeout: 10_000 });
+    const history = () => readFileSync(`${TMP_PROJECT}/.vibe/history.jsonl`, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    expect(history().at(-1)).toMatchObject({ author: 'user', tool: 'modify_game_object', reason: expect.stringMatching(/^Viewport: move coin1 by/) });
+    // Still paused after the reload.
+    const f1 = await frame();
+    await page.waitForTimeout(300);
+    expect(await frame()).toBe(f1);
+
+    // Arrow keys nudge the selection (Shift = 10 px), saved as one change once they rest.
+    const entries = history().length;
+    await page.keyboard.press('Shift+ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(() => coin().transform.x, { timeout: 5000 }).toBe(moved.x + 11);
+    expect(history().length).toBe(entries + 1);
+
+    // Wheel zoom (editor camera only), then a click on empty space clears the selection.
+    p = await client(400, 225);
+    await page.mouse.move(p.x, p.y);
+    await page.mouse.wheel(0, 400);
+    await page.waitForTimeout(100);
+    await page.locator('canvas').screenshot({ path: `${RUNS_DIR}/viewport.png` });
+    p = await client(790, 10);
+    await page.mouse.click(p.x, p.y);
+    await expect.poll(() => (existsSync(`${TMP_PROJECT}/.vibe/selection.json`) ? selection()?.entity ?? null : null)).toBeNull();
+
+    // Leaving edit mode: the game runs again and the mouse plays it.
+    await page.locator('#toggleEdit').click();
+    const f2 = await frame();
+    await expect.poll(frame, { timeout: 5000 }).toBeGreaterThan(f2);
+    expect(errors).toEqual([]);
+    await page.close();
+  });
 });
 

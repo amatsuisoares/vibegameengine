@@ -1,4 +1,4 @@
-import { formatText, hitBox, type Entity, type GameStatus, type World } from '@vibe/engine';
+import { formatText, hitBox, type CameraState, type Entity, type GameStatus, type World } from '@vibe/engine';
 
 /**
  * Rendering is split in two phases so it can be tested without a browser:
@@ -62,15 +62,16 @@ export interface AssetResolver {
 const DEG = Math.PI / 180;
 export const LINE_HEIGHT = 1.2;
 
-export function buildDrawList(world: World): DrawCmd[] {
-  const { camera: cam, config } = world;
+/** `cam` = the view to draw (default: the game camera; the editor viewport passes its own). */
+export function buildDrawList(world: World, cam: CameraState = world.camera): DrawCmd[] {
+  const { config } = world;
   const vw = config.width;
   const vh = config.height;
   const out: DrawCmd[] = [];
 
   for (const e of world.entities) {
     if (!e.active) continue;
-    const sprite = spriteCmd(e, world);
+    const sprite = spriteCmd(e, cam);
     if (sprite) {
       const r = Math.hypot(sprite.w, sprite.h) / 2;
       const visible = sprite.x + r >= 0 && sprite.x - r <= vw && sprite.y + r >= 0 && sprite.y - r <= vh;
@@ -96,15 +97,14 @@ export function buildDrawList(world: World): DrawCmd[] {
       });
     }
   }
-  out.push(...particleCmds(world));
-  out.push(...promptCmds(world));
+  out.push(...particleCmds(world, cam));
+  out.push(...promptCmds(world, cam));
   // Array.prototype.sort is stable: equal layers keep scene order.
   return out.sort((a, b) => a.layer - b.layer);
 }
 
 /** Particles as draw commands (circles/rects, or text glyphs), culled outside the view. */
-function particleCmds(world: World): DrawCmd[] {
-  const cam = world.camera;
+function particleCmds(world: World, cam: CameraState): DrawCmd[] {
   const { width: vw, height: vh } = world.config;
   const out: DrawCmd[] = [];
   for (const p of world.particles.particles) {
@@ -128,12 +128,11 @@ export const PROMPT_LAYER = 1000;
 const PROMPT_FONT = 14;
 
 /** "[E] Open" above the interactable the interaction key would use now (only when it has a label). */
-function promptCmds(world: World): DrawCmd[] {
+function promptCmds(world: World, cam: CameraState): DrawCmd[] {
   const focus = world.interactFocus;
   const target = focus && world.get(focus.entity);
   const c = target?.components.Interactable;
   if (!target || !c?.label) return [];
-  const cam = world.camera;
   const box = hitBox(target);
   const key = world.config.actions[c.key]?.[0] ?? c.key;
   const text = `[${key}] ${c.label}`;
@@ -172,10 +171,9 @@ function promptCmds(world: World): DrawCmd[] {
   return [backdrop, label];
 }
 
-function spriteCmd(e: Entity, world: World): SpriteCmd | null {
+function spriteCmd(e: Entity, cam: CameraState): SpriteCmd | null {
   const s = e.components.Sprite;
   if (!s || !s.visible || s.opacity <= 0) return null;
-  const cam = world.camera;
   return {
     kind: 'sprite',
     id: e.id,
@@ -323,8 +321,7 @@ export function colliderKind(e: Entity): keyof typeof DEBUG_COLORS | null {
 }
 
 /** Collider boxes, entity ids and a status line. */
-export function paintDebug(ctx: CanvasRenderingContext2D, world: World, info: { fps?: number; paused?: boolean } = {}) {
-  const cam = world.camera;
+export function paintDebug(ctx: CanvasRenderingContext2D, world: World, info: { fps?: number; paused?: boolean } = {}, cam: CameraState = world.camera) {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
@@ -382,17 +379,20 @@ export const SELECTION_COLOR = '#00e5ff';
  * Where the selected entity is on screen: its box (Collider or Sprite), or just its position
  * when it has neither. Null when it is not in the running scene.
  */
-export function selectionBox(world: World, id: string): { x: number; y: number; w: number; h: number; enabled: boolean } | null {
+export function selectionBox(
+  world: World,
+  id: string,
+  cam: CameraState = world.camera,
+): { x: number; y: number; w: number; h: number; enabled: boolean } | null {
   const e = world.get(id);
   if (!e || e.destroyed) return null;
-  const cam = world.camera;
   const b = hitBox(e) ?? { x: e.x, y: e.y, w: 0, h: 0 };
   return { x: (b.x - cam.x) * cam.zoom, y: (b.y - cam.y) * cam.zoom, w: b.w * cam.zoom, h: b.h * cam.zoom, enabled: e.enabled };
 }
 
 /** Outline and label of the entity selected in the editor panels (drawn over the game, never into it). */
-export function paintSelection(ctx: CanvasRenderingContext2D, world: World, id: string) {
-  const box = selectionBox(world, id);
+export function paintSelection(ctx: CanvasRenderingContext2D, world: World, id: string, cam: CameraState = world.camera) {
+  const box = selectionBox(world, id, cam);
   if (!box) return;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);

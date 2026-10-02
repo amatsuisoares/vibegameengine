@@ -130,6 +130,23 @@ describe('inspector', () => {
     expect(editorStore.history.nextSeq).toBe(4);
   });
 
+  it('moves an entity (viewport drag) in one history entry, from its effective position', async () => {
+    const { store, ok } = setup();
+    let r = await applyInspectorEdit(store, 'level1', 'coin1', { action: 'move', dx: 12, dy: -4.5 });
+    expect(r).toMatchObject({ ok: true, changed: true });
+    expect(field(r.inspection!, 'transform', 'x').value).toBe(412);
+    expect(field(r.inspection!, 'transform', 'y').value).toBe(385.5);
+    const history = await ok<{ entries: { author: string; reason?: string }[] }>('get_history');
+    expect(history.entries.at(-1)).toMatchObject({ author: 'user', reason: 'Viewport: move coin1 by (12, -4.5) to (412, 385.5)' });
+
+    // A prefab instance gets the moved position stored on the instance.
+    await ok('create_prefab', { id: 'moeda', from: { scene: 'level1', id: 'coin2' }, link: true });
+    r = await applyInspectorEdit(store, 'level1', 'coin2', { action: 'move', dx: -100, dy: 0 });
+    expect(field(r.inspection!, 'transform', 'x')).toMatchObject({ value: 1000, set: true });
+
+    expect((await applyInspectorEdit(store, 'level1', 'ghost', { action: 'move', dx: 1, dy: 1 })).ok).toBe(false);
+  });
+
   it('fails clearly for unknown entities', () => {
     const { store } = setup();
     expect(() => inspectEntity(store, 'level1', 'ghost')).toThrow(/does not exist/);

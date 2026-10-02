@@ -386,6 +386,13 @@ canvas {
   outline: none;
 }
 
+/* Viewport edit mode: the canvas edits the scene instead of playing it. */
+canvas.editing {
+  cursor: crosshair;
+  box-shadow: 0 0 0 2px #00e5ff;
+  touch-action: none;
+}
+
 canvas.pixelated {
   image-rendering: pixelated;
 }

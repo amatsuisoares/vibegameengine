@@ -162,6 +162,8 @@ export const InspectorEditSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('set'), section: z.string(), key: z.string().min(1), value: z.unknown() }),
   z.object({ action: z.literal('addComponent'), type: z.enum(COMPONENT_TYPES as [ComponentType, ...ComponentType[]]) }),
   z.object({ action: z.literal('removeComponent'), type: z.enum(COMPONENT_TYPES as [ComponentType, ...ComponentType[]]) }),
+  /** Viewport drag: moves the stored position by (dx, dy) world px (one history entry for x and y). */
+  z.object({ action: z.literal('move'), dx: z.number().finite(), dy: z.number().finite() }),
 ]);
 export type InspectorEdit = z.output<typeof InspectorEditSchema>;
 
@@ -181,7 +183,12 @@ export function replacePatch(before: unknown, after: unknown): unknown {
  * The merge patch (for modify_game_object) that applies an inspector edit. `stored` is the
  * entity as in the scene file, so an object value replaces the stored one instead of merging.
  */
-export function inspectorPatch(edit: InspectorEdit, stored: Raw = {}): Raw {
+export function inspectorPatch(edit: InspectorEdit, stored: Raw = {}, effective: Raw = stored): Raw {
+  if (edit.action === 'move') {
+    const t = obj(effective.transform);
+    const at = (v: unknown, d: number) => Math.round(((typeof v === 'number' ? v : 0) + d) * 100) / 100;
+    return { transform: { x: at(t.x, edit.dx), y: at(t.y, edit.dy) } };
+  }
   if (edit.action === 'addComponent') return { components: { [edit.type]: {} } };
   if (edit.action === 'removeComponent') return { components: { [edit.type]: null } };
   const value = edit.value === undefined ? null : edit.value;
@@ -195,7 +202,11 @@ export function inspectorPatch(edit: InspectorEdit, stored: Raw = {}): Raw {
   return { components: { [edit.section]: { [edit.key]: replacePatch(before, value) } } };
 }
 
-function describeEdit(id: string, edit: InspectorEdit): string {
+function describeEdit(id: string, edit: InspectorEdit, patch: Raw): string {
+  if (edit.action === 'move') {
+    const t = obj(patch.transform);
+    return `Viewport: move ${id} by (${edit.dx}, ${edit.dy}) to (${t.x}, ${t.y})`;
+  }
   if (edit.action === 'addComponent') return `Inspector: add ${edit.type} to ${id}`;
   if (edit.action === 'removeComponent') return `Inspector: remove ${edit.type} from ${id}`;
   const what = edit.section === 'entity' ? edit.key : `${edit.section}.${edit.key}`;
@@ -211,8 +222,9 @@ export async function applyInspectorEdit(store: ProjectStore, scene: string, id:
   let raw: Raw;
   let patch: Raw;
   try {
-    raw = obj((gameObjectOf(store, scene, id) as { raw: unknown }).raw);
-    patch = inspectorPatch(edit, raw);
+    const found = gameObjectOf(store, scene, id) as { raw: unknown; effective: unknown };
+    raw = obj(found.raw);
+    patch = inspectorPatch(edit, raw, obj(found.effective ?? found.raw));
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -222,7 +234,7 @@ export async function applyInspectorEdit(store: ProjectStore, scene: string, id:
       return { ok: false, error: `${edit.type} comes from the prefab "${raw.prefab}": change the prefab to remove it.` };
     }
   }
-  const r = await createEditingTools().call('modify_game_object', { scene, id, patch, reason: describeEdit(id, edit) }, { store, author: 'user' });
+  const r = await createEditingTools().call('modify_game_object', { scene, id, patch, reason: describeEdit(id, edit, patch) }, { store, author: 'user' });
   const inspection = safeInspect(store, scene, id);
   if (!r.ok) return { ok: false, error: r.error, ...(r.details && { details: r.details }), ...(inspection && { inspection }) };
   return { ok: true, changed: (r.result as { changed?: boolean }).changed ?? true, inspection: inspection! };

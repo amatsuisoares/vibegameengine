@@ -17,6 +17,7 @@ import {
 import { parseProject, type LiveRun, type Project } from '@vibe/shared';
 import { HierarchyPanel, type PanelSelection } from './hierarchy-panel';
 import { InspectorPanel } from './inspector-panel';
+import { ViewportController } from './viewport-controller';
 
 declare global {
   interface Window {
@@ -201,8 +202,12 @@ async function main() {
   // Closing the panel or the browser: write whatever is pending.
   addEventListener('pagehide', () => pendingWrite !== undefined && flushSave(true));
   const realClock = (): ClockOptions => ({ start: Date.now(), utcOffsetMinutes: -new Date().getTimezoneOffset() });
+  /** Viewport edit mode: the game is paused, gets no input and (re)starts in the scene being edited. */
+  let editing = false;
+  let editScene: string | undefined;
+  let viewport: ViewportController | undefined;
   /** Starts the played game again from the real date and the latest save. */
-  const playStart = () => ({ seed, scene, clock: realClock(), storage: save });
+  const playStart = () => ({ seed, scene: editScene ?? scene, clock: realClock(), storage: save });
   clearSaveBtn.hidden = !playing;
   clearSaveBtn.onclick = async () => {
     if (!confirm('Apagar os dados salvos deste jogo?')) return;
@@ -243,12 +248,13 @@ async function main() {
 
   // In follow mode the keyboard must not reach the replayed game (it would diverge from the agent's run).
   const ignoredInput = new Input();
-  attachDomInput(() => (follow ? ignoredInput : runtime.game.input), {
+  // Same in edit mode: the mouse selects and moves entities instead of playing.
+  attachDomInput(() => (follow || editing ? ignoredInput : runtime.game.input), {
     keyTarget: window,
     canvas,
     viewport: () => runtime.project.config,
     onShellKey: (code) => {
-      if (follow || code !== 'KeyR' || runtime.game.status === 'running') return false;
+      if (follow || editing || code !== 'KeyR' || runtime.game.status === 'running') return false;
       restartPlay();
       return true;
     },
@@ -322,13 +328,19 @@ async function main() {
         scene === runtime.game.world.scene.id ? ((runtime.game.getState({ ids: [id] }).entities[0] as unknown as Record<string, unknown> | undefined) ?? null) : null,
       log: (level, message) => appendLog(level, message),
     });
-    const panel = new HierarchyPanel(panelEl, (sel) => {
+    const select = (sel: PanelSelection | null) => {
       outline(sel);
       void inspector.show(sel);
       const req = sel
         ? fetch(selectionUrl, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, ...sel, at: Date.now() }) })
         : fetch(selectionUrl, { method: 'DELETE' });
       req.catch((err) => appendLog('warn', `Could not save the selection: ${err instanceof Error ? err.message : String(err)}`));
+    };
+    const panel = new HierarchyPanel(panelEl, select);
+    if (playing) setupViewport(project, (entity) => {
+      const sel = entity ? { scene: runtime.game.world.scene.id, entity } : null;
+      panel.setSelection(sel);
+      select(sel);
     });
     const refresh = () => {
       if (!inspectorEl.hidden) inspector.updateLive();
@@ -395,6 +407,60 @@ async function main() {
         void inspector.show(panel.selected);
       })
       .catch(() => undefined);
+  }
+
+  /**
+   * Viewport edit mode ("Editar"): the scene as authored (the game restarts in it, paused) seen
+   * through an editor camera; clicking selects, dragging moves (saved as a user edit).
+   */
+  function setupViewport(project: string, select: (entity: string | null) => void) {
+    const editBtn = $<HTMLButtonElement>('toggleEdit');
+    const stepBtn = $<HTMLButtonElement>('step');
+    editBtn.hidden = false;
+    let wasPaused = false;
+    const vp = new ViewportController({
+      runtime,
+      canvas,
+      select,
+      cannotMove: (id) => {
+        const scene = runtime.project.scenes[runtime.game.world.scene.id];
+        return scene?.entities.some((e) => e.id === id) ? null : `"${id}" was created while the game ran: it is not in the scene file, so it cannot be moved.`;
+      },
+      move: async (id, dx, dy) => {
+        try {
+          const res = await fetch(`/api/projects/${encodeURIComponent(project)}/inspect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scene: runtime.game.world.scene.id, id, edit: { action: 'move', dx, dy } }),
+          });
+          const result = await res.json();
+          return result.ok ? null : [result.error, ...(result.details ?? [])].join('\n');
+        } catch (err) {
+          return `Could not save the move: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+      log: (level, message) => appendLog(level, message),
+    });
+    viewport = vp;
+    editBtn.onclick = () => {
+      editing = !editing;
+      editBtn.classList.toggle('active', editing);
+      canvas.classList.toggle('editing', editing);
+      pauseBtn.disabled = stepBtn.disabled = editing;
+      if (editing) {
+        wasPaused = runtime.paused;
+        editScene = runtime.game.world.scene.id;
+        runtime.setProject(runtime.project, undefined, playStart());
+        runtime.pause();
+        vp.enter();
+        appendLog('log', 'Modo edição: clique seleciona, arrastar move, roda do mouse dá zoom, arrastar o fundo move a câmera (F centraliza, 0 volta à câmera do jogo)');
+      } else {
+        vp.exit();
+        editScene = undefined;
+        if (!wasPaused) runtime.resume();
+      }
+      canvas.focus();
+    };
   }
 
   // Follow mode: mirror the run the agent publishes after every action.
@@ -472,6 +538,7 @@ async function main() {
         if (seq !== reloadSeq) return;
         window.__vibeError = undefined;
         runtime.setProject(next.project, next.assets, playing ? playStart() : undefined);
+        viewport?.onReload();
         setupSound(next.project);
         logAssetErrors(next.assetErrors);
         appendLog('log', `Project reloaded (${files} changed)`);

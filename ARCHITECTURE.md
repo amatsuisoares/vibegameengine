@@ -254,6 +254,13 @@ app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶
   gravação atômica, histórico e undo do agente. A página só renderiza e mostra os valores ao vivo
   (`game.getState`). O `History` relê `.vibe/history.jsonl` quando o tamanho muda, então o servidor MCP e o dev
   server compartilham o log (seqs não colidem; o agente desfaz edições do usuário).
+- **Viewport** (V0.5, `runtime/src/viewport.ts` + `app/viewport-controller.ts`): modo edição da página jogada. O
+  `Runtime.editor` (`{ view, drag }`) troca a câmera do desenho: `buildDrawList`, `paintDebug` e `paintSelection`
+  recebem a câmera como parâmetro (padrão: a do jogo). A prévia do arrasto desloca só os comandos de desenho da
+  entidade (`offsetDrawList`). Nada disso toca o `World`. Seleção por `pickAt` (o `stackAt` da engine, por cima a
+  selecionada). O movimento é a edição `move { dx, dy }` do inspector (mesma rota, `modify_game_object` como `user`),
+  e o hot reload mostra a posição nova. No modo edição o jogo fica pausado, sem input (como em "Seguir agente"), e
+  reinicia na cena editada.
 
 - **Renderização em duas fases.** `buildDrawList(world)` é pura: converte entidades em comandos em
   coordenadas de tela (câmera, zoom, escala, rotação, flip), descarta o que está fora da tela e ordena por

@@ -2,6 +2,7 @@ import { FIXED_DT, Game, type ClockOptions, type GameEvent, type LogEntry, type 
 import type { Project } from '@vibe/shared';
 import { FixedLoop } from './loop';
 import { buildDrawList, paint, paintDebug, paintSelection, paintStatusOverlay, type AssetResolver } from './render';
+import { dragView, offsetDrawList, paintViewportGizmos, type EditorView } from './viewport';
 
 export interface Scheduler {
   request(cb: (now: number) => void): number;
@@ -68,6 +69,8 @@ export class Runtime {
   debug: boolean;
   /** Entity selected in the editor panels: outlined over the game (never part of the simulation). */
   selected: string | null = null;
+  /** Editor viewport: its own camera, a drag preview and gizmos (null = the game's own view). */
+  editor: EditorView | null = null;
   fps = 0;
   private assets?: AssetResolver;
   private readonly ctx: CanvasRenderingContext2D;
@@ -176,7 +179,11 @@ export class Runtime {
   render() {
     const { config } = this.project;
     const world = this.game.world;
-    paint(this.ctx, buildDrawList(world), {
+    const ed = this.editor;
+    const cam = ed?.view ?? world.camera;
+    let cmds = buildDrawList(world, cam);
+    if (ed?.drag) cmds = offsetDrawList(cmds, ed.drag, cam.zoom);
+    paint(this.ctx, cmds, {
       width: config.width,
       height: config.height,
       background: world.scene.background,
@@ -184,8 +191,9 @@ export class Runtime {
       assets: this.assets,
       onAssetError: (message) => this.reportAssetError(message),
     });
-    if (this.debug) paintDebug(this.ctx, world, { fps: this.running && !this._paused ? this.fps : undefined, paused: this._paused });
-    if (this.selected) paintSelection(this.ctx, world, this.selected);
+    if (this.debug) paintDebug(this.ctx, world, { fps: this.running && !this._paused ? this.fps : undefined, paused: this._paused }, cam);
+    if (ed) paintViewportGizmos(this.ctx, world, ed, this.selected);
+    if (this.selected) paintSelection(this.ctx, world, this.selected, ed?.drag?.id === this.selected ? dragView(cam, ed.drag) : cam);
     if (this.options.statusOverlay ?? true) {
       const crash = world.status === 'crashed' ? world.events.findLast((e) => e.type === 'crash') : undefined;
       paintStatusOverlay(this.ctx, world.status, config.width, config.height, crash?.message as string | undefined);

@@ -34,6 +34,16 @@ describe('inspector route', () => {
     expect(readFileSync(join(dir, 'game', 'scenes', 'level1.json'), 'utf8')).toMatch(/"width": 20/);
     const history = readFileSync(join(dir, 'game', '.vibe', 'history.jsonl'), 'utf8');
     expect(JSON.parse(history.trim().split('\n').at(-1)!)).toMatchObject({ author: 'user', tool: 'modify_game_object' });
+
+    // The viewport saves a drag the same way.
+    const move = await handleInspectRequest(
+      dir,
+      'POST',
+      '/api/projects/game/inspect',
+      JSON.stringify({ scene: 'level1', id: 'coin1', edit: { action: 'move', dx: 20, dy: 0 } }),
+    );
+    expect(body(move)).toMatchObject({ ok: true });
+    expect(readFileSync(join(dir, 'game', 'scenes', 'level1.json'), 'utf8')).toMatch(/"x": 420/);
   });
 
   it('reports rejected edits and bad requests', async () => {
