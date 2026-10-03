@@ -247,7 +247,7 @@ Um sistema por vez; só depois que os anteriores estão funcionando.
 - [x] meu-pet: um plano verificado pelos 4 playbooks do pet (numa cópia, sem tocar na memória real)
 - [x] 406 testes unitários + 26 e2e
 
-## V0.7 — Indivíduos (em andamento)
+## ✅ V0.7 — Indivíduos (concluída)
 Pets que parecem indivíduos: personalidade contínua, preferências descobertas, itens com tags, memória, diário vivo.
 Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engine; frases e números do pet no jogo.
 - [x] **Fase 1 — Análise e arquitetura**: sistemas existentes, divisão engine × jogo, riscos, desempenho, migração
@@ -356,6 +356,18 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
   carinho morno, dorme bem com luz, Pega-pega devagar, nem fareja nas Caixinhas) — o diário do pet calmo passou de 1 jeito
   em 36 h para 4 em ~2 min; história inteira no diário em páginas; "sociável"; observações que dizem do quê; contração
   nos gostos que mudam; preferido já sabido não repete; resumo das Caixinhas conta quando o pet não esperou (480 testes)
+
+## V0.8 — App (em andamento)
+Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` (Capacitor). Análise e fases em
+`docs/V08_APP.md`.
+
+- [x] **Fase 1 — Análise e arquitetura** (`docs/V08_APP.md`)
+- [ ] **Fase 2 — Player standalone + `vibe export`** (projeto embutido, save no aparelho, escala com letterbox)
+- [ ] **Fase 3 — Celular no navegador** (teclado virtual para texto, som no primeiro toque, paisagem, salvar ao ir
+  para o fundo)
+- [ ] **Fase 4 — Desktop (Electron)**: `vibe package desktop` → `.exe`
+- [ ] **Fase 5 — Android (Capacitor)**: `vibe package android` → `.apk` (requer Android Studio)
+- [ ] **Fase 6 — Polimento**: ícone e nome do app pelo projeto, tela de carregamento, guia de como gerar, playtest
 
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.
