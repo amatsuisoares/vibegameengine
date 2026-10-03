@@ -239,6 +239,7 @@ function terminar(game) {
   const linhas = [acertos.map((a) => (a ? '✅' : '❌')).join(' ')];
   linhas.push(r.pontos === RODADAS ? 'Você achou o ossinho todas as vezes!' : r.pontos === 0 ? `${p.nome || 'O pet'} achou o ossinho pelo faro.` : 'Acharam o ossinho juntos.');
   if (farejou) linhas.push(`${p.nome || 'O pet'} farejou por perto antes de você escolher.`);
+  if (naoEsperou) linhas.push(`${p.nome || 'O pet'} não esperou você escolher.`);
   if (r.moedas > 0) linhas.push(`+${r.moedas} 🪙`);
   else if (p.moedas === 0 && r.pontos > 0) linhas.push('Hoje já ganhou bastante moeda brincando.');
   texto(game, '');

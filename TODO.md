@@ -350,7 +350,12 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
   caixa certa, sem paciência não espera). Na volta: diversão, cansaço, lembrança de brincar com você, pistas de gostos
   e de jeito no diário ("talvez" já na primeira partida), moedas (até 15/dia em jogos), página do diário na primeira vez;
   recusa se dormindo, doente, cansado ou com fome
-- [ ] **Fase 12 — Polimento, balanceamento e avaliação das 10 perguntas de qualidade**
+- [x] **Fase 12 — Polimento, balanceamento e avaliação das 10 perguntas de qualidade** (só jogo): dois pets gerados,
+  os mais opostos entre 40, com o mesmo jogador (1× e 36 h a 60×); respostas e evidências em
+  `docs/V07_INDIVIDUOS.md` §9. Ajustes: traços baixos também se mostram (olha coisa nova de longe, satisfeito mais cedo,
+  carinho morno, dorme bem com luz, Pega-pega devagar, nem fareja nas Caixinhas) — o diário do pet calmo passou de 1 jeito
+  em 36 h para 4 em ~2 min; história inteira no diário em páginas; "sociável"; observações que dizem do quê; contração
+  nos gostos que mudam; preferido já sabido não repete; resumo das Caixinhas conta quando o pet não esperou (480 testes)
 
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.

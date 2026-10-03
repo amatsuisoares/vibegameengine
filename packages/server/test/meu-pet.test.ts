@@ -16,7 +16,8 @@ function load(): Project {
 
 const pick = (events: GameEvent[], type: string) => events.filter((e) => e.type === type);
 
-describe('meu-pet (regression)', () => {
+// Simulations of hours of game time: alone ~1 s each, but slower when the whole suite runs in parallel.
+describe('meu-pet (regression)', { timeout: 20_000 }, () => {
   it('names a pet, then every object in the room is an Interactable that reacts to clicks, and an hours-long absence leaves dirt to clean', () => {
     const game = new Game(load(), { seed: 3, clock: { start: '2026-03-10T10:00:00Z' } });
     game.perform([{ type: 'wait', ms: 200 }, { type: 'type', text: 'Mimi\n' }, { type: 'wait', ms: 500 }]);
@@ -897,6 +898,48 @@ describe('meu-pet (regression)', () => {
     const neglected = grow(base('juvenil2', 35.98, { wellbeing: 25, provou: {} }), {});
     expect(neglected).toMatchObject({ to: 'adulto3b' });
     expect(neglected.story).toBe('Cresceu: agora é adulto. Passou por uns apertos, se acostumou a ficar sozinho e quase só conheceu ração.');
+  });
+
+  it('a calm pet shows itself too: low traits are seen (glances from afar, full sooner, lukewarm about petting) and reach the diary', () => {
+    const t = Date.parse('2026-03-10T14:00:00Z');
+    const pet = {
+      version: 2, name: 'Sereno', born: t - 3_600_000, stage: 'bebe', needs: { fome: 85, energia: 90, diversao: 80, higiene: 95, saude: 100, afeto: 70 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const g = new Game(load(), {
+      seed: 5, scene: 'quarto', clock: { start: '2026-03-10T14:00:00Z' },
+      storage: {
+        pet,
+        petIndividuo: { version: 1, traits: { atividade: 0.4, sociabilidade: 0.15, curiosidade: 0.1, independencia: 0.5, sensibilidade: 0.5, apetite: 0.1, paciencia: 0.6, brincadeira: 0.4 }, preferences: { carinho: p(0), maca: p(0.5) } },
+        'vibe.inventory': { default: { maca: 1 } }, 'vibe.wallet': { moedas: 40 }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+      },
+    });
+    g.perform([{ type: 'wait', ms: 500 }]);
+    const texts = () => g.events(0, 'notification').map((e) => String(e.text));
+
+    // Something new in the room: a pet with little curiosity only glances at it.
+    g.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 80 }]);
+    const card = g.world.withTag('cartaLoja').find((c) => c.components.Script!.props.item === 'cestinha')!;
+    g.perform([{ type: 'click', entity: card.id }, { type: 'wait', ms: 80 }, { type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 4000 }]);
+    expect(texts()).toContain('Sereno olhou a cestinha fofa de longe e continuou o que estava fazendo.');
+    // Little appetite: not that hungry (85) and it already says no (twice: one sign is not enough for the diary).
+    for (let i = 0; i < 2; i++) {
+      g.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 80 }]);
+      g.perform([{ type: 'click', entity: g.world.withTag('cartaComida')[0].id }, { type: 'wait', ms: 3000 }]);
+    }
+    expect(texts()).toContain('Sereno não parece estar com fome agora.');
+    // Reserved: petting is fine, nothing more.
+    g.perform([{ type: 'click', entity: 'pet' }, { type: 'wait', ms: 7000 }, { type: 'click', entity: 'pet' }, { type: 'wait', ms: 3000 }]);
+    expect(texts()).toContain('Sereno aceitou o carinho, sem muita empolgação.');
+
+    g.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 80 }, { type: 'click', entity: 'diarioAba1' }, { type: 'wait', ms: 80 }]);
+    const jeito = g.entity('diarioTexto')!.components.Text!.text;
+    expect(jeito).toContain('Talvez seja pouco curioso.');
+    expect(jeito).toContain('Talvez seja de pouco apetite.');
+    expect(jeito).toContain('Talvez seja reservado.');
+    expect(g.console.read(0, 'error')).toEqual([]);
   });
 
   it('minigames: Brincar opens Pega-pega or Caixinhas with who the pet is, and the room comes back with fun, clues about its tastes, coins and a diary page', () => {

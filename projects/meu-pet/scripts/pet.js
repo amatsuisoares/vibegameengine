@@ -25,7 +25,7 @@ const ADULTO_AT = 36;
 const JEITO = {
   'atividade:alto': 'bastante ativo',
   'atividade:baixo': 'bem tranquilo',
-  'sociabilidade:alto': 'muito apegado a você',
+  'sociabilidade:alto': 'sociável',
   'sociabilidade:baixo': 'reservado',
   'curiosidade:alto': 'curioso',
   'curiosidade:baixo': 'pouco curioso',
@@ -389,6 +389,7 @@ function sonoVisivel(game) {
       reveal('sensibilidade', 'alto');
     }
   } else if (s.q >= 0.7) {
+    if (pet.lightOn) reveal('sensibilidade', 'baixo'); // dorme bem mesmo com a luz acesa
     const onde = ondeDorme(game);
     if (observe(game, 'dormeBem', `{n} está dormindo tranquilo${onde.frase}.`, 120, 0) && onde.id && onde.id !== 'cama') {
       gostoVisto(game, onde.id, me.prefs.item(onde.id).level, 0.5);
@@ -404,6 +405,12 @@ function verCoisa(game, self, id) {
   const e = game.entity(id);
   const item = e && game.items.get(String(e.props.item));
   if (!item || pet.asleep || refeicao) return;
+  if (T('curiosidade') < LOW) {
+    // Pouco curioso: olha de longe e continua o que fazia.
+    observe(game, `coisa:${item.id}`, `{n} olhou ${oItem(item)} de longe e continuou o que estava fazendo.`, 10);
+    reveal('curiosidade', 'baixo', 1);
+    return;
+  }
   const r = me.prefs.item(item.id);
   const lado = self.x < e.x ? -1 : 1;
   go(game, e.x + lado * 30, () => {
@@ -937,6 +944,7 @@ function arrive(game, self, then) {
   } else if (then === 'greet') {
     mind = { act: 'greet', t: 3 };
     reveal('sociabilidade', 'alto');
+    reveal('independencia', 'baixo');
     if (n.afeto < 40) observe(game, 'saudade', '{n} parece estar com saudade de você.', 90);
   } else if (then === 'toy') {
     comecarBrincar(game, self, mind.what);
@@ -992,6 +1000,7 @@ function brincouSozinho(game, self, id) {
   const k = { favorito: 1.6, gosta: 1, neutro: 0.4, nao: 0 }[jeito];
   n.diversao = clamp(n.diversao + (Number(item.props.diversao) || 8) * k * lerp(0.7, 1.4, T('independencia')));
   n.afeto = clamp(n.afeto + (Number(item.props.afeto) || 0) * k);
+  if (item.tags.includes('barulhento') && !barulhoIncomoda(item)) reveal('sensibilidade', 'baixo');
   if (barulhoIncomoda(item)) {
     n.diversao = clamp(n.diversao - 6);
     reveal('sensibilidade', 'alto');
@@ -1005,7 +1014,10 @@ function brincouSozinho(game, self, id) {
   anotar(game, 'brinquedo', `Brincou com ${oItem(item)} pela primeira vez.`, `brincou:${item.id}`, 0.4);
   if (jeito === 'favorito') {
     emote(game, self, '♥', '#ff8fab');
-    observe(game, `favorito:${item.id}`, `{n} brincou um tempão com ${oItem(item)}. Parece ser o brinquedo preferido.`, 30);
+    // Enquanto você ainda não sabe, a observação aponta o preferido; depois, só de vez em quando.
+    const sabe = me.knowledge.level(`favorito:${item.id}`) !== 'unknown' && me.knowledge.level(`favorito:${item.id}`) !== 'possible';
+    if (sabe) observe(game, `favorito:${item.id}`, `{n} se divertiu um tempão com ${oItem(item)}, o brinquedo preferido.`, 360);
+    else observe(game, `favorito:${item.id}`, `{n} brincou um tempão com ${oItem(item)}. Parece ser o brinquedo preferido.`, 30);
   } else if (jeito === 'neutro') observe(game, `neutro:${item.id}`, `{n} mexeu um pouco ${noItem(item)} e logo perdeu o interesse.`, 60);
 }
 
@@ -1175,7 +1187,9 @@ function voltouDoJogo(game, self, ev) {
   for (const [id, nivel] of Object.entries(r.reacoes || {})) if (game.items.get(id) && VERBO[nivel]) gostoVisto(game, id, nivel, 0.6);
   // O jeito dele aparece no jogo: rápido (ativo), farejador (curioso), sem paciência para esperar.
   if (r.jogo === 'pegar') reveal('atividade', 'alto', 1);
+  if (r.jogo === 'pegar') reveal('atividade', 'baixo', 1); // devagar atrás das coisas
   if (r.farejou) reveal('curiosidade', 'alto', 1);
+  if (r.jogo === 'caixinhas' && !r.farejou) reveal('curiosidade', 'baixo', 1); // nem fareja
   if (r.naoEsperou) reveal('paciencia', 'baixo', 1);
   if (animo >= 0.6) reveal('brincadeira', 'alto');
   const hoje = moedasDeJogoHoje(game);
@@ -1248,7 +1262,7 @@ function makeApi(game, self) {
         return;
       }
       if (recent) {
-        observe(game, 'carinhoDemais', '{n} não parece muito interessado.', 2);
+        observe(game, 'carinhoDemais', '{n} não parece querer mais carinho agora.', 2);
         return;
       }
       // O gosto pelo carinho (o inato já é puxado pelo jeito: apegados gostam mais, independentes menos).
@@ -1268,6 +1282,7 @@ function makeApi(game, self) {
       } else if (level === 'neutral') {
         n.afeto = clamp(n.afeto + 8);
         lembrar('carinho', 'voce', 0.1, 0.3);
+        reveal('sociabilidade', 'baixo');
         gostoVisto(game, 'carinho', level);
         anotar(game, 'lembranca', 'Recebeu o primeiro carinho, sem muita empolgação.', 'carinho', 0.4);
         observe(game, 'carinho', '{n} aceitou o carinho, sem muita empolgação.', 2);
@@ -1276,6 +1291,7 @@ function makeApi(game, self) {
         // Não gosta: se afasta um pouco (afastar já diz muito; sem punição).
         n.afeto = clamp(n.afeto + 2);
         reveal('independencia', 'alto');
+        reveal('sociabilidade', 'baixo');
         lembrar('carinho', 'voce', -0.4, 0.3);
         gostoVisto(game, 'carinho', level);
         anotar(game, 'lembranca', 'No primeiro carinho, se afastou: parece gostar do próprio espaço.', 'carinho', 0.5);
@@ -1295,7 +1311,7 @@ function makeApi(game, self) {
     },
     remedio() {
       if (!pet.sick) {
-        observe(game, 'remedioSemDoenca', '{n} não parece muito interessado.', 2);
+        observe(game, 'remedioSemDoenca', '{n} não parece precisar de remédio.', 2);
         return;
       }
       pet.sick = false;
@@ -1346,7 +1362,7 @@ function makeApi(game, self) {
       const b = bola();
       const wants = n.energia > 20 && (n.diversao < 85 || T('brincadeira') > HIGH) && !pet.sick;
       if (!wants) {
-        observe(game, 'semVontade', '{n} não parece muito interessado.', 5);
+        observe(game, 'semVontade', '{n} não parece com vontade de brincar agora.', 5);
         return;
       }
       if (b.score <= -0.3) {
@@ -1525,7 +1541,7 @@ function abaGostos(game) {
 }
 
 function abaHistorias(game) {
-  const entries = me.journal.entries({ limit: 10 });
+  const entries = me.journal.entries();
   if (!entries.length) return ['Nada aconteceu ainda.'];
   return entries.map((e) => `Dia ${Math.max(1, Math.floor((e.t - pet.born) / DAY) + 1)}  ·  ${e.text}`);
 }
@@ -1593,6 +1609,14 @@ const DESCEU = {
   hate: ['parece ter passado a detestar', 'Passou a detestar'],
 };
 
+/** "gostar de" + "a bola" → "gostar da bola"; "por" + "o leite" → "pelo leite". */
+function junta(frase, nome) {
+  const m = /^(o|a|os|as) (.*)$/.exec(nome);
+  if (m && frase.endsWith(' de')) return `${frase.slice(0, -3)} d${nome}`;
+  if (m && frase.endsWith(' por')) return `${frase.slice(0, -4)} pel${nome}`;
+  return `${frase} ${nome}`;
+}
+
 let mudouAgora = { subject: null, t: -99 }; // o gosto que acabou de mudar (para não dizer "enjoando" na mesma hora)
 
 function mudouGosto(game, ev) {
@@ -1603,8 +1627,8 @@ function mudouGosto(game, ev) {
   const item = game.items.get(ev.subject);
   const nome = item ? (item.category === 'comida' ? nomeDe(item) : oItem(item)) : OUTROS[ev.subject];
   if (!frase || !nome) return;
-  observe(game, `mudou:${ev.subject}`, `{n} ${frase[0]} ${nome}.`, 30);
-  anotar(game, 'gosto', `${frase[1]} ${nome}.`, `mudou:${ev.subject}:${ev.to}`, 0.7);
+  observe(game, `mudou:${ev.subject}`, `{n} ${junta(frase[0], nome)}.`, 30);
+  anotar(game, 'gosto', `${junta(frase[1], nome)}.`, `mudou:${ev.subject}:${ev.to}`, 0.7);
   // O que você sabia do gosto antigo vale menos; o novo passa na frente (você acabou de ver).
   let antes = 0;
   for (const k of me.knowledge.list({ prefix: `gosto:${ev.subject}:`, minLevel: 'unknown' })) {
@@ -1689,8 +1713,9 @@ function onItem(self, item, game) {
     observe(game, 'ofertaDormindo', '{n} está dormindo.', 1);
     return { consumed: false, reason: 'dormindo' };
   }
-  if (pet.needs.fome > 92) {
+  if (pet.needs.fome > (T('apetite') < LOW ? 78 : 92)) {
     observe(game, 'semFome', '{n} não parece estar com fome agora.', 1);
+    reveal('apetite', 'baixo');
     return { consumed: false, reason: 'satisfeito' };
   }
   // Uma comida ainda no chão (oferecida logo antes): termina aquela primeiro.

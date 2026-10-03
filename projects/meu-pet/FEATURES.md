@@ -285,13 +285,13 @@ com o indivíduo (`storage.petIndividuo`) e volta ao reabrir o jogo.
 
 | Ação | Como | Efeito e reação |
 |---|---|---|
-| Carinho | clicar no pet | afeto +15 (carinhoso +22), diversão +3, pulinho e ♥; repetido em < 6 s: "não parece muito interessado"; dormindo: "se mexeu um pouco" (irritável acorda incomodado) |
+| Carinho | clicar no pet | afeto +15 (carinhoso +22), diversão +3, pulinho e ♥; repetido em < 6 s: "não parece querer mais carinho agora"; dormindo: "se mexeu um pouco" (irritável acorda incomodado) |
 | Encher a tigela | clicar na tigela | 3 porções (som); se o pet está acordado e com fome < 70, vai comer |
 | Loja | botão "Loja · N 🪙" (canto superior direito) → cartas com preço e quanto você tem → clicar compra 1 | sem moedas: "Faltam moedas para…" |
-| Comida | botão → bandeja com as comidas que você **tem** (com quantidade) → clicar numa; vazia: carta que leva à Loja | só sai do inventário se o pet comer | o pet cheira e reage pelo gosto (ver seção 7a); satisfeito (fome > 92): "não parece estar com fome agora" |
+| Comida | botão → bandeja com as comidas que você **tem** (com quantidade) → clicar numa; vazia: carta que leva à Loja | só sai do inventário se o pet comer | o pet cheira e reage pelo gosto (ver seção 7a); satisfeito (fome > 92; de pouco apetite, > 78): "não parece estar com fome agora" |
 | Jogar a bola | clicar na bola | a bola voa e rola; o pet corre atrás se tiver energia > 20, não estiver doente e diversão < 85 (brincalhão sempre); brinca 4 s: diversão +30, energia −8, afeto +5, "ficou animado!" |
 | Limpar | clicar na sujeira | uma nuvem de poeira (partículas); higiene +18; sem sujeira: "parece mais à vontade com o quarto limpo" |
-| Remédio | botão | doente: cura, saúde +25; saudável: "não parece muito interessado" |
+| Remédio | botão | doente: cura, saúde +25; saudável: "não parece precisar de remédio" |
 | Luz | clicar na lâmpada | acende/apaga; dormir no escuro recupera energia mais rápido; dormindo com luz à noite: "parece incomodado com a luz" |
 
 Os objetos clicáveis ficam numa camada acima do pet, então dá para clicar na tigela mesmo com o pet na frente.
@@ -366,7 +366,22 @@ adorada que você nunca ofereceu **não aparece**.
 |---|---|
 | **Jeito** | idade e fase; até 6 jeitos ("Talvez seja curioso." / "Parece ser…" / "É…"); até 4 hábitos da rotina estável ("Costuma dormir de madrugada." — madrugada, manhã, tarde, noite; aparecem com os dias) |
 | **Gostos** | Comidas (até 7, sem artigo: "Adora maçã."), Brinquedos ("O brinquedo preferido parece ser a pelúcia.", "Talvez adore a bola."), Outras coisas (carinho, dormir no escuro). Por assunto vale o nível com mais evidência. Nada visto: "Ainda não deu para perceber do que gosta." |
-| **Histórias** | as 10 páginas mais novas do `Journal` com "Dia N" |
+| **Histórias** | a história inteira (o `Journal` guarda até 80 entradas), da mais nova para a mais antiga, com "Dia N", em páginas |
+
+**Como cada jeito se mostra** (sinais que contam para "jeito:eixo:alto|baixo"; só contam se o pet é mesmo assim — traço
+≥ 0,65 ou ≤ 0,35; peso 0,5, ou 1 quando o sinal é inequívoco). Desde a fase 12 os **traços baixos também se mostram**:
+antes, um pet calmo passava 36 h com um só traço no diário.
+
+| Eixo | alto | baixo |
+|---|---|---|
+| atividade | passeia pelo quarto; Pega-pega (corre rápido) | fica parado; dorme de dia; Pega-pega (devagar) |
+| sociabilidade ("sociável" / "reservado") | vem até você; adora carinho | aceita carinho sem empolgação ou se afasta |
+| curiosidade | investiga cantos; fareja a caixa certa nas Caixinhas | olha uma coisa nova de longe e continua o que fazia (peso 1); nas Caixinhas, nem fareja |
+| independência ("independente" / "grudento") | brinca sozinho; se afasta do carinho | vem até você |
+| sensibilidade ("sensível" / "tranquilo com o que acontece em volta") | dorme mal (luz, barulho); se assusta com barulho | dorme bem com a luz acesa; brinca com o chocalho sem se incomodar |
+| apetite ("guloso" / "de pouco apetite") | come com vontade o que adora | satisfeito mais cedo: recusa comida com fome > 78 |
+| paciência | — | emburra; acordado fica chateado; nas Caixinhas, não espera você |
+| brincadeira | brinca, corre atrás da bola | olha a bola passar |
 
 Cada aba é dividida em **páginas** que cabem no papel (14 linhas, estimando as que quebram; um título de seção não fica
 sozinho no fim): ◀ 1/2 ▶ no canto de baixo à esquerda (`scripts/diarioSeta.js`); trocar de aba volta à página 1.
@@ -397,7 +412,8 @@ Checagem automática a cada segundo (em ordem de prioridade):
 Mensagens de eventos: "{n} chegou! Observe com atenção." · "{n} adormeceu." · "{n} acordou." · "{n} comeu da
 tigela." · "{n} está olhando para a tigela vazia." · "{n} parece estar
 procurando alguma coisa." · "{n} ficou animado!" · "{n} parece gostar do carinho." / "parece adorar o carinho." ·
-"{n} não parece gostar disso agora." · "{n} não parece muito interessado." · "{n} parece ter gostado do petisco." ·
+"{n} não parece gostar disso agora." · "{n} não parece querer mais carinho agora." · "{n} não parece com vontade de
+brincar agora." · "{n} parece ter gostado do petisco." ·
 "{n} parece estar se sentindo melhor." · "{n} parece mais à vontade com o quarto limpo." · "{n} cresceu!" ·
 "{n} chegou à fase adulta! No Diário você pode começar com um novo pet." · "A tigela já está cheia."
 
@@ -470,6 +486,17 @@ dormir e acordar; carinho, tigela, bola, petisco, remédio, limpeza, luz; observ
 Jovem 1 e Jovem 2 conforme o cuidado e para Adulto 3a com abandono; resumo de tempo fora; novo pet na fase adulta e
 coleção. A plataforma tem testes que confirmam que o save no disco sobrevive a um navegador novo.
 
+**Avaliação da V0.7 (fase 12)** — dois pets gerados pela seed, os mais opostos entre 40 (Faísca: ativo, curioso,
+brincalhão; Sereno: calmo, pouco curioso, de pouco apetite, impaciente), com **o mesmo jogador**: 10 min sozinhos a 1×,
+as mesmas comidas, carinho, bola, luz e cortina, os dois minigames, depois 36 h a 60× com cuidado de hora em hora.
+Faísca passou 60% dos primeiros 10 min brincando, Sereno 21% (e 35% parado); no Pega-pega, com as mesmas comidas
+caindo, Faísca fez careta para o peixe e Sereno adorou; Faísca (gosta de escuro) dormiu mal com a luz e se incomodou
+com a claridade, Sereno ficou "mais à vontade com a luz acesa"; cresceram por caminhos diferentes ("passou a infância
+brincando" × "descansando") e os diários contam histórias diferentes. Ajustes que a avaliação pediu: sinais dos
+traços baixos (acima), história inteira no diário (antes, só as 10 últimas), "sociável" no lugar de "muito apegado a
+você" (contradizia "independente"), observações que dizem do quê, "começou a gostar da bola" (contração), o brinquedo
+preferido já sabido não é repetido de hora em hora, e o resumo das Caixinhas conta quando o pet não esperou.
+
 Playbooks de regressão em `playbooks/` (rodar com `run_playbooks`): `limpar_sujeira`, `encher_tigela`, `carinho`,
 `bola`.
 
@@ -479,6 +506,6 @@ Playbooks de regressão em `playbooks/` (rodar com `run_playbooks`): `limpar_suj
 - Cenário e objetos são formas simples; não há trilha sonora; os sons são efeitos sintetizados.
 - Balanceamento é um primeiro chute: ritmos das necessidades, 12 h / 36 h para evoluir, limites de doença.
 - O pet adulto não envelhece nem muda depois de adulto; não há morte (decisão de design).
-- Um único quarto; sem objetos novos para desbloquear, sem itens de loja, sem mini-jogos.
-- A personalidade só aparece no diário depois de 3 sinais; não há outra pista explícita.
+- Um único quarto; a loja tem 13 itens e há 2 minigames (prova de conceito da arquitetura).
+- Com os outros traços iguais, um pet ativo dorme ~40% do dia e um calmo ~45%: a diferença existe, mas é pequena.
 - Sem acessibilidade de teclado para as ações (só mouse, exceto digitar o nome).

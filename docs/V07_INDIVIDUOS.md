@@ -147,7 +147,7 @@ reabrir) → docs (ARCHITECTURE, AGENT_TOOLS, FEATURES do jogo) → TODO → com
 | 9 ✅ | aprendizado de afinidade ligado à memória | preferências que mudam devagar; hábitos no diário |
 | 10 ✅ | — | evolução por histórico (rotina, relação, alimentação, exploração), registrada no diário |
 | 11 ✅ | `startMinigame`/`endMinigame` | 1–2 minigames (moeda, vínculo, memória, revelar preferência; vantagem pequena por traço) |
-| 12 | — | balanceamento; avaliação das 10 perguntas de qualidade com dois pets de personalidades opostas |
+| 12 ✅ | — | balanceamento; avaliação das 10 perguntas de qualidade com dois pets de personalidades opostas |
 
 ## 8. Decisões de design propostas
 
@@ -160,3 +160,33 @@ reabrir) → docs (ARCHITECTURE, AGENT_TOOLS, FEATURES do jogo) → TODO → com
   frases ("Parece ser bastante ativo."), nunca como número.
 - **Sem punição severa por item odiado**: reação negativa (afasta, emburra, perde interesse), sem dano.
 - **Moeda modesta**: cuidado diário + minigames; preços pensados para comprar algo novo a cada 1–2 dias de jogo.
+
+## 9. Avaliação (Fase 12)
+
+Dois pets **gerados pela seed** — os mais opostos entre 40 nascimentos — com **o mesmo jogador**: 10 min sozinhos a
+1×, as mesmas comidas da cesta, carinho, bola, luz e cortina, Pega-pega e Caixinhas, mais 10 min a 1× e 36 h a 60× com
+cuidado de hora em hora (tigela, carinho, bola, compras e uma comida da bolsa). **Faísca**: ativo, sociável, curioso,
+independente, brincalhão. **Sereno**: calmo, pouco curioso, pouco sensível, de pouco apetite, impaciente.
+
+| # | Pergunta | Resposta | Evidência |
+|---|---|---|---|
+| 1 | Personalidades diferentes se comportam diferente? | sim | primeiros 10 min a 1×: Faísca brincando 60% do tempo, Sereno 21% (e 35% parado); com os outros traços iguais, o ativo dorme ~40% do dia e o calmo ~45% e nunca brinca sozinho |
+| 2 | Gostam de itens diferentes? | sim | as mesmas comidas no Pega-pega: Faísca fez careta para o peixe e ficou feliz com biscoito e cenoura; Sereno adorou o peixe e fez careta para biscoito e cenoura |
+| 3 | O jogador descobre naturalmente? | **sim, depois do ajuste** | antes, só traços *altos* tinham sinais: Sereno passou 36 h com "Talvez seja impaciente" como único jeito. Agora há sinais dos baixos (olhar de longe, recusar com pouca fome, carinho morno, dormir bem com luz, Pega-pega devagar) e o diário dele mostra 4 jeitos em ~2 min de jogo |
+| 4 | Preferências afetam o gameplay? | sim | come rápido/devagar/recusa; a IA escolhe brinquedo e lugar de dormir pelo gosto; reações no Pega-pega; memória de comida adorada/detestada; gostos que mudam com fome e enjoo |
+| 5 | O ambiente afeta? | sim | Faísca (gosta de escuro) dormiu mal com a luz 5× e se incomodou com a claridade 8×; Sereno "parece mais à vontade com a luz acesa" e "se mexeu inquieto no escuro" |
+| 6 | Motivos para experimentar itens? | sim | cada comida provada vira página e pista ("Talvez…"), descobrir um gosto dá moedas, o diário mostra o que falta; a loja tem comidas, brinquedos e móveis com tags que cada pet sente diferente |
+| 7 | O diário registra descobertas e momentos? | **sim, depois do ajuste** | a aba Histórias mostrava só as 10 entradas mais novas (as primeiras vezes sumiam em um dia); agora mostra a história inteira em páginas |
+| 8 | Representa a história individual? | sim | com as mesmas ações: Faísca "passou a infância brincando e andando pelo quarto", Sereno "descansando"; primeiros gostos, doença, pedidos de bola, minigames, por que cresceu |
+| 9 | Dá para sentir que conhece aquele pet? | sim | Jeito de Faísca: brincalhão, independente, ativo, curioso, sociável, sensível; de Sereno: tranquilo com o que acontece em volta, pouco curioso, de pouco apetite, reservado, impaciente; gostos em níveis de confiança |
+| 10 | Mais interessante sem barras e números? | sim | nenhuma barra nem número do pet na tela (só moedas, idade e hora); tudo é comportamento, sinais (♥ 💢 ❗ z ~) e frases observacionais |
+
+**Ajustes feitos na fase 12**: sinais para os traços baixos; história inteira no diário; "sociável" no lugar de "muito
+apegado a você" (contradizia "independente" no mesmo pet); observações que dizem do quê ("não parece querer mais carinho
+agora", "não parece precisar de remédio", "não parece com vontade de brincar agora"); contração em gostos que mudam
+("começou a gostar da bola"); o brinquedo preferido, quando já é sabido, não é repetido de hora em hora; o resumo das
+Caixinhas conta quando o pet não esperou; timeout de 20 s nos testes de simulação do meu-pet (a suíte em paralelo
+deixava um deles perto dos 5 s).
+
+**Pontos em aberto**: a diferença de sono entre ativo e calmo é pequena (~40% × ~45%); cada pet só tem um brinquedo
+no começo, então "brinquedo preferido" só fica interessante depois de comprar outros.

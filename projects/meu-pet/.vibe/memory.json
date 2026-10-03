@@ -242,10 +242,25 @@
     {
       "id": "f21",
       "kind": "feature",
-      "text": "Minigames (Brincar): Pega-pega (guiar com o mouse; reação por gosto; ativos mais rápidos) e Caixinhas (achar o petisco; curioso fareja, impaciente não espera); cenas via startMinigame/endMinigame; volta com diversão, memória, pistas no diário, moedas (15/dia) e página do diário",
+      "text": "Minigames (Brincar): Pega-pega (guiar com o mouse; reação por gosto; ativos mais rápidos) e Caixinhas (achar o ossinho só do jogo; curioso fareja, impaciente não espera); cenas via startMinigame/endMinigame; volta com diversão, memória, pistas no diário, moedas (15/dia) e página do diário",
       "status": "verified",
       "evidence": "teste 'minigames: Brincar opens Pega-pega or Caixinhas...' (jogando a 1x: pontos, resumo, volta ao quarto, moedas, memória brincouComVoce, gosto:maca:love e jeito possíveis, Caixinhas 3/3 com farejar, recusa doente); screenshots do menu, das duas cenas e do quarto na volta",
-      "updatedAt": "2026-10-03T02:17:04.189Z"
+      "updatedAt": "2026-10-03T14:04:07.154Z"
+    },
+    {
+      "id": "f22",
+      "kind": "feature",
+      "text": "Avaliação V0.7 (fase 12): dois pets gerados opostos com o mesmo jogador; traços baixos também se mostram (olha coisa nova de longe, satisfeito mais cedo, carinho morno, dorme bem com luz, Pega-pega devagar, nem fareja); história inteira no diário; textos corrigidos. Respostas das 10 perguntas em docs/V07_INDIVIDUOS.md §9",
+      "status": "verified",
+      "evidence": "teste 'a calm pet shows itself too' (Talvez seja pouco curioso / de pouco apetite / reservado); simulação de 36 h com Faísca × Sereno; screenshots: olhou a cestinha de longe, não esperou nas Caixinhas, aba Jeito do pet calmo",
+      "updatedAt": "2026-10-03T14:04:07.154Z"
+    },
+    {
+      "id": "i1",
+      "kind": "issue",
+      "text": "Diferença de sono entre ativo e calmo é pequena (~40% × ~45% do dia, demais traços iguais)",
+      "status": "open",
+      "updatedAt": "2026-10-03T14:04:07.154Z"
     }
   ],
   "plans": []
