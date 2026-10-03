@@ -238,6 +238,14 @@
       "status": "verified",
       "evidence": "teste 'evolution comes from its history' (bebê ativo → jovem 1, carinhoso → jovem 2, bem cuidado → adulto 1a, negligenciado → adulto 3b, com as frases); screenshot da aba Jeito",
       "updatedAt": "2026-10-03T00:33:17.403Z"
+    },
+    {
+      "id": "f21",
+      "kind": "feature",
+      "text": "Minigames (Brincar): Pega-pega (guiar com o mouse; reação por gosto; ativos mais rápidos) e Caixinhas (achar o petisco; curioso fareja, impaciente não espera); cenas via startMinigame/endMinigame; volta com diversão, memória, pistas no diário, moedas (15/dia) e página do diário",
+      "status": "verified",
+      "evidence": "teste 'minigames: Brincar opens Pega-pega or Caixinhas...' (jogando a 1x: pontos, resumo, volta ao quarto, moedas, memória brincouComVoce, gosto:maca:love e jeito possíveis, Caixinhas 3/3 com farejar, recusa doente); screenshots do menu, das duas cenas e do quarto na volta",
+      "updatedAt": "2026-10-03T02:17:04.189Z"
     }
   ],
   "plans": []

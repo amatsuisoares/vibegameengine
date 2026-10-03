@@ -87,6 +87,13 @@ export function runAction(w: World, a: RuleAction, target: (ref: string) => Enti
     case 'deleteSlot':
       w.slots?.deleteSlot(a.slot);
       return;
+    case 'startMinigame':
+      w.minigames?.startMinigame(a.scene, a.params ?? {});
+      return;
+    case 'endMinigame':
+      if (!w.minigames?.minigame) w.console.warn(`endMinigame: no minigame is running (${origin.label})`, origin.source);
+      else w.minigames.endMinigame(a.result ?? null);
+      return;
     case 'giveItem':
       w.economy?.inventory(a.inventory).add(a.item, a.count, origin.label);
       return;

@@ -899,6 +899,104 @@ describe('meu-pet (regression)', () => {
     expect(neglected.story).toBe('Cresceu: agora é adulto. Passou por uns apertos, se acostumou a ficar sozinho e quase só conheceu ração.');
   });
 
+  it('minigames: Brincar opens Pega-pega or Caixinhas with who the pet is, and the room comes back with fun, clues about its tastes, coins and a diary page', () => {
+    const t = Date.parse('2026-03-10T14:00:00Z');
+    const pet = {
+      version: 2, name: 'Mimi', born: t - 5 * 3_600_000, stage: 'bebe', needs: { fome: 80, energia: 90, diversao: 40, higiene: 95, saude: 100, afeto: 60 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const g = new Game(load(), {
+      seed: 4, scene: 'quarto', clock: { start: '2026-03-10T14:00:00Z' },
+      storage: {
+        pet,
+        petIndividuo: { version: 1, traits: { atividade: 0.9, curiosidade: 0.85, paciencia: 0.8, brincadeira: 0.8 }, preferences: { maca: p(0.9), peixe: p(-0.9), queijo: p(0.4) } },
+        'vibe.inventory': { default: {} }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+      },
+    });
+    g.perform([{ type: 'wait', ms: 300 }]);
+    const coins = () => g.economy.wallet.get('moedas');
+    const before = coins();
+    g.entity('pet')!.x = 300;
+
+    // Brincar → Pega-pega: the minigame gets the pet's form, its way and what it thinks of each food.
+    g.perform([{ type: 'click', entity: 'botaoJogos' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'jogoPegar' }, { type: 'wait', ms: 100 }]);
+    expect(g.world.scene.id).toBe('pegar');
+    const params = g.minigame!.params as { nome: string; quadros: string[]; jeito: Record<string, number>; comidas: { id: string; nivel: string }[] };
+    expect(params).toMatchObject({ nome: 'Mimi', quadros: ['bebe_1', 'bebe_2'], jeito: { atividade: 0.9 } });
+    expect(params.comidas.find((c) => c.id === 'maca')!.nivel).toBe('love');
+    expect(params.comidas.find((c) => c.id === 'peixe')!.nivel).toBe('hate');
+    expect(g.entity('pet')!.components.Sprite!.asset).toBe('bebe_1');
+
+    // Playing at 1x: the mouse follows whatever is falling lowest, so the pet catches most things.
+    for (let f = 0; f < 60 * 34 && !g.world.vars.fim; f += 4) {
+      const falling = g.world.withTag('queda').filter((e) => !e.destroyed).sort((a, b) => b.y - a.y)[0];
+      if (falling) g.apply({ op: 'mouseMove', x: falling.x, y: 300 });
+      g.step(4);
+    }
+    expect(g.world.vars.fim).toBe(true);
+    expect(g.world.vars.pontos as number).toBeGreaterThan(15);
+    const resumo = g.entity('resumo')!.components.Text!.text;
+    expect(resumo).toMatch(/^Mimi pegou (bastante coisa|um montão de coisas)/);
+    expect(resumo).toContain('Ficou feliz com: ');
+    expect(resumo).toMatch(/\+\d 🪙/);
+    expect(g.events(0, 'spawn').filter((e) => e.prefab === 'emote').length).toBeGreaterThan(3); // ♥ and 💢 as it catches
+    g.perform([{ type: 'click', entity: 'botaoVoltarJogo' }, { type: 'wait', ms: 200 }]);
+
+    // Back in the room, as it was: fun up, a memory of playing with you, clues, coins and a diary page.
+    expect(g.world.scene.id).toBe('quarto');
+    expect(g.entity('pet')).toBeDefined();
+    const end = g.events(0, 'minigame_end')[0];
+    expect(end).toMatchObject({ scene: 'pegar', from: 'quarto', result: { jogo: 'pegar' } });
+    const after = g.storage.get('pet') as { needs: Record<string, number>; care: { brincadeiras: number }; jogos: Record<string, { vezes: number }> };
+    expect(after.needs.diversao).toBeGreaterThan(60);
+    expect(after.care.brincadeiras).toBe(1);
+    expect(after.jogos.pegar.vezes).toBe(1);
+    expect(coins()).toBe(before + (end.result as { moedas: number }).moedas);
+    expect((end.result as { moedas: number }).moedas).toBeGreaterThan(0);
+    const snap = g.getState({ ids: ['pet'] }).entities[0];
+    expect(snap.memories!.some((m) => m.type === 'brincouComVoce')).toBe(true);
+    expect(snap.journal!.last[0]).toBe('Brincou de Pega-pega com você pela primeira vez.');
+    expect(g.events(0, 'notification').map((e) => e.text)).toContain('Mimi adorou brincar de Pega-pega com você!');
+    expect(snap.knowledge).toMatchObject({ 'gosto:maca:love': 'possible' }); // a clue about its tastes, without feeding it
+    expect(snap.knowledge).toMatchObject({ 'jeito:atividade:alto': 'possible' }); // a fast one: you see it in the game
+
+    // Caixinhas: the treat goes in a box, they shuffle, you point; a curious pet sniffs near the right one first.
+    g.perform([{ type: 'wait', ms: 2000 }, { type: 'click', entity: 'botaoJogos' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'jogoCaixinhas' }, { type: 'wait', ms: 100 }]);
+    expect(g.world.scene.id).toBe('caixinhas');
+    const sniffed: boolean[] = [];
+    for (let round = 0; round < 3; round++) {
+      expect(g.waitUntil((x) => x.world.vars.fase === 'escolher', 20_000).ok).toBe(true);
+      g.perform([{ type: 'wait', ms: 2500 }]); // give it time to sniff
+      const right = g.entity(`cx${g.world.vars.premio}`)!;
+      sniffed.push(Math.abs(g.entity('pet')!.x - right.x) < Math.abs(480 - right.x) || right.x === 480);
+      g.perform([{ type: 'click', entity: right.id }]);
+    }
+    expect(sniffed).toEqual([true, true, true]);
+    expect(g.waitUntil((x) => x.world.vars.fase === 'fim', 20_000).ok).toBe(true);
+    expect(g.entity('resumo')!.components.Text!.text).toContain('✅ ✅ ✅');
+    expect(g.entity('resumo')!.components.Text!.text).toContain('Mimi farejou por perto antes de você escolher.');
+    g.perform([{ type: 'click', entity: 'botaoVoltarJogo' }, { type: 'wait', ms: 200 }]);
+    expect(g.world.scene.id).toBe('quarto');
+    const box = g.events(0, 'minigame_end')[1];
+    expect(box).toMatchObject({ result: { jogo: 'caixinhas', pontos: 3, farejou: true } });
+    expect(box.result).not.toHaveProperty('reacoes'); // a toy bone only for the game: no tastes, no food
+    const boxFrame = g.events(0, 'minigame_start')[1].frame;
+    expect(g.events(boxFrame, 'spawn').filter((e) => e.prefab === 'emote').length).toBeGreaterThan(0);
+    const known = g.getState({ ids: ['pet'] }).entities[0].knowledge!;
+    expect(known).toMatchObject({ 'jeito:curiosidade:alto': 'possible' });
+    expect(g.console.read(0, 'error')).toEqual([]);
+
+    // A sick pet does not want to play (a tired one goes to sleep, and a sleeping one is asleep).
+    const saved = g.storage.snapshot() as { pet: { sick: boolean } };
+    saved.pet.sick = true;
+    const sick = new Game(load(), { seed: 4, scene: 'quarto', clock: { start: g.clock.iso }, storage: saved });
+    sick.perform([{ type: 'wait', ms: 300 }, { type: 'click', entity: 'botaoJogos' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'jogoPegar' }, { type: 'wait', ms: 100 }]);
+    expect(sick.world.scene.id).toBe('quarto');
+    expect(sick.events(0, 'notification').map((e) => e.text)).toContain('Mimi não está se sentindo bem para brincar.');
+  });
+
   it('verify_game plays a scenario of the real game and reports PASS per check', async () => {
     const store = new ProjectStore(MEU_PET);
     const r = await createAgentTools().call(

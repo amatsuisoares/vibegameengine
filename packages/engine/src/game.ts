@@ -26,6 +26,7 @@ import { Economy } from './economy';
 import { recall } from './memory';
 import { KNOWLEDGE_LEVELS, levelIndex } from './knowledge';
 import { Notifier, type NotifyOptions } from './notifier';
+import { jsonCopy, type MinigameCall, type MinigameHost, type MinigameInfo, type MinigameRequest } from './minigame';
 import { cooldownsLeft, type TimerInfo } from './timers';
 import type { TweenInfo } from './tweens';
 import { SoundDirector, soundOf } from './sound';
@@ -228,6 +229,8 @@ export interface GameState {
   /** Non-empty inventories (item id → count) and wallets (currency → amount). */
   inventories?: Record<string, Record<string, number>>;
   wallet?: Record<string, number>;
+  /** Inside a minigame: its scene, the calling scene and the parameters it got. */
+  minigame?: MinigameInfo;
 }
 
 /** An entity's box in viewport pixels (top-left, size). */
@@ -257,7 +260,7 @@ export const msToFrames = (ms: number) => Math.max(0, Math.round((ms / 1000) / F
  * Headless-capable game instance. Owns the simulation; rendering is done by
  * whoever reads `world` (browser renderer, screenshot tool) and never affects state.
  */
-export class Game implements SlotHost {
+export class Game implements SlotHost, MinigameHost {
   readonly project: Project;
   readonly input: Input;
   readonly console: GameConsole;
@@ -268,6 +271,10 @@ export class Game implements SlotHost {
   readonly saves: GameSaves;
   /** Slot to load at the end of the current frame. */
   private pendingSlot: string | null = null;
+  /** The minigame being played (startMinigame), with the caller to go back to. Kept by hot reload and slots. */
+  minigameCall: MinigameCall | null = null;
+  /** startMinigame / endMinigame requested this frame (applied at its end). */
+  private pendingMinigame: MinigameRequest | null = null;
   /** Seed of the game's random generator. */
   readonly seed: number;
   private readonly scripts: ScriptLibrary;
@@ -327,6 +334,50 @@ export class Game implements SlotHost {
     return this.scriptRunner.itemUsed(target, item, by);
   }
 
+  /**
+   * Opens `scene` as a minigame at the end of the frame: the current scene is kept as it is and comes back
+   * with endMinigame(result). `params` (JSON) are read in the minigame with game.minigame.params.
+   */
+  startMinigame(scene: string, params: Record<string, unknown> = {}) {
+    if (typeof scene !== 'string' || !this.project.scenes[scene]) throw new Error(`startMinigame: scene "${scene}" does not exist`);
+    if (this.minigameCall || this.pendingMinigame) throw new Error('startMinigame: a minigame is already running (end it with endMinigame first)');
+    if (scene === this.world.scene.id) throw new Error(`startMinigame: "${scene}" is the current scene`);
+    if (params === null || typeof params !== 'object' || Array.isArray(params)) throw new Error('startMinigame(scene, params): params must be an object');
+    this.pendingMinigame = { kind: 'start', scene, params: jsonCopy(params, 'startMinigame params') };
+    this.world.emit('minigame_start', { scene, from: this.world.scene.id, params: structuredClone(this.pendingMinigame.params) });
+  }
+
+  /** Ends the minigame at the end of the frame: the caller comes back as it was and gets "minigame_end" with `result` (JSON). */
+  endMinigame(result: unknown = null) {
+    if (!this.minigameCall) throw new Error('endMinigame: no minigame is running');
+    if (this.pendingMinigame?.kind === 'end') return;
+    this.pendingMinigame = { kind: 'end', result: jsonCopy(result ?? null, 'endMinigame result') };
+  }
+
+  /** The minigame being played (scene, caller, params) or null. */
+  get minigame(): MinigameInfo | null {
+    const c = this.minigameCall;
+    return c ? { scene: c.scene, from: c.from, params: structuredClone(c.params) } : null;
+  }
+
+  private applyMinigame(req: MinigameRequest) {
+    const now = { frame: this.world.frame, time: this.world.time };
+    if (req.kind === 'start') {
+      const from = this.world.scene.id;
+      const caller = captureHotState(this);
+      this.loadScene(req.scene, {});
+      this.minigameCall = { scene: req.scene, from, params: req.params, startedAt: now.time, caller };
+      this.console.log(`Minigame "${req.scene}" started from "${from}"`, 'engine');
+      return;
+    }
+    const call = this.minigameCall!;
+    this.minigameCall = null;
+    this.loadScene(call.from, {});
+    restoreHotState(this, call.caller, { keepTime: now });
+    this.world.emit('minigame_end', { scene: call.scene, from: call.from, params: call.params, result: req.result, ms: Math.round((now.time - call.startedAt) * 1000) });
+    this.console.log(`Minigame "${call.scene}" ended; back to "${call.from}"`, 'engine');
+  }
+
   /** Shows an observation to the player if its cooldowns and priority allow (see Notifier); returns whether it did. */
   notify(kind: string, text: string, options?: NotifyOptions): boolean {
     return this.notifications.notify(kind, text, options);
@@ -355,6 +406,7 @@ export class Game implements SlotHost {
     this.world = new World(this.project.config, structuredClone(scene), this.input, this.console, new Rng(this.seed), vars);
     this.world.prefabs = this.project.prefabs ?? {};
     this.world.slots = this;
+    this.world.minigames = this;
     this.world.economy = this.economy;
     this.world.notifier = this.notifications;
     this.world.particles.reseed(this.seed);
@@ -441,6 +493,8 @@ export class Game implements SlotHost {
     this.storage.reset();
     this.saves.reset();
     this.pendingSlot = null;
+    this.minigameCall = null;
+    this.pendingMinigame = null;
     this.console.log('Game restarted', 'engine');
     this.loadScene(this.options.scene ?? this.project.config.startScene, {});
   }
@@ -506,7 +560,12 @@ export class Game implements SlotHost {
     w.time += dt;
     this.clock.tick();
 
-    if (w.pendingScene) {
+    if (this.pendingMinigame) {
+      const req = this.pendingMinigame;
+      this.pendingMinigame = null;
+      w.pendingScene = null;
+      this.applyMinigame(req);
+    } else if (w.pendingScene) {
       const next = w.pendingScene;
       w.pendingScene = null;
       this.loadScene(next);
@@ -649,6 +708,7 @@ export class Game implements SlotHost {
       ...(query.storage && { storage: this.storage.snapshot() }),
       ...(this.saves.list().length && { slots: this.saves.list() }),
       ...this.economy.snapshot(),
+      ...(this.minigameCall && { minigame: this.minigame! }),
     };
   }
 }

@@ -230,10 +230,10 @@ function observe(game, kind, text, cooldownMin = 0, priority = 1) {
  * Sinal de personalidade: um comportamento típico de um traço forte ("alto" ou "baixo"). Só conta se o
  * pet realmente é assim; vira evidência (Knowledge "jeito:eixo:dir") e o diário passa de "talvez" a "é".
  */
-function reveal(axis, dir) {
+function reveal(axis, dir, weight = 0.5) {
   const v = T(axis);
   if (dir === 'alto' ? v < HIGH : v > LOW) return;
-  saber(gameRef, `jeito:${axis}:${dir}`, 0.5);
+  saber(gameRef, `jeito:${axis}:${dir}`, weight);
 }
 
 function emote(game, self, glyph, color) {
@@ -1104,6 +1104,109 @@ function finish(game, self) {
 
 // ---------------------------------------------------------------- interações (API)
 
+// ---------------------------------------------------------------- minigames (engine: game.startMinigame / endMinigame)
+//
+// Brincar junto é uma cena à parte (o quarto fica guardado como estava e volta no fim). O pet leva para lá o
+// que o jogo precisa saber dele (forma, jeito, gostos) e volta com o que aconteceu: aqui isso vira diversão,
+// cansaço, lembrança de ter brincado com você, pistas dos gostos dele, moedas e uma página no diário.
+
+const JOGOS = {
+  pegar: { nome: 'Pega-pega', cena: 'pegar', energia: -10, fome: -4 },
+  caixinhas: { nome: 'Caixinhas', cena: 'caixinhas', energia: -4, fome: 0 },
+};
+const MOEDAS_JOGO_DIA = 15;
+
+function moedasDeJogoHoje(game) {
+  const dia = Math.floor((game.clock.now + localOffset) / DAY);
+  if (!pet.jogosDia || pet.jogosDia.dia !== dia) pet.jogosDia = { dia, moedas: 0 };
+  return pet.jogosDia;
+}
+
+/** Por que ele não quer brincar agora (ou null). */
+function semVontadeDeJogar() {
+  if (pet.asleep) return '{n} está dormindo.';
+  if (pet.sick) return '{n} não está se sentindo bem para brincar.';
+  if (pet.needs.energia < 20) return '{n} está cansado demais para brincar agora.';
+  if (pet.needs.fome < 15) return '{n} está com fome demais para brincar.';
+  return null;
+}
+
+function jogar(game, self, jogo) {
+  const j = JOGOS[jogo];
+  if (!j) return { ok: false, reason: 'jogo' };
+  const nao = semVontadeDeJogar();
+  if (nao) {
+    observe(game, 'semJogo', nao, 0, 2); // resposta ao seu clique: aparece sempre
+    return { ok: false, reason: nao };
+  }
+  terminarRefeicao(game, self, false);
+  const st = STAGES[pet.stage];
+  const params = {
+    jogo,
+    nome: pet.name,
+    quadros: [...st.frames],
+    tamanho: st.size,
+    pe: st.foot,
+    jeito: { atividade: T('atividade'), curiosidade: T('curiosidade'), paciencia: T('paciencia'), brincadeira: T('brincadeira') },
+    // O que ele acha de cada comida (o jogo mostra a reação; o diário só aprende com o que você vê).
+    comidas: game.items.list({ category: 'comida' }).map((it) => ({ id: it.id, icon: it.icon || '•', nivel: me.prefs.item(it.id).level })),
+    moedas: Math.max(0, MOEDAS_JOGO_DIA - moedasDeJogoHoje(game).moedas),
+  };
+  save(game);
+  game.startMinigame(j.cena, params);
+  return { ok: true };
+}
+
+/** De volta ao quarto depois de um minigame: o que a brincadeira fez com ele. */
+function voltouDoJogo(game, self, ev) {
+  const r = ev.result || {};
+  const j = JOGOS[r.jogo];
+  if (!j) return;
+  const animo = Math.max(0, Math.min(1, Number(r.animo) || 0));
+  const n = pet.needs;
+  n.diversao = clamp(n.diversao + 12 + animo * 18);
+  n.afeto = clamp(n.afeto + 6);
+  n.energia = clamp(n.energia + j.energia);
+  n.fome = clamp(n.fome + j.fome);
+  pet.care.brincadeiras++;
+  lembrar('brincouComVoce', 'voce', 1, 0.6);
+  me.routine.record('brincar');
+  // As reações que você viu no jogo são pistas dos gostos (mais fracas do que dar de comer, mas uma partida já dá um "talvez").
+  for (const [id, nivel] of Object.entries(r.reacoes || {})) if (game.items.get(id) && VERBO[nivel]) gostoVisto(game, id, nivel, 0.6);
+  // O jeito dele aparece no jogo: rápido (ativo), farejador (curioso), sem paciência para esperar.
+  if (r.jogo === 'pegar') reveal('atividade', 'alto', 1);
+  if (r.farejou) reveal('curiosidade', 'alto', 1);
+  if (r.naoEsperou) reveal('paciencia', 'baixo', 1);
+  if (animo >= 0.6) reveal('brincadeira', 'alto');
+  const hoje = moedasDeJogoHoje(game);
+  const moedas = Math.min(Math.max(0, Math.floor(Number(r.moedas) || 0)), MOEDAS_JOGO_DIA - hoje.moedas);
+  if (moedas > 0) {
+    hoje.moedas += moedas;
+    ganhar(game, moedas, 'jogo');
+  }
+  pet.jogos = pet.jogos || {};
+  const rec = pet.jogos[r.jogo] || { vezes: 0, melhor: 0 };
+  const primeira = rec.vezes === 0;
+  const recorde = !primeira && (Number(r.pontos) || 0) > rec.melhor;
+  rec.vezes++;
+  rec.melhor = Math.max(rec.melhor, Number(r.pontos) || 0);
+  pet.jogos[r.jogo] = rec;
+  if (primeira) anotar(game, 'lembranca', `Brincou de ${j.nome} com você pela primeira vez.`, `jogo:${r.jogo}`, 0.6);
+  else if (recorde) anotar(game, 'lembranca', `Foi melhor do que nunca no ${j.nome}.`, undefined, 0.4);
+  const frase = recorde
+    ? `{n} foi melhor do que nunca no ${j.nome}!`
+    : animo >= 0.6
+      ? `{n} adorou brincar de ${j.nome} com você!`
+      : animo >= 0.25
+        ? `{n} se divertiu brincando de ${j.nome} com você.`
+        : `{n} brincou de ${j.nome} com você, meio sem jeito.`;
+  observe(game, 'jogo', frase, 0, 2);
+  emote(game, self, '♥', '#ff8fab');
+  if (animo >= 0.6) self.after(300, () => emote(game, self, '♥', '#ff8fab'));
+  mind = { act: 'happy', t: 1.4 };
+  save(game);
+}
+
 function makeApi(game, self) {
   const awake = () => !pet.asleep;
   return {
@@ -1209,6 +1312,10 @@ function makeApi(game, self) {
       const item = e && game.items.get(String(e.props.item));
       if (item && item.category === 'ambiente') verCoisa(game, self, id);
       else verBrinquedo(game, self, id, como || 'novo');
+    },
+    /** Brincar junto (minigame "pegar" ou "caixinhas"): {ok} ou {ok: false, reason} se ele não quer agora. */
+    jogar(jogo) {
+      return jogar(game, self, jogo);
     },
     /** Você abriu ou fechou a cortina. */
     cortina() {
@@ -1509,6 +1616,7 @@ function mudouGosto(game, ev) {
 
 /** Uma lembrança forte que se apagou também é parte da história; um gosto que mudou também. */
 function onEvent(self, ev, game) {
+  if (ev.type === 'minigame_end') return voltouDoJogo(game, self, ev);
   if (ev.type === 'preference_change' && ev.entity === self.id) return mudouGosto(game, ev);
   if (ev.type !== 'memory_forgotten' || ev.entity !== self.id || ev.memory !== 'susto' || ev.importance < 0.7) return;
   const item = game.items.get(String(ev.subject));

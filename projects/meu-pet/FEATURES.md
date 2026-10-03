@@ -433,6 +433,26 @@ procurando alguma coisa." · "{n} ficou animado!" · "{n} parece gostar do carin
   "Está crescendo muito bem cuidado." — sem números.
 - Ao evoluir: pulsa, som, a forma entra na coleção.
 
+## 10a. Brincar junto: minigames (V0.7 fase 11)
+
+- Botão **Brincar** (à direita, abaixo de Coisas) abre dois jogos. Cada um é uma cena à parte (engine
+  `startMinigame` / `endMinigame`): o quarto fica guardado como estava e volta igual no fim.
+- O pet leva para o jogo a forma, o jeito (atividade, curiosidade, paciência) e o que acha de cada comida.
+- **Pega-pega** (30 s): comidas e estrelas caem; você guia o pet com o mouse. A cada comida ele reage pelo gosto
+  (♥ gosta/adora, nada se é indiferente, 💢 e para um instante se não gosta/detesta). Pets **ativos correm mais**.
+  O tempo é uma barra; o que ele pegou aparece em fila no alto. No fim: "pegou bastante coisa", "Ficou feliz com: 🍎",
+  "Fez careta para: 🐟" e as moedas.
+- **Caixinhas** (3 rodadas): o **ossinho 🦴** — só do jogo: não se compra, não é comida, não mata a fome — entra
+  numa caixa, as caixas se embaralham (cada vez mais trocas e mais rápido) e você clica onde está. O pet vai abrir e
+  fica feliz (♥♥ se você acertou); errou, ele fareja até a certa. Achar é sempre bom: nenhum gosto envolvido. Um pet **curioso** fareja e chega perto da caixa certa antes de você escolher (uma dica, se você olhar
+  para ele); um **sem paciência** não espera e vai abrir uma sozinho se você demora. No fim: ✅ ❌ por rodada.
+- **Na volta ao quarto**: diversão sobe (mais se foi bem), afeto +6, cansa (Pega-pega cansa mais, e gasta um pouco
+  de fome); lembrança "brincou com você" (conta para a relação e a evolução); as reações viram **pistas no diário**
+  ("Talvez adore maçã" já na primeira partida) e o jogo mostra o jeito (rápido, farejador, impaciente); moedas (até 6
+  por partida, 15 por dia em jogos); página "Brincou de Pega-pega com você pela primeira vez" e "foi melhor do que
+  nunca" num recorde; observação "{n} adorou brincar de Pega-pega com você!".
+- **Recusa**: dormindo, doente, cansado demais ou com fome demais, ele não vai (e a observação diz por quê).
+
 ## 11. Coleção ("pokédex") e novo pet
 
 - Toda forma alcançada fica registrada (com o nome do pet que a revelou), mesmo depois de trocar de pet.

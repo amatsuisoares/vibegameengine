@@ -21,6 +21,7 @@ import { topmostAt, type InteractionRunner, type InteractResult, type InteractVi
 import { emitSound } from './sound';
 import type { GameStorage } from './storage';
 import type { SlotHost, SlotInfo } from './saves';
+import type { MinigameHost } from './minigame';
 import { screenToWorld } from './systems/camera';
 import { applyDamage } from './systems/interactions';
 import { FIXED_DT, type GameEvent, type World } from './world';
@@ -59,7 +60,7 @@ export interface ScriptHooks {
 const HOOKS = ['onStart', 'onUpdate', 'onCollision', 'onClick', 'onEvent', 'onInteract', 'onStateChange', 'onDecision', 'onItem'] as const;
 
 /** What scripts reach beyond the world: the calendar clock, the saved data, interactions and state machines. */
-export interface ScriptHost extends SlotHost {
+export interface ScriptHost extends SlotHost, MinigameHost {
   clock: GameClock;
   storage: GameStorage;
   readonly interactions: InteractionRunner;
@@ -418,6 +419,15 @@ export interface ScriptGame {
   nearbyInteractables(actor: string | ScriptEntity): NearbyInteractable[];
   /** Environment (Ambient emitters) at a point or an entity: {light, noise, ...} = what reaches it. */
   env(x: number | string | ScriptEntity, y?: number): Record<string, number>;
+  /**
+   * Opens a scene as a minigame at the end of the frame: this scene is kept as it is and comes back with
+   * endMinigame. `params` (JSON) are read there in game.minigame.params.
+   */
+  startMinigame(scene: string, params?: Record<string, unknown>): void;
+  /** In a minigame: goes back to the calling scene (as it was) and emits "minigame_end" {scene, from, params, result, ms} there. */
+  endMinigame(result?: unknown): void;
+  /** The minigame being played ({scene, from, params}) or null. */
+  readonly minigame: { scene: string; from: string; params: Record<string, unknown> } | null;
   /** The item catalog: get(id) (null if unknown), has(id), list({category?, tag?}). */
   readonly items: { get(id: string): ItemInfo | null; has(id: string): boolean; list(filter?: ItemFilter): ItemInfo[] };
   /** An inventory (default "default"): count, has, add, remove, list({category, tag}), size. Kept in storage. */
@@ -582,6 +592,11 @@ class ScriptApi {
         return envAt(w, at.x, at.y);
       },
       nearbyInteractables: (actor) => host.interactions.nearby(resolve(actor, 'game.nearbyInteractables')),
+      startMinigame: (scene, params) => host.startMinigame(scene, params),
+      endMinigame: (result) => host.endMinigame(result),
+      get minigame() {
+        return host.minigame;
+      },
       items: {
         get: (id) => host.items.get(String(id)),
         has: (id) => host.items.has(String(id)),

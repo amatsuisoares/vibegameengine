@@ -1,0 +1,13 @@
+{
+  "tags": ["queda"],
+  "components": {
+    "Text": {
+      "text": "",
+      "fontSize": 40,
+      "font": "sans-serif",
+      "align": "center",
+      "screenSpace": false,
+      "layer": 20
+    }
+  }
+}

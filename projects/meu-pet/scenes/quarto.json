@@ -662,6 +662,39 @@
         "Collider": { "width": 40, "height": 30, "isTrigger": true },
         "Script": { "src": "scripts/diarioSeta.js", "props": { "dir": 1 } }
       }
+    },
+    {
+      "id": "botaoJogos",
+      "prefab": "botao",
+      "enabled": true,
+      "transform": { "x": 880, "y": 174 },
+      "components": {
+        "Sprite": { "width": 140, "color": "#6b3f7a" },
+        "Text": { "text": "Brincar" },
+        "Script": { "props": { "acao": "jogos" } }
+      }
+    },
+    {
+      "id": "jogoPegar",
+      "prefab": "botao",
+      "enabled": false,
+      "transform": { "x": 880, "y": 214 },
+      "components": {
+        "Sprite": { "width": 140, "color": "#4d3a63" },
+        "Text": { "text": "Pega-pega" },
+        "Script": { "props": { "acao": "jogo", "jogo": "pegar" } }
+      }
+    },
+    {
+      "id": "jogoCaixinhas",
+      "prefab": "botao",
+      "enabled": false,
+      "transform": { "x": 880, "y": 252 },
+      "components": {
+        "Sprite": { "width": 140, "color": "#4d3a63" },
+        "Text": { "text": "Caixinhas" },
+        "Script": { "props": { "acao": "jogo", "jogo": "caixinhas" } }
+      }
     }
   ]
 }

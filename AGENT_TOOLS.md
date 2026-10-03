@@ -158,7 +158,8 @@ Ações: `setVar {var, value}`, `addVar {var, amount}`, `emit {event, data?}`, `
 `destroy {target}`, `setEnabled {target, enabled}`, `setText {target, text}`, `damage {target, amount}`,
 `heal {target, amount}`, `move {target, x?, y?}`, `modify {target, component, set}`, `log {message}`,
 `playSound {asset, volume?}`, `spawn {prefab, x?, y?, at?, id?}`, `saveSlot {slot, label?}`, `loadSlot {slot}`,
-`deleteSlot {slot}` (slots de save; ver [Save slots](#save-slots)), `after {ms, do: [ações], id?}` (roda as ações
+`deleteSlot {slot}` (slots de save; ver [Save slots](#save-slots)), `startMinigame {scene, params?}`, `endMinigame {result?}`
+(ver [Minigames](#minigames-startminigame--endminigame)), `after {ms, do: [ações], id?}` (roda as ações
 depois de um tempo; ver [Timers](#timers)), `cancelTimer {id}`, `tween {target, prop, to, ms, from?, ease?, yoyo?,
 repeat?}` (ver [Tweens](#tweens)), `burst {target, count?}` (rajada de partículas; ver [Partículas](#partículas-particleemitter)).
 `target` é um id, `"$by"` (quem entrou na zona, ou o `by`/`entity` do evento) ou `"$entity"` (a zona, ou o `entity`
@@ -453,6 +454,25 @@ lugar só, com as regras que evitam spam:
   `vibe.notifications` com os cooldowns.
 - **Regras:** ação `notify {kind, text, cooldownMs?, realCooldownMs?, priority?}`.
 - **Config:** `notifications: {minGapMs: 0, logSize: 50}` em `project.json` (`modify_project_config`).
+
+## Minigames (`startMinigame` / `endMinigame`)
+
+Implementado na V0.7 (`engine/src/minigame.ts`). Um minigame é uma **cena chamada como uma função**: recebe
+parâmetros, devolve um resultado, e a cena que chamou volta exatamente como estava.
+
+- `game.startMinigame(cena, params?)` (no fim do frame): guarda a cena atual (o mesmo estado do hot reload: posições,
+  variáveis, valores de componentes, entidades criadas) e abre `cena`. Lá, `game.minigame` = `{scene, from, params}`
+  (`null` fora de um minigame). Emite `minigame_start {scene, from, params}`.
+- `game.endMinigame(resultado?)` (no fim do frame): volta para a cena que chamou, restaurada, e emite nela
+  `minigame_end {scene, from, params, result, ms}` (os scripts recebem no `onEvent`, as regras com
+  `{"event": "minigame_end"}`). Os scripts da cena que volta rodam `onStart` de novo, como depois de um hot reload:
+  o que precisa sobreviver fica no `game.storage` ou em componentes.
+- `params` e `result` são JSON (até 64 000 caracteres). Erros: cena inexistente, já há um minigame, `endMinigame`
+  fora de um minigame. Um minigame por vez (sem aninhar).
+- **Regras:** ações `startMinigame {scene, params?}` e `endMinigame {result?}`.
+- **Estado:** `inspect_game_state` mostra `minigame` durante um; hot reload e save slots guardam a chamada (dá para
+  terminar o minigame depois). Fechar o jogo no meio volta pela cena inicial, como qualquer estado em execução.
+- O jogo decide o que o resultado vale (moedas, necessidades, memória): a engine só entrega.
 
 ## Animação (`Animator`)
 

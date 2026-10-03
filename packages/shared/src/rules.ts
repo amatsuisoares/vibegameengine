@@ -82,6 +82,15 @@ const immediateActions = [
   z.strictObject({ action: z.literal('loadSlot'), slot: SlotName.describe('Loaded at the end of the frame; nothing happens (a log line) if it does not exist.') }),
   z.strictObject({ action: z.literal('deleteSlot'), slot: SlotName }),
   z.strictObject({
+    action: z.literal('startMinigame'),
+    scene: z.string().min(1).describe('Scene opened as a minigame; this scene comes back as it is with endMinigame.'),
+    params: z.record(z.string(), z.unknown()).optional().describe('Read in the minigame with game.minigame.params.'),
+  }),
+  z.strictObject({
+    action: z.literal('endMinigame'),
+    result: z.unknown().optional().describe('Delivered to the caller in the "minigame_end" event (result).'),
+  }),
+  z.strictObject({
     action: z.literal('giveItem'),
     item: z.string().min(1).describe('Catalog item id (items/<id>.json).'),
     count: z.number().int().min(1).default(1),

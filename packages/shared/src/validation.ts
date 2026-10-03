@@ -60,6 +60,7 @@ function actionErrors(
       else if (!ref.startsWith('$') && ids && !ids.has(ref)) errors.push(`${at}[${i}].${field}: entity "${ref}" does not exist`);
     }
     if (a.action === 'loadScene' && project && !project.scenes[a.scene]) errors.push(`${at}[${i}].scene: scene "${a.scene}" does not exist`);
+    if (a.action === 'startMinigame' && project && !project.scenes[a.scene]) errors.push(`${at}[${i}].scene: scene "${a.scene}" does not exist`);
     if (a.action === 'spawn' && project && !project.prefabs[a.prefab]) errors.push(`${at}[${i}].prefab: prefab "${a.prefab}" does not exist`);
     if ((a.action === 'giveItem' || a.action === 'takeItem') && project && !project.items[a.item]) errors.push(`${at}[${i}].item: item "${a.item}" does not exist`);
     if (a.action === 'modify' && !(COMPONENT_TYPES as string[]).includes(a.component)) {

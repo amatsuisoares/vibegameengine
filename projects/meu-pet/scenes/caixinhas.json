@@ -1,0 +1,184 @@
+{
+  "id": "caixinhas",
+  "name": "Caixinhas",
+  "background": "#3d3352",
+  "width": 960,
+  "height": 540,
+  "entities": [
+    {
+      "id": "jogo",
+      "transform": { "x": 0, "y": 0 },
+      "components": { "Script": { "src": "scripts/caixinhas.js" } }
+    },
+    {
+      "id": "chao",
+      "transform": { "x": 480, "y": 505 },
+      "components": { "Sprite": { "width": 960, "height": 70, "color": "#5b4636", "layer": 1 } }
+    },
+    {
+      "id": "mesa",
+      "transform": { "x": 480, "y": 312 },
+      "components": { "Sprite": { "width": 620, "height": 24, "color": "#6e4b2f", "layer": 2 } }
+    },
+    {
+      "id": "titulo",
+      "transform": { "x": 24, "y": 22 },
+      "components": {
+        "Text": {
+          "text": "Caixinhas",
+          "fontSize": 24,
+          "font": "sans-serif",
+          "color": "#ffe28a",
+          "screenSpace": false,
+          "layer": 30
+        }
+      }
+    },
+    {
+      "id": "dica",
+      "transform": { "x": 480, "y": 70 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 19,
+          "font": "sans-serif",
+          "color": "#e9e3ff",
+          "screenSpace": false,
+          "align": "center",
+          "maxWidth": 700,
+          "layer": 30
+        }
+      }
+    },
+    {
+      "id": "petisco",
+      "enabled": false,
+      "transform": { "x": 480, "y": 120 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 40,
+          "font": "sans-serif",
+          "color": "#e9e3ff",
+          "screenSpace": false,
+          "align": "center",
+          "layer": 4
+        }
+      }
+    },
+    {
+      "id": "cx0",
+      "transform": { "x": 300, "y": 250 },
+      "components": {
+        "Sprite": { "width": 130, "height": 100, "color": "#b98b52", "layer": 5 },
+        "Text": {
+          "text": "",
+          "fontSize": 38,
+          "font": "sans-serif",
+          "color": "#e9e3ff",
+          "screenSpace": false,
+          "align": "center",
+          "layer": 8
+        },
+        "Script": { "src": "scripts/caixaJogo.js", "props": { "i": 0 } }
+      }
+    },
+    {
+      "id": "tampa0",
+      "transform": { "x": 300, "y": 195 },
+      "components": {
+        "Sprite": { "width": 144, "height": 24, "color": "#8a5f33", "layer": 7 },
+        "Script": { "src": "scripts/caixaJogo.js", "props": { "i": 0 } }
+      }
+    },
+    {
+      "id": "cx1",
+      "transform": { "x": 480, "y": 250 },
+      "components": {
+        "Sprite": { "width": 130, "height": 100, "color": "#b98b52", "layer": 5 },
+        "Text": {
+          "text": "",
+          "fontSize": 38,
+          "font": "sans-serif",
+          "color": "#e9e3ff",
+          "screenSpace": false,
+          "align": "center",
+          "layer": 8
+        },
+        "Script": { "src": "scripts/caixaJogo.js", "props": { "i": 1 } }
+      }
+    },
+    {
+      "id": "tampa1",
+      "transform": { "x": 480, "y": 195 },
+      "components": {
+        "Sprite": { "width": 144, "height": 24, "color": "#8a5f33", "layer": 7 },
+        "Script": { "src": "scripts/caixaJogo.js", "props": { "i": 1 } }
+      }
+    },
+    {
+      "id": "cx2",
+      "transform": { "x": 660, "y": 250 },
+      "components": {
+        "Sprite": { "width": 130, "height": 100, "color": "#b98b52", "layer": 5 },
+        "Text": {
+          "text": "",
+          "fontSize": 38,
+          "font": "sans-serif",
+          "color": "#e9e3ff",
+          "screenSpace": false,
+          "align": "center",
+          "layer": 8
+        },
+        "Script": { "src": "scripts/caixaJogo.js", "props": { "i": 2 } }
+      }
+    },
+    {
+      "id": "tampa2",
+      "transform": { "x": 660, "y": 195 },
+      "components": {
+        "Sprite": { "width": 144, "height": 24, "color": "#8a5f33", "layer": 7 },
+        "Script": { "src": "scripts/caixaJogo.js", "props": { "i": 2 } }
+      }
+    },
+    {
+      "id": "pet",
+      "transform": { "x": 480, "y": 440 },
+      "components": { "Sprite": { "asset": "bebe_1", "width": 180, "height": 180, "layer": 10 } }
+    },
+    {
+      "id": "painel",
+      "enabled": false,
+      "transform": { "x": 480, "y": 270 },
+      "components": { "Sprite": { "width": 520, "height": 260, "color": "#3e3763", "layer": 60 } }
+    },
+    {
+      "id": "resumo",
+      "enabled": false,
+      "transform": { "x": 480, "y": 236 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 22,
+          "font": "sans-serif",
+          "color": "#ffffff",
+          "screenSpace": false,
+          "align": "center",
+          "maxWidth": 470,
+          "layer": 61
+        }
+      }
+    },
+    {
+      "id": "botaoVoltarJogo",
+      "prefab": "botao",
+      "enabled": false,
+      "transform": { "x": 480, "y": 360 },
+      "components": {
+        "Sprite": { "width": 200, "color": "#2f7d4f" },
+        "Text": { "text": "Voltar ao quarto" },
+        "Script": { "props": { "acao": "voltarJogo" } }
+      }
+    }
+  ]
+}

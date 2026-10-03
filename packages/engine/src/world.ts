@@ -9,6 +9,7 @@ import { ParticleSystem } from './particles';
 import type { Economy } from './economy';
 import type { Notifier } from './notifier';
 import type { SlotHost } from './saves';
+import type { MinigameHost } from './minigame';
 
 export type GameStatus = 'running' | 'won' | 'lost' | 'crashed';
 
@@ -43,6 +44,8 @@ export class World {
   pendingScene: string | null = null;
   /** Save slots (set by the Game) for rule actions. */
   slots: SlotHost | null = null;
+  /** Minigame calls (set by the Game) for rule actions. */
+  minigames: MinigameHost | null = null;
   /** Inventories, wallets and shop (set by the Game) for rule actions. */
   economy: Economy | null = null;
   /** The game's notifier (game.notify), for the rule action "notify". */

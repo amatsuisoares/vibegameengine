@@ -2,6 +2,7 @@ import type { EntityData, VarValue } from '@vibe/shared';
 import { Entity } from './entity';
 import type { FsmState } from './fsm';
 import type { Game } from './game';
+import type { MinigameCall } from './minigame';
 import type { RuleRunnerState } from './rules';
 
 /**
@@ -63,6 +64,8 @@ export interface HotState {
   rules: RuleRunnerState;
   /** The old project's prefabs (to merge spawned entities). */
   prefabs: Record<string, Raw>;
+  /** Inside a minigame: the call (with the caller to go back to). */
+  minigame?: MinigameCall;
 }
 
 export interface HotRestoreReport {
@@ -176,6 +179,7 @@ export function captureHotState(game: Game): HotState {
         };
       }),
     prefabs: structuredClone(game.project.prefabs ?? {}) as Record<string, Raw>,
+    ...(game.minigameCall && { minigame: structuredClone(game.minigameCall) }),
   };
 }
 
@@ -211,6 +215,7 @@ export function restoreHotState(game: Game, state: HotState, options: RestoreOpt
     return report;
   }
   if (game.world.scene.id !== state.scene) game.loadScene(state.scene, {});
+  game.minigameCall = state.minigame ? structuredClone(state.minigame) : null;
   const w = game.world;
   const shift = options.keepTime ? options.keepTime.frame - state.frame : 0;
   w.frame = options.keepTime?.frame ?? state.frame;

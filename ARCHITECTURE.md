@@ -290,6 +290,12 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   histórico em `storage["vibe.notifications"]`; cooldowns reais e a última prioridade em memória, medidos em
   `world.time` (tempo simulado, não muda com `clock.speed`). Emite `notification`; a ação de regra `notify` usa o
   mesmo objeto (`world.notifier`).
+- **Minigames** (V0.7, `engine/src/minigame.ts`): `Game.startMinigame` / `endMinigame` só registram o pedido; no fim do
+  frame (como `loadScene`, e com prioridade sobre ele) o `Game` captura a cena atual com `captureHotState`, carrega a
+  do minigame e guarda `minigameCall` (cena, origem, params, estado do chamador). No fim, recarrega a origem,
+  `restoreHotState(..., {keepTime})` e emite `minigame_end` no mundo novo (o `ScriptRunner` novo começa antes do
+  evento, então o `onEvent` da cena restaurada o recebe). A chamada faz parte do `HotState` (`minigame`), então hot
+  reload e save slots a preservam; `restart` a descarta. Regras chegam por `world.minigames`.
 - **Itens** (V0.7, `engine/src/items.ts`): `Project.items` (de `items/<id>.json`) vira um `ItemCatalog` só de leitura no
   `Game`. `Game.useItem(item, alvo, por?)` emite `item_used` e chama `ScriptRunner.itemUsed` → hook `onItem` do alvo,
   devolvendo o retorno do hook (clonado como JSON). A engine não interpreta o item: o alvo decide, normalmente pelo

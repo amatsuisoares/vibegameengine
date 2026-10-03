@@ -1,4 +1,5 @@
-// Botão. props.acao: comida | loja | brinquedos | remedio | diario | velocidade | colecao | novoPet | voltar.
+// Botão. props.acao: comida | loja | brinquedos | remedio | diario | velocidade | colecao | novoPet | voltar
+// | jogos (abre o menu de brincar) | jogo (props.jogo: pegar | caixinhas) | voltarJogo (fim de um minigame).
 const SPEEDS = [1, 60, 600];
 const MOEDA = 'moedas';
 let confirmUntil = -1;
@@ -48,6 +49,14 @@ function onEvent(self, ev, game) {
   e.props.color = '#ffd166';
 }
 
+/** O menu de brincar (os botões dos minigames, logo abaixo do "Brincar"). */
+function menuDeJogos(game, open) {
+  for (const id of ['jogoPegar', 'jogoCaixinhas']) {
+    const e = game.entity(id);
+    if (e) e.enabled = open;
+  }
+}
+
 /** Mostra ou esconde o diário (painel, texto e o botão de novo pet, que só aparece na fase adulta). */
 function toggleDiary(game, open) {
   const pet = game.entity('pet');
@@ -75,6 +84,20 @@ function onClick(self, game) {
     case 'brinquedos':
       painel(game, 'caixa');
       break;
+    case 'jogos': {
+      const aberto = game.entity('jogoPegar') && game.entity('jogoPegar').enabled;
+      menuDeJogos(game, !aberto);
+      break;
+    }
+    case 'jogo':
+      menuDeJogos(game, false);
+      if (api) api.jogar(self.props.jogo);
+      break;
+    case 'voltarJogo': {
+      const jogo = game.entity('jogo');
+      if (jogo && jogo.state.voltar) jogo.state.voltar();
+      break;
+    }
     case 'remedio':
       if (api) api.remedio();
       break;

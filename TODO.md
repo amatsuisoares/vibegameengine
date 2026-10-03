@@ -342,7 +342,14 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
 - [x] **Fase 10 — Evolução por histórico** (só jogo, nenhuma peça nova na engine): jovem pela vida que levou (pesos
   da `Routine` + brincadeiras e carinhos), adulto pelo cuidado (bem-estar, relação com você, variedade de comida); ao
   crescer, observação e página do diário dizem por quê; a aba Jeito mostra "Crescendo" (para onde ele vai)
-- [ ] **Fase 11 — Minigames** (`startMinigame`/`endMinigame` + 1–2 minigames)
+- [x] **Fase 11 — Minigames**: engine `startMinigame(cena, params)` / `endMinigame(resultado)` (cena chamada como
+  função: a cena que chamou é guardada como no hot reload e volta igual; evento `minigame_end {scene, from, params,
+  result, ms}`; `game.minigame`; ações de regra; chamada preservada por hot reload e save slots; `minigame` no
+  `inspect_game_state`). No meu-pet, botão **Brincar** → **Pega-pega** (guiar o pet com o mouse; ele reage a cada
+  comida pelo gosto: ♥ / 💢; ativos correm mais) e **Caixinhas** (achar o ossinho embaralhado — só do jogo, não é comida; curioso fareja perto da
+  caixa certa, sem paciência não espera). Na volta: diversão, cansaço, lembrança de brincar com você, pistas de gostos
+  e de jeito no diário ("talvez" já na primeira partida), moedas (até 15/dia em jogos), página do diário na primeira vez;
+  recusa se dormindo, doente, cansado ou com fome
 - [ ] **Fase 12 — Polimento, balanceamento e avaliação das 10 perguntas de qualidade**
 
 ## ~~Etapa 9 — Teste final~~ — descartada

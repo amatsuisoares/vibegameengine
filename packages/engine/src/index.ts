@@ -32,3 +32,4 @@ export * from './individual';
 export * from './items';
 export * from './economy';
 export * from './routine';
+export * from './minigame';
