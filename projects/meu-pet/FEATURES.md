@@ -417,10 +417,21 @@ procurando alguma coisa." · "{n} ficou animado!" · "{n} parece gostar do carin
 ## 10. Ciclo de vida e evolução
 
 - **Bebê** (0–12 h de vida) → **Jovem** (12–36 h) → **Adulto** (36 h em diante, para sempre).
-- **Jovem 1 ou 2** (estilo de cuidado): Jovem 1 se `brincadeiras + petiscos×0,5 ≥ carinhos + sonecas×0,5`; senão Jovem 2.
-- **Adulto** (qualidade do cuidado, pelo bem-estar médio): ≥ 70 → **1**, ≥ 45 → **2**, abaixo → **3**. A letra vem da
-  linha do jovem: Jovem 1 → **a**, Jovem 2 → **b**. São 6 adultos diferentes (1a, 2a, 3a, 1b, 2b, 3b).
-- Ao evoluir: pulsa, som, "{n} cresceu!", a forma entra na coleção.
+- **Jovem 1 ou 2** (V0.7 fase 10: a vida que levou): soma o que ele mais fez na infância — os pesos da rotina
+  (`Routine`, toda decisão registrada) de brincar, explorar, passear, dançar, chamar para brincar (**ativo**) contra
+  descansar, cochilar, vir até você (**calmo**), mais brincadeiras com você ×1,5 (ativo) e carinhos ×1,5 (calmo).
+  Ativo → **Jovem 1**; calmo e carinhoso → **Jovem 2**. Como as decisões vêm do jeito dele e do que você faz, a forma
+  é dos dois.
+- **Adulto** (como foi cuidado): nota = bem-estar médio × 0,6 + relação com você × 0,25 + variedade de comida × 0,15
+  (relação: parte de 30, + lembranças de carinho e de brincar com você, + até 25 pelas interações, − se foi acordado
+  há pouco; variedade: 18 por comida provada). ≥ 70 → **1**, ≥ 45 → **2**, abaixo → **3**. A letra vem da linha do
+  jovem: Jovem 1 → **a**, Jovem 2 → **b**. São 6 adultos diferentes (1a, 2a, 3a, 1b, 2b, 3b).
+- **O diário explica**: ao crescer, "{n} cresceu! Passou a infância brincando e explorando o quarto." / "…Foi muito bem
+  cuidado, confia muito em você e come de tudo um pouco." (ou "passou por uns apertos", "gosta da sua companhia", "se
+  acostumou a ficar sozinho", "quase só conheceu ração"), e a mesma frase vira a página da história. **Antes** de
+  crescer, a aba Jeito tem "Crescendo": "Passa o tempo brincando e explorando o quarto: parece que vai crescer ativo." /
+  "Está crescendo muito bem cuidado." — sem números.
+- Ao evoluir: pulsa, som, a forma entra na coleção.
 
 ## 11. Coleção ("pokédex") e novo pet
 

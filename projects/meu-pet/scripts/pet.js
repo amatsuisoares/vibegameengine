@@ -640,24 +640,101 @@ function checkEvolution(game, self) {
   const age = ageHours(game.clock.now);
   let next = null;
   if (pet.stage === 'bebe' && age >= JUVENIL_AT) {
-    // Estilo de cuidado: mais brincadeira → linha 1; mais calma/carinho → linha 2.
-    const c = pet.care;
-    next = c.brincadeiras + c.petiscos * 0.5 >= c.carinhos + c.sonecas * 0.5 ? 'juvenil1' : 'juvenil2';
+    // A vida que levou: mais brincadeira e exploração → linha 1; mais calma, carinho e você por perto → linha 2.
+    next = `juvenil${historia().linha}`;
   } else if ((pet.stage === 'juvenil1' || pet.stage === 'juvenil2') && age >= ADULTO_AT) {
-    const tier = pet.wellbeing >= 70 ? '1' : pet.wellbeing >= 45 ? '2' : '3';
-    next = `adulto${tier}${pet.stage === 'juvenil1' ? 'a' : 'b'}`;
+    // Como foi cuidado: bem-estar médio, a relação com você e a variedade de comida.
+    next = `adulto${cuidado().tier}${pet.stage === 'juvenil1' ? 'a' : 'b'}`;
   }
   if (!next) return;
   pet.stage = next;
   applyStage(self);
   discover(game, next);
   mind = { act: 'evolve', t: 2.5 };
-  observe(game, 'evolucao', '{n} cresceu!');
-  anotar(game, 'evolucao', `Cresceu: agora é ${STAGES[next].label.toLowerCase()}.`, `estagio:${next}`, 1);
+  const porque = porQueCresceu(next);
+  observe(game, 'evolucao', `{n} cresceu! ${porque}`);
+  anotar(game, 'evolucao', `Cresceu: agora é ${STAGES[next].label.toLowerCase()}. ${porque}`, `estagio:${next}`, 1);
   if (isAdult()) observe(game, 'adulto', '{n} chegou à fase adulta! No Diário você pode começar com um novo pet.');
   game.emit('evolucao', { stage: next });
   game.playSound('sfx_evolucao');
   save(game);
+}
+
+// ---------------------------------------------------------------- evolução pela história dele
+//
+// A forma em que ele cresce sai da vida que levou, não de um sorteio: o que mais fez (Routine — cada decisão
+// fica registrada na faixa do dia), quanto brincou com você e recebeu carinho, quantas comidas conheceu e quão
+// bem foi cuidado. Ao crescer, o diário conta por quê; antes disso, a aba Jeito mostra para onde ele vai.
+
+// O que cada atividade conta para a linha da juventude: ativa (linha 1) ou calma e carinhosa (linha 2).
+const LADO = {
+  brincar: 'ativo', explorar: 'ativo', passear: 'ativo', dancar: 'ativo', chamar: 'ativo',
+  descansar: 'calmo', cochilar: 'calmo', procurar: 'calmo',
+};
+const FAZENDO = {
+  brincar: 'brincando', explorar: 'explorando o quarto', passear: 'andando pelo quarto', dancar: 'dançando',
+  chamar: 'chamando você para brincar', descansar: 'descansando', cochilar: 'tirando cochilos', procurar: 'perto de você',
+  carinhos: 'recebendo carinho',
+};
+
+/** O que ele mais fez na vida até aqui: pesos da rotina (todas as faixas do dia) + o que fez com você. */
+function historia() {
+  const r = (me.get('Routine') || {}).values || {};
+  const total = {};
+  for (const [a, w] of Object.entries(r)) if (LADO[a]) total[a] = w.reduce((s, v) => s + v, 0);
+  // Brincar com você conta como brincar; receber carinho é um lado à parte (calmo).
+  total.brincar = (total.brincar || 0) + pet.care.brincadeiras * 1.5;
+  total.carinhos = pet.care.carinhos * 1.5;
+  let ativo = 0;
+  let calmo = total.carinhos;
+  for (const [a, v] of Object.entries(total)) if (LADO[a] === 'ativo') ativo += v;
+  else if (LADO[a] === 'calmo') calmo += v;
+  const top = Object.entries(total)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([a]) => FAZENDO[a]);
+  return { ativo, calmo, linha: ativo >= calmo ? 1 : 2, top };
+}
+
+/** Como foi cuidado (0..100): bem-estar médio, a relação com você e a variedade de comida. */
+function cuidado() {
+  const provou = Object.keys(pet.provou || {}).length;
+  const relacao = Math.max(0, Math.min(100, 30 + lembranca('voce', 'carinho') * 40 + lembranca('voce', 'brincouComVoce') * 30 + Math.min(25, (pet.care.carinhos + pet.care.brincadeiras) * 2) - (lembranca('voce', 'acordado') < -0.3 ? 15 : 0)));
+  const variedade = Math.min(100, provou * 18);
+  const nota = pet.wellbeing * 0.6 + relacao * 0.25 + variedade * 0.15;
+  return { nota, relacao, provou, tier: nota >= 70 ? '1' : nota >= 45 ? '2' : '3' };
+}
+
+const juntar = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} e ${xs[xs.length - 1]}` : xs[0] || '');
+
+/** Por que ele cresceu assim (frase do diário). */
+function porQueCresceu(next) {
+  if (next.startsWith('juvenil')) {
+    const h = historia();
+    return h.top.length ? `Passou a infância ${juntar(h.top)}.` : 'Passou a infância tranquilo.';
+  }
+  const c = cuidado();
+  const partes = [c.nota >= 70 ? 'foi muito bem cuidado' : c.nota >= 45 ? 'foi bem cuidado' : 'passou por uns apertos'];
+  partes.push(c.relacao >= 70 ? 'confia muito em você' : c.relacao >= 45 ? 'gosta da sua companhia' : 'se acostumou a ficar sozinho');
+  if (c.provou >= 4) partes.push('come de tudo um pouco');
+  else if (c.provou <= 1) partes.push('quase só conheceu ração');
+  const frase = juntar(partes);
+  return frase.charAt(0).toUpperCase() + frase.slice(1) + '.';
+}
+
+/** Para onde ele está indo (aba Jeito), sem números: só o que você pode ver na vida dele até aqui. */
+function crescendo() {
+  if (pet.stage === 'bebe') {
+    const h = historia();
+    if (!h.top.length) return 'Ainda é cedo para saber como vai crescer.';
+    return `Passa o tempo ${juntar(h.top)}: ${h.linha === 1 ? 'parece que vai crescer ativo' : 'parece que vai crescer calmo e carinhoso'}.`;
+  }
+  if (!isAdult()) {
+    const c = cuidado();
+    return c.nota >= 70 ? 'Está crescendo muito bem cuidado.' : c.nota >= 45 ? 'Está crescendo bem.' : 'Está passando por uns apertos: precisa de mais cuidado.';
+  }
+  return null;
 }
 
 function applyStage(self) {
@@ -1309,6 +1386,8 @@ function abaJeito(game) {
   }
   if (habitos.length) for (const f of habitos.slice(0, 4)) lines.push(`· ${f}`);
   else lines.push('· Os hábitos aparecem com os dias.');
+  const rumo = crescendo();
+  if (rumo) lines.push('', 'Crescendo', `· ${rumo}`);
   if (isAdult()) lines.push('', 'Fase adulta: você pode começar com um novo pet (botão abaixo).');
   return lines;
 }

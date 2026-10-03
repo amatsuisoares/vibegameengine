@@ -145,7 +145,7 @@ reabrir) → docs (ARCHITECTURE, AGENT_TOOLS, FEATURES do jogo) → TODO → com
 | 7 ✅ | `Knowledge`, `Journal`, `Text.maxWidth` | diário em seções (básico, personalidade descoberta, gostos, memórias, descobertas, hábitos, evolução) |
 | 8 ✅ | `Ambient`, `env()` | luz, música, silêncio, conforto; qualidade do sono pela cama/luz/ruído/preferências |
 | 9 ✅ | aprendizado de afinidade ligado à memória | preferências que mudam devagar; hábitos no diário |
-| 10 | — | evolução por histórico (rotina, relação, alimentação, exploração), registrada no diário |
+| 10 ✅ | — | evolução por histórico (rotina, relação, alimentação, exploração), registrada no diário |
 | 11 | `startMinigame`/`endMinigame` | 1–2 minigames (moeda, vínculo, memória, revelar preferência; vantagem pequena por traço) |
 | 12 | — | balanceamento; avaliação das 10 perguntas de qualidade com dois pets de personalidades opostas |
 

@@ -230,6 +230,14 @@
       "status": "verified",
       "evidence": "testes 'curtain' e 'you can see what it dislikes' (4 jeitos, quarto escurece, ♪ em < 100 s a 1x, afeto maior em 1 h); screenshots da cortina aberta/fechada e dos 💢",
       "updatedAt": "2026-10-03T00:00:56.961Z"
+    },
+    {
+      "id": "f20",
+      "kind": "feature",
+      "text": "Evolução pela história: jovem pela vida que levou (rotina + brincadeiras/carinhos), adulto pelo cuidado (bem-estar, relação, variedade de comida); diário explica ao crescer e mostra \"Crescendo\" antes",
+      "status": "verified",
+      "evidence": "teste 'evolution comes from its history' (bebê ativo → jovem 1, carinhoso → jovem 2, bem cuidado → adulto 1a, negligenciado → adulto 3b, com as frases); screenshot da aba Jeito",
+      "updatedAt": "2026-10-03T00:33:17.403Z"
     }
   ],
   "plans": []

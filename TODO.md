@@ -339,7 +339,9 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
 - [x] Pedido da usuária: diário em páginas (14 linhas; ◀ 1/2 ▶ no canto, fora do botão de novo pet; título de seção
   não fica sozinho), "gosta da bola" (contração); cartas da bandeja e da caixa de Coisas com quebra de linha; **novo pet
   começa do zero** (sem itens, moedas nem arrumação do anterior: cesta, 15 moedas e a bola; coleção e velocidade ficam)
-- [ ] **Fase 10 — Evolução por histórico**
+- [x] **Fase 10 — Evolução por histórico** (só jogo, nenhuma peça nova na engine): jovem pela vida que levou (pesos
+  da `Routine` + brincadeiras e carinhos), adulto pelo cuidado (bem-estar, relação com você, variedade de comida); ao
+  crescer, observação e página do diário dizem por quê; a aba Jeito mostra "Crescendo" (para onde ele vai)
 - [ ] **Fase 11 — Minigames** (`startMinigame`/`endMinigame` + 1–2 minigames)
 - [ ] **Fase 12 — Polimento, balanceamento e avaliação das 10 perguntas de qualidade**
 

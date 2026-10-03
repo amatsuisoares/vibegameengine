@@ -845,6 +845,60 @@ describe('meu-pet (regression)', () => {
     expect(game.console.read(0, 'error')).toEqual([]);
   });
 
+  it('evolution comes from its history: what it did and how it was cared for pick the form, the diary says why (and shows where it is heading)', () => {
+    const t = Date.parse('2026-03-10T14:00:00Z');
+    const H = 3_600_000;
+    const base = (stage: string, ageH: number, extra: Record<string, unknown> = {}) => ({
+      version: 2, name: 'Mimi', born: t - ageH * H, stage, needs: { fome: 80, energia: 90, diversao: 80, higiene: 95, saude: 100, afeto: 80 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t, ...extra,
+    });
+    const slots = (v: number) => [0, 0, 0, 0, v, v, 0, 0];
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const grow = (pet: unknown, individual: Record<string, unknown>) => {
+      const g = new Game(load(), {
+        seed: 9, scene: 'quarto', clock: { start: '2026-03-10T14:00:00Z' },
+        storage: { pet, petIndividuo: { version: 1, traits: { paciencia: 0.8 }, preferences: {}, ...individual }, 'vibe.inventory': { default: {} }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } },
+      });
+      g.perform([{ type: 'wait', ms: 300 }]);
+      const before = g.storage.get('pet') as { stage: string };
+      const diary = () => {
+        g.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'diarioAba1' }, { type: 'wait', ms: 50 }]);
+        const text = g.entity('diarioTexto')!.components.Text!.text;
+        g.perform([{ type: 'click', entity: 'diario' }, { type: 'wait', ms: 50 }]);
+        return text;
+      };
+      const rumo = diary();
+      g.apply({ op: 'advanceClock', ms: 0.05 * H });
+      g.perform([{ type: 'wait', ms: 1500 }]);
+      expect(g.console.read(0, 'error')).toEqual([]);
+      return { from: before.stage, to: (g.storage.get('pet') as { stage: string }).stage, rumo, story: g.getState({ ids: ['pet'] }).entities[0].journal!.last[0], note: g.events(0, 'notification').find((e) => e.kind === 'evolucao')?.text };
+    };
+
+    // A baby that spent its days playing and exploring grows into the active line; one that rested and got petting, the calm line.
+    const lively = grow(base('bebe', 11.98, { care: { brincadeiras: 6, carinhos: 1, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 } }), { routine: { values: { brincar: slots(6), explorar: slots(4), descansar: slots(1) } } });
+    expect(lively.rumo).toContain('parece que vai crescer ativo');
+    expect(lively).toMatchObject({ from: 'bebe', to: 'juvenil1' });
+    expect(lively.story).toBe('Cresceu: agora é jovem. Passou a infância brincando e explorando o quarto.');
+    expect(lively.note).toBe('Mimi cresceu! Passou a infância brincando e explorando o quarto.');
+    const gentle = grow(base('bebe', 11.98, { care: { brincadeiras: 0, carinhos: 8, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 } }), { routine: { values: { descansar: slots(5), procurar: slots(3), brincar: slots(1) } } });
+    expect(gentle.rumo).toContain('parece que vai crescer calmo e carinhoso');
+    expect(gentle).toMatchObject({ to: 'juvenil2' });
+    expect(gentle.story).toBe('Cresceu: agora é jovem. Passou a infância recebendo carinho e descansando.');
+
+    // A young one well cared for, close to you and that tasted many foods becomes the best adult; a neglected one, the last.
+    const loved = grow(
+      base('juvenil1', 35.98, { wellbeing: 90, provou: { maca: 'love', cenoura: 'like', leite: 'neutral', peixe: 'hate', banana: 'like' }, care: { brincadeiras: 10, carinhos: 10, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 } }),
+      { Memory: undefined, memory: [{ type: 'carinho', subject: 'voce', tags: [], valence: 1, importance: 0.9, t, last: t, count: 6 }] },
+    );
+    expect(loved.rumo).toContain('Está crescendo muito bem cuidado.');
+    expect(loved).toMatchObject({ from: 'juvenil1', to: 'adulto1a' });
+    expect(loved.story).toBe('Cresceu: agora é adulto. Foi muito bem cuidado, confia muito em você e come de tudo um pouco.');
+    const neglected = grow(base('juvenil2', 35.98, { wellbeing: 25, provou: {} }), {});
+    expect(neglected).toMatchObject({ to: 'adulto3b' });
+    expect(neglected.story).toBe('Cresceu: agora é adulto. Passou por uns apertos, se acostumou a ficar sozinho e quase só conheceu ração.');
+  });
+
   it('verify_game plays a scenario of the real game and reports PASS per check', async () => {
     const store = new ProjectStore(MEU_PET);
     const r = await createAgentTools().call(
