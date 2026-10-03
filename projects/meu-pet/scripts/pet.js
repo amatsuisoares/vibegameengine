@@ -202,6 +202,11 @@ function anotar(game, category, text, key, importance = 0.5) {
 /** A reação a algo de que ele tem gosto (comida, brinquedo, carinho) conta como evidência desse gosto. */
 const NIVEL_PESO = { love: 2, hate: 2, like: 1.5, dislike: 1.5, neutral: 1 };
 function gostoVisto(game, subject, level, extra = 1) {
+  // Você já tinha visto outro gosto com segurança e agora vê este: o gosto mudou (mesmo que a mudança tenha
+  // vindo aos poucos, ou de antes desta versão). O diário acompanha e você fica sabendo.
+  const top = me.knowledge.list({ prefix: `gosto:${subject}:` })[0];
+  const antes = top && top.key.slice(`gosto:${subject}:`.length);
+  if (antes && antes !== level && VERBO[antes] && top.level !== 'possible') return mudouGosto(game, { subject, from: antes, to: level });
   saber(game, `gosto:${subject}:${level}`, (NIVEL_PESO[level] || 1) * extra);
 }
 
@@ -238,6 +243,14 @@ function emote(game, self, glyph, color) {
   if (color) e.props.color = color;
 }
 
+/**
+ * Sinais do que ele sente, sem palavras (como os ♥): 💢 não gostou, ❗ se assustou, ❗ âmbar desconfiado.
+ * Ajudam a perceber do que ele NÃO gosta tão bem quanto do que gosta.
+ */
+const naoGostou = (game, self) => emote(game, self, '💢', '#e5534b');
+const levouSusto = (game, self) => emote(game, self, '❗', '#e5534b');
+const desconfiou = (game, self) => emote(game, self, '❗', '#f2b84b');
+
 function pet_size() {
   return STAGES[pet.stage].size;
 }
@@ -254,6 +267,7 @@ function decay(game, h, at) {
   const agitado = (T('atividade') + T('brincadeira')) / 2;
   n.diversao -= h * (asleep ? 1 : 7 * lerp(0.6, 1.5, agitado) * lerp(0.9, 1.2, T('curiosidade')));
   n.afeto -= h * (asleep ? 1 : 5 * lerp(0.4, 1.6, T('sociabilidade')) * lerp(1.25, 0.65, T('independencia')));
+  if (!asleep) n.afeto += h * afetoDoQuarto(game); // o quarto do jeito dele (luz e cortina) faz bem aos poucos
   n.higiene -= h * 3;
   const lowest = Math.min(n.fome, n.higiene, n.energia);
   if (pet.sick) n.saude -= h * 4;
@@ -308,7 +322,8 @@ const xDeDormir = (game) => {
 };
 
 /** Luz no quarto numa hora: a lâmpada (se acesa) e a janela (de dia). Calculada, para valer também no tempo fora. */
-const luzEm = (at) => (pet.lightOn ? 1 : 0) + (isNightAt(at) ? 0 : 0.8);
+/** Luz no quarto numa hora: a lâmpada (se acesa) e a janela (de dia, se a cortina está aberta). */
+const luzEm = (game, at) => (pet.lightOn ? 1 : 0) + (isNightAt(at) || cortinaFechada(game) ? 0 : 0.8);
 
 /** A lâmpada da cena emite luz (Ambient) só quando está acesa. */
 function luzDaLampada(game) {
@@ -327,7 +342,7 @@ function sono(game, at) {
   const env = game.env(me);
   const escuro = me.prefs.of('escuro');
   const sens = T('sensibilidade');
-  const luz = luzEm(at);
+  const luz = luzEm(game, at);
   const pesoLuz = luz * (0.12 + Math.max(0, escuro) * 0.45 + Math.max(0, sens - 0.5) * 0.4) - luz * Math.max(0, -escuro) * 0.12;
   const pesoRuido = (env.noise || 0) * (0.2 + sens * 0.7);
   const musica = (env.music || 0) * likesTag('musica') * 0.25;
@@ -398,7 +413,7 @@ function verCoisa(game, self, id) {
       then: () => {
         gostoVisto(game, item.id, r.level);
         if (r.score <= -0.2) {
-          emote(game, self, '…', '#cfd8dc');
+          naoGostou(game, self);
           observe(game, `coisa:${item.id}`, `{n} cheirou ${oItem(item)} e se afastou.`, 10);
           go(game, e.x + lado * 200, 'idle');
         } else if (e.hasTag('lugarDeDormir') && r.score >= 0.2) {
@@ -415,6 +430,114 @@ function verCoisa(game, self, id) {
   });
 }
 
+/**
+ * O jeito dele com a claridade (do gosto por escuro e da sensibilidade):
+ *   escuro       quer a cortina fechada e a luz apagada
+ *   luz          quer a cortina aberta e a luz acesa
+ *   normal       quer o quarto claro acordado e escuro para dormir (a cortina tanto faz)
+ *   indiferente  pouco sensível: tanto faz
+ */
+function jeitoComLuz() {
+  const escuro = feel('escuro').score;
+  const sens = T('sensibilidade');
+  if (escuro >= 0.2 || (sens > 0.8 && escuro > -0.2)) return 'escuro';
+  if (escuro <= -0.2) return 'luz';
+  return sens < 0.35 ? 'indiferente' : 'normal';
+}
+
+const cortinaFechada = (game) => !!(game.storage.get('quarto') || {}).cortina;
+
+/** Quanto o quarto está do jeito que ele gosta: 0 (nada), 1 (meio), 2 (tudo). Indiferente: sempre 1. */
+function satisfacaoLuz(game, jeito, luzAcesa, fechada) {
+  const claro = luzAcesa || (!fechada && !isNightAt(game.clock.now));
+  if (jeito === 'escuro') return (fechada ? 1 : 0) + (luzAcesa ? 0 : 1);
+  if (jeito === 'luz') return (fechada ? 0 : 1) + (luzAcesa ? 1 : 0);
+  if (jeito === 'normal') return pet.asleep ? (claro ? 0 : 2) : claro ? 2 : 0;
+  return 1;
+}
+
+const FRASES_LUZ = {
+  escuro: {
+    cortina: ['{n} parece gostar da cortina fechada.', '{n} apertou os olhos com a claridade. Parece preferir a cortina fechada.'],
+    luz: ['{n} parece gostar do quarto mais escuro.', '{n} apertou os olhos com a luz. Parece preferir o escuro.'],
+  },
+  luz: {
+    cortina: ['{n} parece gostar da cortina aberta.', '{n} não parece gostar do quarto mais escuro.'],
+    luz: ['{n} parece mais à vontade com a luz acesa.', '{n} não parece gostar do escuro.'],
+  },
+  normal: {
+    cortina: ['{n} parece mais à vontade com o quarto claro.', '{n} não parece gostar do quarto escuro agora.'],
+    luz: ['{n} parece mais à vontade com o quarto claro.', '{n} não parece gostar do quarto escuro agora.'],
+  },
+};
+
+/**
+ * Você mexeu na luz ou na cortina (o que = 'luz' | 'cortina'): ele reage na hora se ficou melhor (♥) ou pior (💢;
+ * ❗ para quem tem medo do escuro) para o jeito dele. Indiferente ou nada mudou para ele: não reage. Dormindo, só se
+ * mexe (a qualidade do sono muda). Cada reação vira evidência do jeito dele com a claridade (diário).
+ */
+function reagirAoAmbiente(game, self, o) {
+  if (refeicao) return;
+  const jeito = jeitoComLuz();
+  const fechada = cortinaFechada(game);
+  const antes = satisfacaoLuz(game, jeito, o === 'luz' ? !pet.lightOn : pet.lightOn, o === 'cortina' ? !fechada : fechada);
+  const depois = satisfacaoLuz(game, jeito, pet.lightOn, fechada);
+  if (jeito === 'indiferente') return saber(game, 'gosto:escuro:neutral', 0.5);
+  if (depois === antes) return;
+  if (jeito === 'normal') saber(game, 'gosto:luzNormal:like', 0.5);
+  else gostoVisto(game, 'escuro', jeito === 'escuro' ? feel('escuro').level === 'love' ? 'love' : 'like' : feel('escuro').level === 'hate' ? 'hate' : 'dislike', 0.5);
+  const melhorou = depois > antes;
+  if (pet.asleep) {
+    if (melhorou) emote(game, self, 'z', '#c9d6ff');
+    else {
+      naoGostou(game, self);
+      observe(game, 'luzDormindo', jeito === 'luz' ? '{n} se mexeu inquieto no escuro.' : '{n} se mexeu incomodado com a claridade.', 10);
+    }
+    return;
+  }
+  const [bom, ruim] = FRASES_LUZ[jeito][o];
+  if (melhorou) {
+    emote(game, self, '♥', jeito === 'escuro' ? '#9fb4ff' : '#ffd166');
+    observe(game, `${o}Melhor`, bom, 10);
+  } else {
+    if (jeito === 'luz') desconfiou(game, self);
+    else naoGostou(game, self);
+    observe(game, `${o}Pior`, ruim, 10);
+    if (jeito === 'escuro') reveal('sensibilidade', 'alto');
+  }
+}
+
+/**
+ * Um quarto do jeito dele faz bem aos poucos: afeto sobe devagar e, de vez em quando, ele mostra ♪ ("parece à
+ * vontade com o quarto assim."); do jeito errado, o afeto cai e de vez em quando aparece um 💢. Chamado a cada segundo.
+ */
+let sinalDoQuarto = 0; // tempo real do próximo sinal (sem sortear: não mexe na sorte das outras decisões)
+
+function bemNoQuarto(game, self) {
+  const jeito = jeitoComLuz();
+  if (jeito === 'indiferente' || pet.asleep || refeicao || realTime < sinalDoQuarto) return;
+  const s = satisfacaoLuz(game, jeito, pet.lightOn, cortinaFechada(game));
+  if (s === 1) return;
+  sinalDoQuarto = realTime + (s === 2 ? 90 : 60);
+  if (s === 2) {
+    emote(game, self, '♪', '#ffd166');
+    observe(game, 'quartoBom', '{n} parece à vontade com o quarto assim.', 30, 0);
+  } else {
+    if (jeito === 'luz') desconfiou(game, self);
+    else naoGostou(game, self);
+    const msg = { escuro: '{n} parece incomodado com a claridade.', luz: '{n} parece incomodado com o quarto escuro.', normal: '{n} não parece gostar do quarto escuro agora.' }[jeito];
+    observe(game, 'quartoRuim', msg, 30, 0);
+  }
+}
+
+/** O afeto anda devagar com o quarto do jeito dele (por hora de jogo; também no tempo fora). */
+function afetoDoQuarto(game) {
+  const jeito = jeitoComLuz();
+  if (jeito === 'indiferente') return 0;
+  const s = satisfacaoLuz(game, jeito, pet.lightOn, cortinaFechada(game));
+  return s === 2 ? 1.5 : s === 0 ? -1.5 : 0;
+}
+
 /** Você ligou a música: quem gosta se anima (e vai dançar); quem não gosta (ou é muito sensível) se afasta. */
 function ouviuMusica(game, self, on, id) {
   if (!on || pet.asleep || refeicao) return;
@@ -424,8 +547,9 @@ function ouviuMusica(game, self, on, id) {
   const r = me.prefs.item(item.id);
   gostoVisto(game, 'musica', r.level);
   if (r.score <= -0.2 || (T('sensibilidade') > 0.8 && r.score < 0.2)) {
-    emote(game, self, '…', '#cfd8dc');
+    naoGostou(game, self);
     observe(game, 'musicaNao', '{n} não parece gostar da música.', 5);
+    lembrar('musica', 'caixinhaMusica', -0.8, 0.5);
     go(game, box.x < 480 ? 820 : 140, 'idle');
   } else if (r.score >= 0.2) {
     emote(game, self, '♪', '#8e7dff');
@@ -437,6 +561,7 @@ function ouviuMusica(game, self, on, id) {
 function dancar(game, self, box) {
   go(game, box.x + (self.x < box.x ? -70 : 70), () => {
     mind = { act: 'dance', t: 5 + Math.max(0, likesTag('musica')) * 4 };
+    lembrar('musica', 'caixinhaMusica', 0.8, 0.5);
     anotar(game, 'lembranca', 'Dançou com a música pela primeira vez.', 'dancou', 0.6);
   });
 }
@@ -667,7 +792,7 @@ function decide(game, self) {
     dancar(game, self, game.entity(target));
   } else if (choice === 'afastar') {
     const box = game.find('musica').find((b) => b.props.tocando);
-    emote(game, self, '…', '#cfd8dc');
+    naoGostou(game, self);
     observe(game, 'musicaNao', '{n} não parece gostar da música.', 30);
     go(game, box && box.x < 480 ? 840 : 120, 'idle');
   } else if (choice === 'procurar') {
@@ -764,6 +889,7 @@ function comecarBrincar(game, self, id) {
 /** O barulho de um brinquedo assustou o pet: ele lembra (desconfia por um tempo) e isso entra na história dele. */
 function assustou(game, item) {
   lembrar('susto', item.id, -1, 0.8);
+  levouSusto(game, me);
   anotar(game, 'lembranca', `Levou um susto com o barulho ${doItem(item)}.`, `susto:${item.id}`, 0.7);
 }
 
@@ -819,7 +945,7 @@ function verBrinquedo(game, self, id, como) {
   const lado = self.x < toy.x ? -1 : 1;
   // Ainda lembra do susto: olha de longe, desconfiado, e não chega perto.
   if (lembranca(item.id, 'susto') <= -0.3) {
-    emote(game, self, '…', '#cfd8dc');
+    desconfiou(game, self);
     observe(game, `desconfiado:${item.id}`, `{n} ainda parece desconfiado ${doItem(item)}.`, 5);
     go(game, toy.x + lado * 260, 'idle');
     return;
@@ -828,7 +954,8 @@ function verBrinquedo(game, self, id, como) {
     const susto = barulhoIncomoda(item) && como !== 'novo';
     if (susto) assustou(game, item);
     const perto = () => {
-      emote(game, self, susto ? '!' : '…', '#cfd8dc');
+      if (susto) levouSusto(game, self);
+      else naoGostou(game, self);
       observe(game, `naoGosta:${item.id}`, susto ? `{n} se assustou com o barulho ${doItem(item)} e foi para longe.` : `{n} cheirou ${oItem(item)} e se afastou. Não parece ter gostado.`, 10);
       go(game, toy.x + lado * 230, 'idle');
     };
@@ -912,6 +1039,7 @@ function makeApi(game, self) {
       const impaciente = T('paciencia') < LOW;
       if (pet.asleep) {
         if (impaciente) {
+          naoGostou(game, self);
           observe(game, 'acordado', '{n} acordou e não parece gostar disso.', 5);
           lembrar('acordado', 'voce', -1, 0.7);
           anotar(game, 'lembranca', 'Ficou chateado quando você o acordou.', 'acordado', 0.5);
@@ -924,7 +1052,7 @@ function makeApi(game, self) {
       lastPetReal = realTime;
       // Ainda lembra de ter sido acordado por você há pouco: se afasta.
       if (!recent && lembranca('voce', 'acordado') <= -0.4) {
-        emote(game, self, '…', '#cfd8dc');
+        naoGostou(game, self);
         observe(game, 'aindaChateado', '{n} ainda parece chateado por ter sido acordado.', 5);
         go(game, self.x + (self.x < 480 ? -1 : 1) * 160, 'idle');
         return;
@@ -933,6 +1061,8 @@ function makeApi(game, self) {
         n.afeto = clamp(n.afeto - 3);
         reveal('paciencia', 'baixo');
         lembrar('carinho', 'voce', -0.6, 0.4);
+        me.prefs.learn('carinho', -0.3);
+        naoGostou(game, self);
         observe(game, 'carinhoRuim', '{n} não parece gostar disso agora.', 2);
         mind = { act: 'sulk', t: 3 };
         return;
@@ -950,6 +1080,7 @@ function makeApi(game, self) {
         emote(game, self, '♥', '#ff8fab');
         reveal('sociabilidade', 'alto');
         lembrar('carinho', 'voce', level === 'love' ? 1 : 0.6, 0.4);
+        me.prefs.learn('carinho', 0.3);
         gostoVisto(game, 'carinho', level);
         anotar(game, 'lembranca', level === 'love' ? 'Recebeu o primeiro carinho e adorou.' : 'Recebeu o primeiro carinho e gostou.', 'carinho', 0.5);
         observe(game, 'carinho', level === 'love' ? '{n} parece adorar o carinho.' : '{n} parece gostar do carinho.', 2);
@@ -968,6 +1099,7 @@ function makeApi(game, self) {
         lembrar('carinho', 'voce', -0.4, 0.3);
         gostoVisto(game, 'carinho', level);
         anotar(game, 'lembranca', 'No primeiro carinho, se afastou: parece gostar do próprio espaço.', 'carinho', 0.5);
+        naoGostou(game, self);
         observe(game, 'carinhoAfasta', '{n} se afastou um pouco. Parece preferir o próprio espaço.', 30);
         go(game, self.x + (self.x < 480 ? -1 : 1) * 140, 'idle');
       }
@@ -1000,6 +1132,10 @@ function makeApi(game, self) {
       const item = e && game.items.get(String(e.props.item));
       if (item && item.category === 'ambiente') verCoisa(game, self, id);
       else verBrinquedo(game, self, id, como || 'novo');
+    },
+    /** Você abriu ou fechou a cortina. */
+    cortina() {
+      reagirAoAmbiente(game, self, 'cortina');
     },
     /** A caixinha de música começou ou parou de tocar. */
     musica(on, id) {
@@ -1060,16 +1196,16 @@ function makeApi(game, self) {
     alternarLuz() {
       pet.lightOn = !pet.lightOn;
       luzDaLampada(game);
-      if (pet.asleep && pet.lightOn && isNightAt(game.clock.now) && lightBothers()) {
-        observe(game, 'luz', '{n} parece incomodado com a luz.', 30);
-        gostoVisto(game, 'escuro', feel('escuro').level);
-        reveal('sensibilidade', 'alto');
-      }
+      reagirAoAmbiente(game, self, 'luz');
       save(game);
     },
     /** O texto do diário na aba ("jeito" | "gostos" | "historias"; padrão: game.vars.diarioAba). */
-    diario(aba) {
-      return diaryText(game, aba || game.vars.diarioAba || 'jeito');
+    diario(aba, pagina) {
+      return diaryText(game, aba || game.vars.diarioAba || 'jeito', pagina === undefined ? game.vars.diarioPagina || 0 : pagina);
+    },
+    /** Quantas páginas a aba tem (padrão: a aberta). */
+    diarioPaginas(aba) {
+      return diaryPages(game, aba || game.vars.diarioAba || 'jeito').length;
     },
     salvar() {
       save(game);
@@ -1091,6 +1227,9 @@ function makeApi(game, self) {
       game.storage.remove('pet');
       if (me.persist.key) game.storage.remove(me.persist.key);
       game.notifications.clear(); // as observações eram deste pet
+      // O novo pet começa do zero: sem os itens, as moedas e o quarto arrumado do anterior (vem a cesta de
+      // boas-vindas, as moedas iniciais e a bola). A coleção e a velocidade ficam.
+      for (const k of ['vibe.inventory', 'vibe.wallet', 'economia', 'quarto']) game.storage.remove(k);
       game.loadScene('inicio');
       return true;
     },
@@ -1129,7 +1268,7 @@ const VERBO = {
   hate: ['deteste', 'detestar', 'Detesta'],
 };
 const CONFIANCA = { possible: 0, observed: 1, confirmed: 2 };
-const OUTROS = { carinho: 'carinho', escuro: 'dormir no escuro', musica: 'música' };
+const OUTROS = { carinho: 'carinho', escuro: 'ficar no escuro', musica: 'música', luzNormal: 'luz acesa acordado e escuro para dormir' };
 
 function fraseJeito(level, jeito) {
   return [`Talvez seja ${jeito}.`, `Parece ser ${jeito}.`, `É ${jeito}.`][CONFIANCA[level]];
@@ -1137,7 +1276,9 @@ function fraseJeito(level, jeito) {
 
 function fraseGosto(level, nivel, nome) {
   const v = VERBO[nivel];
-  return [`Talvez ${v[0]} ${nome}.`, `Parece ${v[1]} ${nome}.`, `${v[2]} ${nome}.`][CONFIANCA[level]];
+  const frase = [`Talvez ${v[0]} ${nome}.`, `Parece ${v[1]} ${nome}.`, `${v[2]} ${nome}.`][CONFIANCA[level]];
+  // "gostar de a bola" → "gostar da bola"; "de o chocalho" → "do chocalho".
+  return frase.replace(/\bde (a|o) /g, (_, art) => `d${art} `);
 }
 
 /** Por assunto, o nível de gosto com mais evidência: [{subject, nivel, level, evidence}]. */
@@ -1203,9 +1344,35 @@ function abaHistorias(game) {
   return entries.map((e) => `Dia ${Math.max(1, Math.floor((e.t - pet.born) / DAY) + 1)}  ·  ${e.text}`);
 }
 
-function diaryText(game, aba) {
+/**
+ * As páginas de uma aba: o papel cabe ~15 linhas, então o texto é dividido (estimando as linhas que quebram por
+ * tamanho) e as setas do diário trocam de página. Um título de seção não fica sozinho no fim de uma página.
+ */
+const LINHAS_POR_PAGINA = 14;
+const linhasDe = (s) => Math.max(1, Math.ceil(s.length / 62));
+
+function diaryPages(game, aba) {
   const body = aba === 'gostos' ? abaGostos(game) : aba === 'historias' ? abaHistorias(game) : abaJeito(game);
-  return [`Diário de ${pet.name}`, '', ...body].join('\n');
+  const pages = [[]];
+  let used = 0;
+  body.forEach((line, i) => {
+    const n = linhasDe(line);
+    const titulo = line && !line.startsWith('·') && body[i + 1] && body[i + 1].startsWith('·');
+    if (used + n + (titulo ? 1 : 0) > LINHAS_POR_PAGINA && used > 0) {
+      pages.push([]);
+      used = 0;
+    }
+    if (used === 0 && line === '') return; // página não começa em branco
+    pages[pages.length - 1].push(line);
+    used += n;
+  });
+  return pages;
+}
+
+function diaryText(game, aba, pagina = 0) {
+  const pages = diaryPages(game, aba);
+  const p = pages[Math.max(0, Math.min(pages.length - 1, pagina))];
+  return [`Diário de ${pet.name}`, '', ...p].join('\n');
 }
 
 /**
@@ -1223,8 +1390,47 @@ function migrarDiario(game) {
   if (!me.journal.entries({ limit: 1 }).length) anotar(game, 'evolucao', 'Começou este diário.', 'diario', 0.9);
 }
 
-/** Uma lembrança forte que se apagou também é parte da história. */
+/**
+ * Um gosto mudou de nível (Preferences: o que ele viveu ensina — a fome, o enjoo que passou, um susto, as
+ * brincadeiras): uma observação, uma página do diário, e o que você sabia dele acompanha a mudança.
+ */
+const SUBIU = {
+  love: ['parece ter passado a adorar', 'Passou a adorar'],
+  like: ['parece ter começado a gostar de', 'Começou a gostar de'],
+  neutral: ['parece não se incomodar mais com', 'Deixou de se incomodar com'],
+  dislike: ['parece estar detestando menos', 'Passou a detestar menos'],
+};
+const DESCEU = {
+  like: ['parece não estar mais tão louco por', 'Já não é mais tão louco por'],
+  neutral: ['parece ter perdido o interesse por', 'Perdeu o interesse por'],
+  dislike: ['parece ter começado a não gostar de', 'Começou a não gostar de'],
+  hate: ['parece ter passado a detestar', 'Passou a detestar'],
+};
+
+let mudouAgora = { subject: null, t: -99 }; // o gosto que acabou de mudar (para não dizer "enjoando" na mesma hora)
+
+function mudouGosto(game, ev) {
+  mudouAgora = { subject: ev.subject, t: realTime };
+  const ordem = ['hate', 'dislike', 'neutral', 'like', 'love'];
+  const subiu = ordem.indexOf(ev.to) > ordem.indexOf(ev.from);
+  const frase = (subiu ? SUBIU : DESCEU)[ev.to];
+  const item = game.items.get(ev.subject);
+  const nome = item ? (item.category === 'comida' ? nomeDe(item) : oItem(item)) : OUTROS[ev.subject];
+  if (!frase || !nome) return;
+  observe(game, `mudou:${ev.subject}`, `{n} ${frase[0]} ${nome}.`, 30);
+  anotar(game, 'gosto', `${frase[1]} ${nome}.`, `mudou:${ev.subject}:${ev.to}`, 0.7);
+  // O que você sabia do gosto antigo vale menos; o novo passa na frente (você acabou de ver).
+  let antes = 0;
+  for (const k of me.knowledge.list({ prefix: `gosto:${ev.subject}:`, minLevel: 'unknown' })) {
+    antes = Math.max(antes, k.evidence);
+    if (!k.key.endsWith(`:${ev.to}`)) me.knowledge.observe(k.key, -k.evidence * 0.5);
+  }
+  saber(game, `gosto:${ev.subject}:${ev.to}`, antes * 0.6 + 1);
+}
+
+/** Uma lembrança forte que se apagou também é parte da história; um gosto que mudou também. */
 function onEvent(self, ev, game) {
+  if (ev.type === 'preference_change' && ev.entity === self.id) return mudouGosto(game, ev);
   if (ev.type !== 'memory_forgotten' || ev.entity !== self.id || ev.memory !== 'susto' || ev.importance < 0.7) return;
   const item = game.items.get(String(ev.subject));
   if (item) anotar(game, 'lembranca', `Parece ter esquecido o susto com ${oItem(item)}.`, `esqueceu:susto:${item.id}`, 0.4);
@@ -1306,7 +1512,7 @@ function onItem(self, item, game) {
   const lembra = lembranca(item.id, 'comida');
   if (lembra <= -0.5) {
     // Já provou e detestou: reconhece de longe e nem cheira.
-    emote(game, self, '…', '#cfd8dc');
+    naoGostou(game, self);
     observe(game, `reconheceu:${item.id}`, `{n} reconheceu ${oItem(item)} e virou o rosto.`);
     gostoVisto(game, item.id, r.level, 0.5);
     mind = { act: 'sulk', t: 1.4 };
@@ -1324,15 +1530,16 @@ function onItem(self, item, game) {
   const dir = self.get('Sprite').flipX ? -1 : 1;
   const food = game.spawn('oferta', self.x + dir * 70, FEET_Y - 12);
   food.get('Text').text = item.icon || '•';
-  refeicao = { item, level: r.level, food, dir };
+  const agora = gostoAgora(item);
+  refeicao = { item, level: agora.level, base: agora.base, enjoado: agora.enjoado, fome: pet.needs.fome, food, dir };
   // Primeiro cheira (inclina a cabeça); a reação vem depois. O que ele lembra de ter adorado: nem precisa cheirar.
   if (lembra >= 0.5) {
     emote(game, self, '♥', '#ff8fab');
     observe(game, `reconheceu:${item.id}`, `{n} reconheceu ${oItem(item)} e se animou na hora!`);
   }
   mind = { act: lembra >= 0.5 ? 'happy' : 'investigate', t: lembra >= 0.5 ? 0.5 : 0.9, refeicao: true, then: () => react(game, self) };
-  game.emit('reacao', { item: item.id, level: r.level });
-  return { consumed: r.level !== 'hate', level: r.level };
+  game.emit('reacao', { item: item.id, level: agora.level, ...(agora.enjoado && { enjoado: true }) });
+  return { consumed: r.level !== 'hate', level: agora.level };
 }
 
 /** Depois de cheirar: recusa (odeia) ou come; o efeito vem no fim (terminarRefeicao). */
@@ -1342,6 +1549,7 @@ function react(game, self) {
     refeicao = null;
     lembrar('comida', item.id, -1, 0.9);
     gostoVisto(game, item.id, 'hate');
+    naoGostou(game, self);
     observe(game, `comida:${item.id}`, `{n} cheirou ${oItem(item)} e se afastou.`);
     sumir(food, 1.5);
     go(game, self.x - dir * 140, 'idle');
@@ -1358,12 +1566,17 @@ function react(game, self) {
  */
 function terminarRefeicao(game, self, reagir) {
   if (!refeicao) return;
-  const { item, level, food } = refeicao;
+  const { item, level, food, base, enjoado, fome } = refeicao;
   refeicao = null;
   sumir(food, 0.3);
   if (level === 'hate') return;
-  lembrar('comida', item.id, { love: 1, like: 0.5, neutral: 0.05, dislike: -0.6 }[level], { love: 0.8, like: 0.4, neutral: 0.2, dislike: 0.6 }[level]);
-  gostoVisto(game, item.id, level);
+  // A memória e o diário ficam com o gosto de verdade (enjoar passa); repetir enjoa um pouco mais.
+  const real = base || level;
+  lembrar('comida', item.id, { love: 1, like: 0.5, neutral: 0.05, dislike: -0.6 }[real], { love: 0.8, like: 0.4, neutral: 0.2, dislike: 0.6 }[real]);
+  lembrar('enjoo', item.id, 0, 0.3);
+  gostoVisto(game, item.id, real);
+  // A fome ensina: comer algo (que não detesta) com fome, várias vezes, faz gostar mais.
+  if (fome !== undefined && fome < 50) me.prefs.learn(item.id, 0.8);
   const n = pet.needs;
   const part = level === 'dislike' ? 0.5 : 1;
   n.fome = clamp(n.fome + (Number(item.props.fome) || 10) * part);
@@ -1371,6 +1584,10 @@ function terminarRefeicao(game, self, reagir) {
   pet.care.petiscos++;
   game.playSound('sfx_comer');
   if (item.tags.includes('doce')) comeuDoce(game);
+  const acabouDeMudar = mudouAgora.subject === item.id && realTime - mudouAgora.t < 5;
+  if (enjoado && !acabouDeMudar) observe(game, `enjoou:${item.id}`, `{n} comeu ${oItem(item)}, mas parece estar enjoando um pouco.`, 30);
+  if (enjoado && reagir) mind = { act: 'idle', t: 1 };
+  if (enjoado) return;
   if (level === 'love') {
     n.afeto = clamp(n.afeto + 10);
     n.diversao = clamp(n.diversao + 5);
@@ -1380,7 +1597,10 @@ function terminarRefeicao(game, self, reagir) {
     n.afeto = clamp(n.afeto + 5);
     observe(game, `comida:${item.id}`, `{n} parece ter gostado ${doItem(item)}.`);
   } else if (level === 'neutral') observe(game, `comida:${item.id}`, `{n} comeu ${oItem(item)} sem muito entusiasmo.`);
-  else observe(game, `comida:${item.id}`, `{n} comeu só um pouco ${doItem(item)}. Não parece ter gostado muito.`);
+  else {
+    observe(game, `comida:${item.id}`, `{n} comeu só um pouco ${doItem(item)}. Não parece ter gostado muito.`);
+    if (reagir) naoGostou(game, me);
+  }
   if (!reagir) return;
   if (level === 'love') {
     emote(game, self, '♥', '#ff8fab');
@@ -1391,6 +1611,20 @@ function terminarRefeicao(game, self, reagir) {
     mind = { act: 'happy', t: 0.9 };
   } else if (level === 'neutral') mind = { act: 'idle', t: 1 };
   else mind = { act: 'sulk', t: 1.5 };
+}
+
+/**
+ * O gosto por uma comida AGORA: o de sempre menos o enjoo de tê-la comido muitas vezes seguidas (memória
+ * "enjoo", meia-vida curta). Só enjoa do que gosta ou adora (do indiferente não há o que enjoar), e enjoar só
+ * desce até "não gosta" — recusar mesmo, só o que ele detesta.
+ */
+function gostoAgora(item) {
+  const r = me.prefs.item(item.id);
+  const enjoo = (me.memory.recall({ type: 'enjoo', subject: item.id })[0] || { strength: 0 }).strength;
+  if ((r.level !== 'love' && r.level !== 'like') || enjoo < 0.05) return { level: r.level, base: r.level, enjoado: false };
+  const ordem = ['hate', 'dislike', 'neutral', 'like', 'love'];
+  const level = ordem[Math.max(1, ordem.indexOf(me.prefs.level(r.score - enjoo * 0.9)))];
+  return { level, base: r.level, enjoado: level !== r.level };
 }
 
 /** Doce demais num dia faz mal (um pouco). */
@@ -1445,6 +1679,7 @@ function onStart(self, game) {
     economiaDoDia(game);
     if (mind.act === 'sleep' || mind.act === 'nap') sonoVisivel(game);
     checkObservations(game, self);
+    bemNoQuarto(game, self);
     checkEvolution(game, self);
   }, 'observar');
   self.every(SAVE_EVERY * 1000, () => save(game), 'salvar');

@@ -111,7 +111,7 @@ gostarem (a surpresa a descobrir); a ração é quase sempre neutra.
 | petisco | ♥, afeto +12/+8, "parece ter adorado/gostado" | "comeu o petisco sem muito entusiasmo" | "não parece ter gostado muito" (emburra); odeia: cheira, recusa e se afasta (não conta no limite diário) |
 | ração | come mais rápido, ♥ se adora, "comeu a ração com muita vontade" | "comeu da tigela" | come devagar e só com mais fome, "comeu a ração, mas sem muita vontade" |
 | bola jogada | corre atrás; brincar rende diversão ×1,5 ("ficou animado!") | corre e "brincou um pouco com a bola" | afinidade ≤ −0,3: só olha a bola passar, "não parece muito interessado nela" |
-| luz à noite | quem gosta de escuro dorme pior com a luz acesa e melhor no escuro ("dormindo mal: parece incomodado com a luz") — seção 6b | | quem não gosta de escuro quase não se incomoda com a luz |
+| luz e cortina (seção 6e) | apagar: ♥ "parece gostar do quarto mais escuro."; acender: 💢 "apertou os olhos com a luz. Parece preferir o escuro."; dorme pior com a luz acesa ("dormindo mal: parece incomodado com a luz") — seção 6b | não reage | quem prefere claridade: apagar ❗ "não parece gostar do escuro."; acender ♥ "parece mais à vontade com a luz acesa." Dormindo, só se mexe (💢 se incomodou) |
 
 **Revelação:** cada comportamento típico de um traço **forte** (> 0,65 ou < 0,35) é meio ponto de evidência no
 `Knowledge` ("jeito:atividade:alto"...). Com 1 ponto o diário diz "Talvez seja bastante ativo.", com 3 "Parece ser…",
@@ -171,6 +171,58 @@ o clique só conta ao soltar sem arrastar; ao soltar volta para o chão). Arranj
 **Sono pelo jeito do pet:** à noite vai dormir abaixo do seu limite de energia (o ativo aguenta mais) e de manhã levanta
 mais cedo se for ativo (menos descansado) e mais tarde se for calmo. De dia só dorme de verdade com energia < 50; entre
 50 e 80, **cochila** (seção 6b).
+
+## 6e. Luz e cortina: o jeito de cada pet com a claridade
+
+A janela tem uma **cortina** (duas metades, `scripts/cortina.js`): clicar nela ou no vidro abre/fecha (ela corre suave;
+estado em `storage.quarto.cortina`). Fechada, tapa a luz do dia — a janela emite 10% da luz e o quarto escurece de dia
+se a lâmpada estiver apagada (`ceu.js`). Cada pet tem um jeito com a claridade (gosto por escuro + sensibilidade):
+
+| Jeito | Quem | Gosta de | Reação ao melhorar / piorar |
+|---|---|---|---|
+| **escuro** | gosto por escuro ≥ 0,2 (ou muito sensível) | cortina fechada **e** luz apagada | ♥ "parece gostar da cortina fechada / do quarto mais escuro." · 💢 "apertou os olhos com a claridade / com a luz…" |
+| **luz** | gosto por escuro ≤ −0,2 | cortina aberta **e** luz acesa | ♥ "parece gostar da cortina aberta / mais à vontade com a luz acesa." · ❗ "não parece gostar do quarto mais escuro / do escuro." |
+| **normal** | o resto, sensibilidade ≥ 0,35 | quarto claro acordado e escuro dormindo (a cortina tanto faz) | ♥ "parece mais à vontade com o quarto claro." · 💢 "não parece gostar do quarto escuro agora." |
+| **indiferente** | o resto, pouco sensível | tanto faz | não reage |
+
+Dormindo, só se mexe (z se melhorou; 💢 "se mexeu incomodado com a claridade" / "inquieto no escuro"), e a qualidade do
+sono já conta a luz de verdade (lâmpada + janela com a cortina). **Mais feliz:** com o quarto todo do jeito dele, o afeto
+sobe 1,5/h e a cada ~90 s ele mostra ♪ ("parece à vontade com o quarto assim."); todo do jeito errado, o afeto cai 1,5/h
+e a cada ~60 s aparece 💢 ("parece incomodado com a claridade" …). As reações viram evidência no diário: "Gosta de
+ficar no escuro", "Não gosta de ficar no escuro", "Parece gostar de luz acesa acordado e escuro para dormir", "Não liga
+muito para ficar no escuro".
+
+## 6d. Sinais (sem palavras)
+
+Como os ♥ e ♪, o pet mostra o que **não** gosta: **💢** (vermelho) quando não gosta — comida recusada ou reconhecida e
+recusada, "comeu só um pouco", carinho indesejado, ser acordado, música de que não gosta, coisa que cheira e larga,
+brinquedo de que não gosta, luz para quem prefere o escuro; **❗** vermelho quando se assusta (barulho do chocalho);
+**❗** âmbar quando fica desconfiado (o brinquedo que o assustou, o escuro para quem prefere luz). O gosto por escuro
+agora é sorteado de −0,9 a 0,9 (+ sensibilidade), então muitos pets têm uma preferência clara.
+
+## 6c. Gostos que mudam (V0.7: `Preferences.learnFrom`, evento `preference_change`)
+
+O gosto **inato** nunca muda; a parte **aprendida** anda devagar com o que ele vive (`learnRate` 0,1 por experiência,
+no máximo ±0,5) e conta **inteira** na reação àquela coisa (a expectativa pelas tags não a dilui). Quando um gosto
+cruza um nível você vê:
+
+| Experiência | Ensina |
+|---|---|
+| comer uma comida (memória `comida`) | adorou +0,1, gostou +0,05, não gostou −0,06, detestou −0,1 |
+| **comer com fome** (fome < 50, algo que não detesta) | +0,08 a mais — uma cenoura indiferente vira "gosta" depois de ~5 refeições com fome |
+| brincar sozinho com um brinquedo (`brinquedo`) | favorito +0,06 … não gosta −0,02 |
+| susto com o barulho (`susto`) | −0,12 (além da desconfiança de algumas horas) |
+| dançar com a música / se afastar dela (`musica`) | +0,06 / −0,06 na caixinha |
+| carinho bom / ruim | +0,03 / −0,03 no carinho |
+
+**Enjoo** (passa): a comida que ele **gosta ou adora**, repetida em seguida, enjoa — memória `enjoo` (meia-vida 2 h)
+tira até um nível ("{n} comeu a maçã, mas parece estar enjoando um pouco."), nunca até recusar. Horas depois volta ao
+normal; o gosto de verdade não muda (a memória e o diário ficam com ele). Do que é indiferente não há o que enjoar.
+
+**Quando um gosto muda de nível:** observação ("{n} parece ter começado a gostar de cenoura." · "passado a adorar" ·
+"não se incomodar mais com" · "perdido o interesse por" · "começado a não gostar de" · "passado a detestar"), página
+na aba Histórias ("Começou a gostar de cenoura."), e na aba Gostos o nível antigo perde metade da evidência e o novo
+passa na frente.
 
 ## 6b. Ambiente e sono (V0.7: componente `Ambient`)
 
@@ -316,6 +368,9 @@ adorada que você nunca ofereceu **não aparece**.
 | **Gostos** | Comidas (até 7, sem artigo: "Adora maçã."), Brinquedos ("O brinquedo preferido parece ser a pelúcia.", "Talvez adore a bola."), Outras coisas (carinho, dormir no escuro). Por assunto vale o nível com mais evidência. Nada visto: "Ainda não deu para perceber do que gosta." |
 | **Histórias** | as 10 páginas mais novas do `Journal` com "Dia N" |
 
+Cada aba é dividida em **páginas** que cabem no papel (14 linhas, estimando as que quebram; um título de seção não fica
+sozinho no fim): ◀ 1/2 ▶ no canto de baixo à esquerda (`scripts/diarioSeta.js`); trocar de aba volta à página 1.
+
 **Páginas da história** (cada uma uma vez só): Chegou ao quarto · Começou este diário (saves antigos) · Provou {a comida}
 pela primeira vez e adorou / gostou / sem muito entusiasmo / não gostou muito / recusou na hora · Recebeu o primeiro
 carinho e adorou (ou se afastou…) · Brincou com {o brinquedo} pela primeira vez · Escolheu {o brinquedo} como brinquedo
@@ -370,6 +425,8 @@ procurando alguma coisa." · "{n} ficou animado!" · "{n} parece gostar do carin
 ## 11. Coleção ("pokédex") e novo pet
 
 - Toda forma alcançada fica registrada (com o nome do pet que a revelou), mesmo depois de trocar de pet.
+- O novo pet **começa do zero**: os itens, as moedas e a arrumação do quarto do anterior não passam para ele (ele
+  ganha a cesta de boas-vindas, as 15 moedas e a bola). A coleção e a velocidade ficam.
 - Na fase adulta, o Diário oferece **"Começar com um novo pet"** (pede um segundo clique para confirmar). O adulto vai
   para "Pets anteriores" (nome, forma final, dias de vida, traços percebidos) e o jogo volta à tela de nomear.
 - O objetivo de longo prazo implícito é descobrir as 9 formas.

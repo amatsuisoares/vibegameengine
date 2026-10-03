@@ -318,7 +318,27 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
   tranquilo na cestinha") e recupera mais ou menos energia; cochilo de dia (50–80 de energia; de dia só dorme de verdade
   abaixo de 50); dança com a música ou se afasta dela; coisa nova no quarto é conferida na hora; "Coisas" guarda
   brinquedos e móveis; loja em 6 colunas com quebra de linha
-- [ ] **Fase 9 — Preferências dinâmicas + histórico**
+- [x] **Fase 9 — Preferências dinâmicas**: `Preferences.learnFrom` (memória ensina o gosto) e evento
+  `preference_change` quando um gosto cruza um nível (item: id + tags); validação (`learnFrom` precisa de `Memory`)
+- [x] meu-pet: a fome ensina (comer algo que não detesta com fome < 50 → +0,8 de experiência; ~5 vezes e a cenoura
+  neutra vira "gosta"); enjoo (memória "enjoo", meia-vida 2 h: a comida que ele gosta/adora repetida em seguida desce
+  um nível, "parece estar enjoando um pouco", e passa em horas; o gosto de verdade não muda); sustos, brincadeiras,
+  dança e carinho também ensinam; mudança vira observação, página do diário ("Começou a gostar de cenoura.") e a aba
+  Gostos acompanha
+- [x] Correção (teste da usuária com "mbappe"): o aprendido sobre o item ficava diluído no peso do item (40%) e, com
+  tags de que ele não gosta, nunca chegava a "gosta" (cenoura travada em 0,006 com o aprendido no máximo). Agora o
+  aprendido sobre a coisa conta inteiro (`evaluate`); e quando a reação mostra um gosto diferente do que o diário sabia
+  com segurança, o diário acompanha e avisa (o mbappe mostra "começou a gostar de cenoura" na próxima cenoura)
+- [x] Pedido da usuária: sinais do que ele não gosta (💢 não gostou, ❗ susto, ❗ âmbar desconfiado) em todas as reações
+  negativas; a lâmpada provoca reação na hora, a qualquer hora (♥/💢/❗ pelo gosto por escuro; antes só aparecia à
+  noite com o pet dormindo); gosto por escuro mais marcado (−0,9…0,9); diário: "ficar no escuro"
+- [x] Pedido da usuária: **cortina** na janela (clique abre/fecha; fechada tapa a luz do dia e escurece o quarto) e o
+  jeito de cada pet com a claridade — escuro (cortina fechada + luz apagada), luz (aberta + acesa), normal (claro
+  acordado, escuro dormindo), indiferente (tanto faz); reação na hora, afeto e sinais periódicos pelo quarto do jeito
+  dele, evidência no diário
+- [x] Pedido da usuária: diário em páginas (14 linhas; ◀ 1/2 ▶ no canto, fora do botão de novo pet; título de seção
+  não fica sozinho), "gosta da bola" (contração); cartas da bandeja e da caixa de Coisas com quebra de linha; **novo pet
+  começa do zero** (sem itens, moedas nem arrumação do anterior: cesta, 15 moedas e a bola; coleção e velocidade ficam)
 - [ ] **Fase 10 — Evolução por histórico**
 - [ ] **Fase 11 — Minigames** (`startMinigame`/`endMinigame` + 1–2 minigames)
 - [ ] **Fase 12 — Polimento, balanceamento e avaliação das 10 perguntas de qualidade**

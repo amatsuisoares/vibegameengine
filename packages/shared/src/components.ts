@@ -355,6 +355,10 @@ export const PreferencesSchema = z
       .describe('How the tags combine: 0 = their mean; 1 = the strongest feeling among them (a hated smell spoils any smelly food); in between blends both.'),
     learnRate: z.number().min(0).max(1).default(0.05).describe('learn(subject, outcome): learned moves by learnRate × outcome (outcome -1..1).'),
     maxLearned: z.number().min(0).max(1).default(0.5).describe('Bound of |learned|: experience shifts a preference, never rewrites it.'),
+    learnFrom: z
+      .record(z.string(), z.number().min(-2).max(2))
+      .default(() => ({}))
+      .describe('Memory types that teach: remembering {type, subject, valence} also learns(subject, valence × weight), e.g. {"ate": 1, "scared": 1.2}. Needs Memory.'),
   })
   .refine((p) => Object.values(p.generate).every((g) => g.min <= g.max), 'generate: min must be <= max');
 

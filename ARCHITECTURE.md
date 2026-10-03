@@ -274,6 +274,9 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   meia-vida por tipo, a partir de `last`); reforço por tipo + assunto; esquecimento (abaixo da força mínima e acima da
   capacidade) só em `remember`/`recall`, com evento `memory_forgotten`. O snapshot usa uma consulta só de leitura.
   Persistida pelo `IndividualRunner` (com validação de cada entrada ao carregar).
+- **Gostos que mudam** (V0.7): `Preferences.learnFrom` liga a memória ao gosto — o `remember` da API de script chama
+  `learn(subject, valence × peso)` para os tipos listados; todo `learn` compara o nível antes/depois (item: id + tags) e
+  emite `preference_change`. Gostos mudam devagar (`learnRate`, limitados por `maxLearned`); o inato nunca muda.
 - **Ambiente** (V0.7, `engine/src/ambient.ts`): `envAt(world, x, y)` soma, por propriedade, `emits × alcance` dos
   `Ambient` ligados (alcance linear ou plano até `radius`; sem raio = cena toda). Calculado sob demanda (O(emissores)),
   sem estado próprio: ligar/desligar é mexer no componente.

@@ -78,9 +78,11 @@ export function affinityOf(e: Entity, subject: string): number {
 }
 
 /**
- * How the entity feels about something: the subject's own affinity weighted (subjectWeight) with its
- * tags' — their mean, or blended toward the strongest feeling among them (tagBlend). Either side
- * alone counts fully when the other is unknown.
+ * How the entity feels about something: the subject's own INNATE affinity weighted (subjectWeight) with its
+ * tags' — their mean, or blended toward the strongest feeling among them (tagBlend) — plus what it LEARNED
+ * about the subject itself, in full: the tags are what it expects of things like it, experience with this
+ * very thing overrides that (a carrot eaten many times can become liked even if crunchy veggies are not).
+ * Either side alone counts fully when the other is unknown.
  */
 export function evaluate(e: Entity, subject: string | null, tags: readonly string[] = []): Evaluation {
   const prefs = e.components.Preferences;
@@ -102,7 +104,8 @@ export function evaluate(e: Entity, subject: string | null, tags: readonly strin
     tagScore = (1 - b) * mean + b * strongest;
   }
   const w = prefs?.subjectWeight ?? 0.6;
-  const score = own !== null && tagScore !== null ? w * own + (1 - w) * tagScore : (own ?? tagScore ?? 0);
+  const learned = own !== null ? prefs!.values[subject!].learned : 0;
+  const score = own !== null && tagScore !== null ? clamp(w * (own - learned) + (1 - w) * tagScore + learned, -1, 1) : (own ?? tagScore ?? 0);
   const s = round3(score);
   return { score: s, level: preferenceLevel(s), known: own !== null || tagScore !== null, parts };
 }

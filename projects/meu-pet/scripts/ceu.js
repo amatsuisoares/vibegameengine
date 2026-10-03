@@ -21,9 +21,11 @@ function onUpdate(self, game) {
   const h = game.clock.hour;
   const n = nightness(h);
   self.get('Sprite').color = mix('#8fd3ff', '#14183a', n);
-  // A janela é luz no quarto (Ambient) durante o dia.
+  // A janela é luz no quarto (Ambient) durante o dia — quase nada com a cortina fechada.
+  const quarto = game.storage.get('quarto') || {};
+  const laFora = (1 - n) * (quarto.cortina ? 0.1 : 1);
   const amb = self.get('Ambient');
-  if (amb) amb.emits.light = Math.round((1 - n) * 80) / 100;
+  if (amb) amb.emits.light = Math.round(laFora * 80) / 100;
 
   const astro = game.entity('astro');
   if (astro) {
@@ -39,7 +41,9 @@ function onUpdate(self, game) {
   const pet = game.entity('pet');
   const lightOn = pet && pet.state.api ? pet.state.api.pet.lightOn : true;
   const overlay = game.entity('noite');
-  if (overlay) overlay.get('Sprite').opacity = n * (lightOn ? 0.18 : 0.6) + (lightOn ? 0 : 0.1);
+  // Escuro = noite ou cortina fechada; a lâmpada clareia.
+  const escuro = 1 - laFora;
+  if (overlay) overlay.get('Sprite').opacity = escuro * (lightOn ? 0.18 : 0.6) + (lightOn ? 0 : 0.1);
 
   const clock = game.entity('relogio');
   if (clock) {
@@ -48,4 +52,10 @@ function onUpdate(self, game) {
     const speed = game.clock.speed;
     clock.get('Text').text = `${hh}:${mm}${speed > 1 ? `  ·  ${speed}×` : ''}`;
   }
+}
+
+/** Clicar no vidro abre/fecha a cortina (cortina.js). */
+function onClick(self, game) {
+  const c = game.entity('cortinaE');
+  if (c && c.state.alternar) c.state.alternar();
 }

@@ -319,7 +319,12 @@ sentido aos eixos e aos assuntos.
 | `subjectWeight` | `0.6`: peso do próprio assunto contra as tags em `evaluate` |
 | `tagBlend` | `0`: como as tags se combinam — `0` a média; `1` o sentimento mais forte entre elas (um cheiro odiado estraga qualquer comida cheirosa); entre os dois, mistura |
 | `learnRate` / `maxLearned` | `0.05` / `0.5`: cada experiência move `learned` em `learnRate × resultado`, nunca além de ±`maxLearned` |
+| `learnFrom` | `{}` | tipos de memória que ensinam (precisa de `Memory`): `self.memory.remember(tipo, {subject, valence})` também faz `learn(subject, valence × peso)`, ex. `{"comida": 1, "susto": 1.2}` — um susto deixa a coisa um pouco menos querida, para sempre |
 | `Persist.key` | chave do `game.storage` onde os valores ficam entre sessões e cenas |
+
+- **Gosto que muda:** quando um `learn` (direto ou por `learnFrom`) faz o nível de um assunto cruzar um limite (para
+  um item: o nível do item com id + tags), sai o evento `preference_change {entity, subject, from, to, score}` — o jogo
+  mostra a mudança, anota no diário, atualiza o que o jogador sabe.
 
 - **Quando:** antes do primeiro `onStart` da entidade, os valores salvos são carregados e o que falta é sorteado (evento
   `individual {entity, key?, loaded, drawn}`). Mudanças feitas por scripts são gravadas no fim do frame. Uma versão nova
@@ -327,7 +332,9 @@ sentido aos eixos e aos assuntos.
 - **Sorteio:** gerador próprio a partir da seed, do id da entidade e do relógio do jogo: reproduzível nas runs, diferente
   para um indivíduo criado depois na mesma sessão, e não muda a sequência de `game.random()`.
 - **Níveis:** `≥ 0,6` love · `≥ 0,2` like · `> −0,2` neutral · `> −0,6` dislike · resto hate.
-- **`evaluate(assunto, tags)`:** `subjectWeight × assunto + (1 − subjectWeight) × tags`, onde tags = `(1 − tagBlend) × média + tagBlend × mais forte` (só as conhecidas); um lado
+- **`evaluate(assunto, tags)`:** `subjectWeight × inato do assunto + (1 − subjectWeight) × tags + aprendido do assunto` (o que
+  a experiência ensinou sobre **esta** coisa conta inteiro, por cima da expectativa das tags: uma cenoura comida muitas vezes
+  pode virar querida mesmo que vegetais crocantes não sejam), onde tags = `(1 − tagBlend) × média + tagBlend × mais forte` (só as conhecidas); um lado
   sozinho conta inteiro; nada conhecido = 0 (`known: false`).
 - **Scripts:** `self.traits.get/set/has/all` (eixo desconhecido é erro, não "médio"); `self.prefs.of(assunto)`,
   `known`, `evaluate(assunto, tags?)` → `{score, level, known, parts}`, `level(score)`,

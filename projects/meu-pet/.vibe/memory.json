@@ -214,6 +214,22 @@
       "status": "verified",
       "evidence": "teste 'ambient and sleep' (noite: cestinha, dorme mal com luz, apagar = dorme bem e recupera > 1,4×; cochilo em < 4 min a 1x; fã dança, sensível se afasta); playtest com screenshots (sono com luz, escuro, dança, loja 6 colunas)",
       "updatedAt": "2026-10-02T22:04:06.790Z"
+    },
+    {
+      "id": "f18",
+      "kind": "feature",
+      "text": "Gostos que mudam: a fome ensina (cenoura neutra vira gosta), enjoo de comida repetida (passa em horas), sustos/brincadeiras/música/carinho ensinam; mudança vira observação, diário e aba Gostos",
+      "status": "verified",
+      "evidence": "teste 'tastes change' (maçã adorada enjoa em 5 e volta 6 h depois; cenoura com fome vira gosta com preference_change, observação e diário); playtest com screenshot do diário",
+      "updatedAt": "2026-10-02T22:17:07.869Z"
+    },
+    {
+      "id": "f19",
+      "kind": "feature",
+      "text": "Cortina (clique abre/fecha, tapa a luz do dia) e jeito com a claridade: escuro / luz / normal / indiferente; reação na hora (♥ 💢 ❗), afeto e ♪/💢 periódicos pelo quarto do jeito dele; sinais 💢/❗ em todas as reações negativas",
+      "status": "verified",
+      "evidence": "testes 'curtain' e 'you can see what it dislikes' (4 jeitos, quarto escurece, ♪ em < 100 s a 1x, afeto maior em 1 h); screenshots da cortina aberta/fechada e dos 💢",
+      "updatedAt": "2026-10-03T00:00:56.961Z"
     }
   ],
   "plans": []

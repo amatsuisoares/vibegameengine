@@ -122,6 +122,8 @@ export function individualErrors(c: Components, at: string): string[] {
       else if (!axes.has(axis)) errors.push(`${p}: trait "${axis}" does not exist (traits: ${[...axes].join(', ') || 'none'})`);
     }
   }
+  if (c.Preferences && Object.keys(c.Preferences.learnFrom).length && !c.Memory)
+    errors.push(`${at}.components.Preferences.learnFrom: learning from memories needs a Memory component`);
   if (c.Persist && !c.Traits && !c.Preferences && !c.Routine && !c.Memory && !c.Knowledge && !c.Journal)
     errors.push(`${at}.components.Persist: nothing to keep (add Traits, Preferences, Routine, Memory, Knowledge or Journal)`);
   return errors;

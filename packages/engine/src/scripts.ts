@@ -743,6 +743,20 @@ class ScriptApi {
       has: (axis) => Object.hasOwn(traitsData().values, String(axis)),
       all: () => ({ ...traitsData().values }),
     };
+    /** How the entity feels about a subject now (an item: by its id, category and tags). */
+    const levelOfSubject = (subject: string) => {
+      const item = host.items.get(subject);
+      return item ? evaluateItem(e, item) : evaluate(e, subject);
+    };
+    /** learn(), saved, and "preference_change" when the level the subject shows crosses a threshold. */
+    const learnAndReport = (subject: string, outcome: number) => {
+      const before = levelOfSubject(subject);
+      const v = learn(e, subject, outcome);
+      individuals.touch(e);
+      const after = levelOfSubject(subject);
+      if (after.level !== before.level) w.emit('preference_change', { entity: e.id, subject, from: before.level, to: after.level, score: after.score });
+      return v;
+    };
     const prefs: ScriptPrefs = {
       of: (subject) => (prefsData(), affinityOf(e, String(subject))),
       known: (subject) => Object.hasOwn(prefsData().values, String(subject)),
@@ -756,12 +770,7 @@ class ScriptApi {
         prefsData();
         return evaluateItem(e, host.items.require(typeof item === 'string' ? item : item?.id));
       },
-      learn: (subject, outcome) => {
-        prefsData();
-        const v = learn(e, String(subject), finite(outcome, 'outcome'));
-        individuals.touch(e);
-        return v;
-      },
+      learn: (subject, outcome) => (prefsData(), learnAndReport(String(subject), finite(outcome, 'outcome'))),
       set: (subject, innate) => {
         const p = prefsData();
         const v = (p.values[String(subject)] ??= { innate: 0, learned: 0, n: 0 });
@@ -798,6 +807,9 @@ class ScriptApi {
         memoryData();
         const r = remember(e, host.clock.now, String(type), input ?? {}, forgotten);
         individuals.touch(e);
+        // Memory teaches preferences (Preferences.learnFrom): a scare makes the thing a bit less liked, for good.
+        const teach = e.components.Preferences?.learnFrom[r.memory.type];
+        if (teach && r.memory.subject !== undefined && input?.valence) learnAndReport(r.memory.subject, Math.max(-1, Math.min(1, input.valence * teach)));
         w.emit('memory', { entity: e.id, memory: r.memory.type, ...(r.memory.subject !== undefined && { subject: r.memory.subject }), valence: r.memory.valence, strength: r.memory.strength, count: r.memory.count, reinforced: r.reinforced });
         return r.memory;
       },

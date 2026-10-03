@@ -249,7 +249,7 @@
             "doce": { "min": -0.3, "max": 0.9, "traits": { "apetite": 0.3 } },
             "racao": { "min": -0.4, "max": 0.7 },
             "crocante": { "min": -0.5, "max": 0.6 },
-            "escuro": { "min": -0.5, "max": 0.7, "traits": { "sensibilidade": 0.4 } },
+            "escuro": { "min": -0.9, "max": 0.9, "traits": { "sensibilidade": 0.4 } },
             "fruta": { "min": -1.1, "max": 1.98 },
             "fresco": { "min": -0.88, "max": 1.32 },
             "macio": { "min": -0.88, "max": 1.32 },
@@ -277,7 +277,9 @@
             "caixinhaMusica": { "min": -0.6, "max": 0.6 }
           },
           "subjectWeight": 0.4,
-          "tagBlend": 0.7
+          "tagBlend": 0.7,
+          "learnRate": 0.1,
+          "learnFrom": { "comida": 1, "brinquedo": 0.6, "susto": 1.2, "musica": 0.8 }
         },
         "Persist": { "key": "petIndividuo" },
         "Routine": { "slots": 8, "halfLifeDays": 4, "minEvidence": 3 },
@@ -290,7 +292,9 @@
             "carinho": 6,
             "brincouComVoce": 8,
             "brinquedo": 24,
-            "comida": 72
+            "comida": 72,
+            "enjoo": 2,
+            "musica": 24
           },
           "minStrength": 0.05
         },
@@ -346,7 +350,7 @@
       "transform": { "x": 14, "y": 503 },
       "components": {
         "Text": {
-          "text": "Clique no pet para fazer carinho\nClique na tigela, luz e brinquedos",
+          "text": "Clique no pet (carinho), na tigela,\nna luz, na cortina e nos brinquedos",
           "fontSize": 12,
           "font": "sans-serif",
           "color": "#e9e3ff",
@@ -583,6 +587,80 @@
         },
         "Collider": { "width": 92, "height": 30, "isTrigger": true },
         "Script": { "src": "scripts/diarioAba.js", "props": { "aba": "historias", "nome": "Histórias" } }
+      }
+    },
+    {
+      "id": "varao",
+      "transform": { "x": 250, "y": 64 },
+      "components": { "Sprite": { "width": 236, "height": 6, "color": "#5b3a26", "layer": -10 } }
+    },
+    {
+      "id": "cortinaE",
+      "transform": { "x": 148, "y": 142 },
+      "components": {
+        "Sprite": { "width": 24, "height": 150, "color": "#b5485f", "layer": -11 },
+        "Script": { "src": "scripts/cortina.js", "props": { "lado": -1 } }
+      }
+    },
+    {
+      "id": "cortinaD",
+      "transform": { "x": 352, "y": 142 },
+      "components": {
+        "Sprite": { "width": 24, "height": 150, "color": "#b5485f", "layer": -11 },
+        "Script": { "src": "scripts/cortina.js", "props": { "lado": 1 } }
+      }
+    },
+    {
+      "id": "diarioAnt",
+      "enabled": false,
+      "transform": { "x": 200, "y": 428 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 18,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#b5541c",
+          "screenSpace": false,
+          "layer": 72
+        },
+        "Collider": { "width": 40, "height": 30, "isTrigger": true },
+        "Script": { "src": "scripts/diarioSeta.js", "props": { "dir": -1 } }
+      }
+    },
+    {
+      "id": "diarioPag",
+      "enabled": false,
+      "transform": { "x": 236, "y": 428 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 15,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#b5541c",
+          "screenSpace": false,
+          "layer": 72
+        },
+        "Script": { "src": "scripts/diarioSeta.js", "props": { "dir": 0 } }
+      }
+    },
+    {
+      "id": "diarioProx",
+      "enabled": false,
+      "transform": { "x": 272, "y": 428 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 18,
+          "font": "sans-serif",
+          "align": "center",
+          "color": "#b5541c",
+          "screenSpace": false,
+          "layer": 72
+        },
+        "Collider": { "width": 40, "height": 30, "isTrigger": true },
+        "Script": { "src": "scripts/diarioSeta.js", "props": { "dir": 1 } }
       }
     }
   ]

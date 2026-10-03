@@ -8,5 +8,6 @@ function onUpdate(self, game) {
 
 function onClick(self, game) {
   game.vars.diarioAba = self.props.aba;
+  game.vars.diarioPagina = 0;
   game.playSound('sfx_clique');
 }

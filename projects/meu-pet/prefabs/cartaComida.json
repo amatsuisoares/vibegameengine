@@ -4,12 +4,13 @@
     "Sprite": { "width": 100, "height": 76, "color": "#fffaf0", "layer": 66 },
     "Text": {
       "text": "",
-      "fontSize": 16,
+      "fontSize": 15,
       "font": "sans-serif",
       "align": "center",
       "color": "#3b2f2f",
       "screenSpace": false,
-      "layer": 67
+      "layer": 67,
+      "maxWidth": 94
     },
     "Script": { "src": "scripts/cartaComida.js", "props": { "item": "" } }
   }

@@ -501,7 +501,9 @@ describe('meu-pet (regression)', () => {
     expect(game.console.read(0, 'error')).toEqual([]);
 
     // Kept with the individual: reopening the game it still recognizes the fish.
-    const again = new Game(project, { seed: 3, scene: 'quarto', clock: { start: '2026-03-10T10:20:00Z' }, storage: game.storage.snapshot() });
+    const reopened = game.storage.snapshot() as Record<string, { needs: { fome: number } }>;
+    reopened.pet.needs.fome = 40; // hungry again, so the offer is not refused for being full
+    const again = new Game(project, { seed: 3, scene: 'quarto', clock: { start: '2026-03-10T10:20:00Z' }, storage: reopened });
     again.perform([{ type: 'wait', ms: 500 }, { type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
     const fish = again.world.withTag('cartaComida').find((c) => c.components.Script!.props.item === 'peixe')!.id;
     again.perform([{ type: 'click', entity: fish }, { type: 'wait', ms: 500 }]);
@@ -633,6 +635,214 @@ describe('meu-pet (regression)', () => {
     expect(kinds(shy)).toContain('musicaNao');
     expect(Math.abs(shy.entity('pet')!.x - shy.entity('caixinhaMusica')!.x)).toBeGreaterThan(400);
     for (const g of [night, day, fan, shy]) expect(g.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('tastes change: the same food many times in a row gets boring (and passes), and food eaten when hungry ends up liked — you see it and the diary follows', () => {
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const pet = {
+      version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 0, energia: 90, diversao: 80, higiene: 95, saude: 100, afeto: 80 }, sick: false,
+      asleep: false, lightOn: true, bowl: 0, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const traits = { atividade: 0.4, sociabilidade: 0.5, curiosidade: 0.4, independencia: 0.5, sensibilidade: 0.4, apetite: 0.5, paciencia: 0.8, brincadeira: 0.4 };
+    const start = (preferences: Record<string, unknown>, bag: Record<string, number>, storage: Record<string, unknown> = {}, iso = '2026-03-10T10:00:00Z') =>
+      new Game(load(), {
+        seed: 4, scene: 'quarto', clock: { start: iso },
+        storage: { pet, petIndividuo: { version: 1, traits, preferences }, 'vibe.inventory': { default: bag }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) }, ...storage },
+      });
+    const offer = (g: Game, item: string) => {
+      g.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
+      const card = g.world.withTag('cartaComida').find((c) => c.components.Script!.props.item === item)!.id;
+      g.perform([{ type: 'click', entity: card }, { type: 'wait', ms: 4000 }]);
+      return g.events(0, 'reacao').at(-1)!;
+    };
+    const neutralTags = { fruta: p(0), doce: p(0), fresco: p(0), vegetal: p(0), crocante: p(0), comida: p(0) };
+
+    // Boredom: a loved apple, again and again — after a few it is "getting a bit tired of it"; hours later it is loved again.
+    const bored = start({ ...neutralTags, maca: p(1), fruta: p(1), doce: p(1), fresco: p(1) }, { maca: 8 });
+    bored.perform([{ type: 'wait', ms: 500 }]);
+    const levels = [0, 1, 2, 3, 4].map(() => offer(bored, 'maca').level);
+    expect(levels[0]).toBe('love');
+    expect(levels.at(-1)).not.toBe('love');
+    expect(bored.events(0, 'notification').map((e) => e.kind)).toContain('enjoou:maca');
+    const later = start({}, { maca: 3 }, { petIndividuo: bored.storage.get('petIndividuo') }, '2026-03-10T16:00:00Z'); // 6 hours later
+    later.perform([{ type: 'wait', ms: 500 }]);
+    expect(offer(later, 'maca').level).toBe('love');
+    expect(later.storage.get('petIndividuo')).toMatchObject({ preferences: { maca: { innate: 1 } } }); // the taste itself never moved down
+
+    // Hunger teaches: a carrot it does not care about, eaten while hungry, becomes liked.
+    const hungry = start({ ...neutralTags, cenoura: p(0.1) }, { cenoura: 8 });
+    hungry.perform([{ type: 'wait', ms: 500 }]);
+    expect(offer(hungry, 'cenoura').level).toBe('neutral');
+    for (let i = 0; i < 4; i++) offer(hungry, 'cenoura');
+    expect(hungry.events(0, 'preference_change')).toEqual([expect.objectContaining({ entity: 'pet', subject: 'cenoura', from: 'neutral', to: 'like' })]);
+    expect(hungry.events(0, 'notification').find((e) => e.kind === 'mudou:cenoura')!.text).toBe('Mimi parece ter começado a gostar de cenoura.');
+    hungry.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'diarioAba2' }, { type: 'wait', ms: 50 }]);
+    expect(hungry.entity('diarioTexto')!.components.Text!.text).toMatch(/(Gosta de|gostar de) cenoura\./);
+    expect(hungry.entity('diarioTexto')!.components.Text!.text).not.toMatch(/ligar muito para cenoura/);
+    hungry.perform([{ type: 'click', entity: 'diarioAba3' }, { type: 'wait', ms: 50 }]);
+    expect(hungry.entity('diarioTexto')!.components.Text!.text).toContain('Começou a gostar de cenoura.');
+    for (const g of [bored, later, hungry]) expect(g.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('you can see what it dislikes: the lamp gets a reaction any time (♥ / 💢 / ❗ by its taste for the dark), and refusing shows 💢', () => {
+    const t = Date.parse('2026-03-10T14:00:00Z');
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const pet = {
+      version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 50, energia: 90, diversao: 80, higiene: 95, saude: 100, afeto: 80 }, sick: false,
+      asleep: false, lightOn: true, bowl: 0, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const traits = { atividade: 0.4, sociabilidade: 0.5, curiosidade: 0.4, independencia: 0.5, sensibilidade: 0.4, apetite: 0.5, paciencia: 0.8, brincadeira: 0.4 };
+    const start = (preferences: Record<string, unknown>) =>
+      new Game(load(), {
+        seed: 6, scene: 'quarto', clock: { start: '2026-03-10T14:00:00Z' },
+        storage: { pet, petIndividuo: { version: 1, traits, preferences }, 'vibe.inventory': { default: { peixe: 1 } }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } },
+      });
+    const glyphs = (g: Game) => g.world.withTag('emote').map((e) => e.components.Text!.text);
+    const lamp = (g: Game) => {
+      g.perform([{ type: 'click', entity: 'lampada' }, { type: 'wait', ms: 100 }]);
+      return { signs: glyphs(g), note: g.events(0, 'notification').at(-1)?.text };
+    };
+
+    const owl = start({ escuro: p(0.8) });
+    owl.perform([{ type: 'wait', ms: 500 }]);
+    expect(lamp(owl)).toEqual({ signs: expect.arrayContaining(['♥']), note: 'Mimi parece gostar do quarto mais escuro.' }); // off, in the afternoon
+    owl.perform([{ type: 'wait', ms: 2000 }]);
+    expect(lamp(owl)).toEqual({ signs: expect.arrayContaining(['💢']), note: 'Mimi apertou os olhos com a luz. Parece preferir o escuro.' });
+
+    const sunny = start({ escuro: p(-0.8) });
+    sunny.perform([{ type: 'wait', ms: 500 }]);
+    expect(lamp(sunny)).toEqual({ signs: expect.arrayContaining(['❗']), note: 'Mimi não parece gostar do escuro.' });
+
+    const calm = start({ escuro: p(0) });
+    calm.perform([{ type: 'wait', ms: 500 }]);
+    expect(lamp(calm).signs).toEqual([]); // does not care: no reaction
+
+    // Diary: the taste for the dark is something you saw.
+    owl.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'diarioAba2' }, { type: 'wait', ms: 50 }]);
+    expect(owl.entity('diarioTexto')!.components.Text!.text).toContain('ficar no escuro.');
+
+    // Refusing a hated food: 💢.
+    const picky = start({ peixe: p(-1), proteina: p(-1), cheiroso: p(-1), salgado: p(-1) });
+    picky.perform([{ type: 'wait', ms: 500 }, { type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
+    const card = picky.world.withTag('cartaComida')[0].id;
+    picky.perform([{ type: 'click', entity: card }, { type: 'wait', ms: 1100 }]);
+    expect(glyphs(picky)).toContain('💢');
+    for (const g of [owl, sunny, calm, picky]) expect(g.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('curtain: each pet has its way with brightness — dark (curtain closed, light off), light (open, on), normal (bright awake, dark asleep), indifferent — reacts on the spot and is happier when it is right', () => {
+    const t = Date.parse('2026-03-10T14:00:00Z');
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const pet = {
+      version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 80, energia: 90, diversao: 80, higiene: 95, saude: 100, afeto: 50 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const traits = (sensibilidade: number) => ({ atividade: 0.4, sociabilidade: 0.5, curiosidade: 0.4, independencia: 0.5, sensibilidade, apetite: 0.5, paciencia: 0.8, brincadeira: 0.4 });
+    const start = (escuro: number, sens: number, quarto: Record<string, unknown> = {}) =>
+      new Game(load(), {
+        seed: 7, scene: 'quarto', clock: { start: '2026-03-10T14:00:00Z' },
+        storage: { pet, petIndividuo: { version: 1, traits: traits(sens), preferences: { escuro: p(escuro) } }, 'vibe.inventory': { default: {} }, quarto: { bolaDada: true, brinquedos: {}, ...quarto }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } },
+      });
+    const click = (g: Game, id: string) => {
+      g.perform([{ type: 'click', entity: id }, { type: 'wait', ms: 150 }]);
+      return { signs: g.world.withTag('emote').map((e) => e.components.Text!.text), note: g.events(0, 'notification').at(-1)?.text };
+    };
+
+    // Prefers the dark: closing the curtain pleases it; the window stops lighting the room and the room darkens.
+    const owl = start(0.8, 0.5);
+    owl.perform([{ type: 'wait', ms: 500 }]);
+    expect(click(owl, 'cortinaE')).toEqual({ signs: expect.arrayContaining(['♥']), note: 'Mimi parece gostar da cortina fechada.' });
+    owl.perform([{ type: 'wait', ms: 1000 }]);
+    expect(owl.storage.get('quarto')).toMatchObject({ cortina: true });
+    expect(owl.entity('janela')!.components.Ambient!.emits.light).toBeLessThan(0.1);
+    expect(owl.entity('cortinaE')!.components.Sprite!.width).toBeGreaterThan(80); // drawn closed
+    owl.perform([{ type: 'click', entity: 'lampada' }, { type: 'wait', ms: 1000 }]);
+    expect(owl.entity('noite')!.components.Sprite!.opacity).toBeGreaterThan(0.5); // dark afternoon
+    // Just right for it: within a minute and a half at 1x it shows it is at ease, and it grows fonder over time.
+    let ok = false;
+    for (let s = 0; s < 100 && !ok; s++) {
+      owl.perform([{ type: 'wait', ms: 1000 }]);
+      ok = owl.events(0, 'notification').some((e) => e.kind === 'quartoBom');
+    }
+    expect(ok).toBe(true);
+
+    // Prefers light: closing the curtain is not welcome.
+    const sunny = start(-0.8, 0.5);
+    sunny.perform([{ type: 'wait', ms: 500 }]);
+    expect(click(sunny, 'janela')).toEqual({ signs: expect.arrayContaining(['❗']), note: 'Mimi não parece gostar do quarto mais escuro.' });
+
+    // Normal: the curtain alone does not matter while the lamp is on; a dark room while awake does.
+    const normal = start(0, 0.5);
+    normal.perform([{ type: 'wait', ms: 500 }]);
+    expect(click(normal, 'cortinaE').signs).toEqual([]);
+    expect(click(normal, 'lampada')).toEqual({ signs: expect.arrayContaining(['💢']), note: 'Mimi não parece gostar do quarto escuro agora.' });
+    normal.perform([{ type: 'wait', ms: 2000 }]);
+    expect(click(normal, 'cortinaD')).toEqual({ signs: expect.arrayContaining(['♥']), note: 'Mimi parece mais à vontade com o quarto claro.' });
+
+    // Indifferent (not sensitive): nothing.
+    const easy = start(0, 0.2);
+    easy.perform([{ type: 'wait', ms: 500 }]);
+    expect(click(easy, 'cortinaE').signs).toEqual([]);
+    expect(click(easy, 'lampada').signs).toEqual([]);
+
+    // Happier over time: an hour in the room it likes vs in the room it does not.
+    const afeto = (quarto: Record<string, unknown>, lightOn: boolean) => {
+      const g = new Game(load(), {
+        seed: 7, scene: 'quarto', clock: { start: '2026-03-10T14:00:00Z', speed: 60 },
+        storage: { pet: { ...pet, lightOn }, petIndividuo: { version: 1, traits: traits(0.5), preferences: { escuro: p(0.8) } }, 'vibe.inventory': { default: {} }, quarto: { bolaDada: true, brinquedos: {}, ...quarto }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) } },
+      });
+      g.perform([{ type: 'wait', ms: 60_000 }]);
+      return g.world.vars.afeto as number;
+    };
+    expect(afeto({ cortina: true }, false)).toBeGreaterThan(afeto({ cortina: false }, true) + 2);
+    for (const g of [owl, sunny, normal, easy]) expect(g.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('a full diary splits into pages that fit the paper (◂ 1/2 ▸), and a new pet starts from scratch: no items, coins or room of the previous one', () => {
+    const t = Date.parse('2026-03-10T10:00:00Z');
+    const pet = {
+      version: 2, name: 'Velho', born: t - 40 * 3_600_000, stage: 'adulto1a', needs: { fome: 80, energia: 90, diversao: 80, higiene: 95, saude: 100, afeto: 80 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const seen = (key: string) => [key, { evidence: 4, first: t, last: t }];
+    const subjects = ['maca', 'banana', 'leite', 'queijo', 'peixe', 'cenoura', 'biscoito', 'racao', 'bola', 'pelucia', 'chocalho', 'cestinha', 'caixinhaMusica', 'carinho', 'escuro', 'musica'];
+    const knowledge = Object.fromEntries(subjects.map((s) => seen(`gosto:${s}:like`)));
+    const game = new Game(load(), {
+      seed: 8, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z' },
+      storage: {
+        pet, petIndividuo: { version: 1, traits: { paciencia: 0.8 }, preferences: {}, knowledge },
+        'vibe.inventory': { default: { maca: 3, pelucia: 1, bola: 1 } }, 'vibe.wallet': { moedas: 57 }, quarto: { bolaDada: true, brinquedos: {}, cortina: true },
+        economia: { cesta: true, dia: Math.floor(t / 86_400_000) }, config: { speed: 1 },
+      },
+    });
+    const text = () => game.entity('diarioTexto')!.components.Text!.text;
+    game.perform([{ type: 'wait', ms: 300 }, { type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'diarioAba2' }, { type: 'wait', ms: 50 }]);
+    expect(game.entity('diarioPag')!.components.Text!.text).toBe('1/2');
+    const first = text();
+    expect(first.split('\n').length).toBeLessThanOrEqual(16); // title + blank + 14 lines: fits the paper
+    expect(game.entity('diarioAnt')!.components.Text!.text).toBe('');
+    game.perform([{ type: 'click', entity: 'diarioProx' }, { type: 'wait', ms: 50 }]);
+    expect(game.entity('diarioPag')!.components.Text!.text).toBe('2/2');
+    expect(text()).not.toBe(first);
+    expect(first + text()).toContain('Parece gostar de ficar no escuro.');
+    game.perform([{ type: 'click', entity: 'diarioAba1' }, { type: 'wait', ms: 50 }]);
+    expect(game.entity('diarioPag')!.components.Text!.text).toBe(''); // one page: no arrows
+
+    // New pet: confirm twice, name it; the collection keeps the old one, everything else starts over.
+    game.perform([{ type: 'click', entity: 'botaoNovoPet' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'botaoNovoPet' }, { type: 'wait', ms: 300 }]);
+    expect(game.world.scene.id).toBe('inicio');
+    game.perform([{ type: 'type', text: 'Novo\n' }, { type: 'wait', ms: 500 }]);
+    expect(game.world.scene.id).toBe('quarto');
+    expect(game.getState().inventories).toEqual({ default: { maca: 1, cenoura: 1, leite: 1, biscoito: 1, bola: 1 } }); // the welcome basket and the ball
+    expect(game.getState().wallet).toEqual({ moedas: 15 });
+    expect(game.storage.get('quarto')).not.toMatchObject({ cortina: true });
+    expect((game.storage.get('colecao') as { pets: { nome: string }[] }).pets.map((p) => p.nome)).toEqual(['Velho']);
+    expect(game.console.read(0, 'error')).toEqual([]);
   });
 
   it('verify_game plays a scenario of the real game and reports PASS per check', async () => {
