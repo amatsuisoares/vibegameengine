@@ -1065,6 +1065,84 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(g.console.read(0, 'error')).toEqual([]);
   });
 
+  it('desires: soon after you arrive it wants a food (thought balloon + observation); giving it what it wanted pleases it, a wrong guess does not count, an ignored one passes', () => {
+    const iso = '2026-03-10T14:00:00Z';
+    const t = Date.parse(iso);
+    const pet = {
+      version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 50, energia: 95, diversao: 80, higiene: 95, saude: 100, afeto: 60 }, sick: false,
+      asleep: false, lightOn: true, bowl: 0, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const g = new Game(load(), {
+      seed: 5, scene: 'quarto', clock: { start: iso },
+      storage: {
+        pet, petIndividuo: { version: 1, traits: { atividade: 0.8, sociabilidade: 0.5, curiosidade: 0.5, independencia: 0.2, sensibilidade: 0.3, apetite: 0.7, paciencia: 0.1, brincadeira: 0.5 }, preferences: { peixe: p(1), crocante: p(0.9), biscoito: p(0.6), maca: p(0.3) } },
+        'vibe.inventory': { default: { maca: 2, biscoito: 1 } }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+      },
+    });
+    const script = () => (g as unknown as { scriptRunner: { api: { entity(e: unknown): { state: Record<string, unknown>; desires: { cancel(r: string): unknown } } } } }).scriptRunner.api.entity(g.entity('pet'));
+    const api = () => script().state.api as { desejar(p?: unknown): { kind: string; subject?: string; data: { tipo: string; icone: string } } | null; desejo(): unknown; pet: { needs: Record<string, number> } };
+    const desires = () => script().desires;
+    const balloon = () => g.entity('balao')!.components.Sprite!.opacity;
+    const offer = (item: string) => {
+      g.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 80 }]);
+      g.perform([{ type: 'click', entity: g.world.withTag('cartaComida').find((c) => c.components.Script!.props.item === item)!.id }, { type: 'wait', ms: 6000 }]);
+    };
+    const notes = () => g.events(0, 'notification').map((e) => e.text as string);
+
+    // Within the first minute of the visit it wants something to eat: a thought balloon with what, and an observation.
+    g.perform([{ type: 'wait', ms: 20_000 }]);
+    expect(g.events(0, 'desire_start')).toEqual([]);
+    expect(balloon()).toBe(0);
+    g.perform([{ type: 'wait', ms: 45_000 }]);
+    const first = g.events(0, 'desire_start');
+    expect(first).toMatchObject([{ entity: 'pet', kind: 'comida' }]);
+    expect(balloon()).toBeGreaterThan(0.9);
+    expect(g.entity('balaoIcone')!.components.Text!.text).toBe((first[0].data as { icone: string }).icone);
+    expect(notes().some((n) => /^Mimi (parece com vontade de|parece querer|está farejando o ar)/.test(n))).toBe(true);
+    expect(g.getState({ ids: ['pet'] }).entities[0].desires).toMatchObject([{ kind: 'comida' }]);
+    desires().cancel('*');
+
+    // It wants fish, which you do not have: buy it and give it — even full, it eats what it was craving.
+    expect(api().desejar({ tipo: 'especifica', item: 'peixe' })).toMatchObject({ subject: 'peixe', data: { tipo: 'especifica', icone: '🐟' } });
+    expect(notes().at(-1)).toBe('Mimi parece com vontade de comer peixe.');
+    g.economy.inventory().add('peixe', 1);
+    api().pet.needs.fome = 95;
+    const bondBefore = g.getState({ ids: ['pet'] }).entities[0].bonds?.voce?.value ?? 0.2;
+    offer('peixe');
+    expect(g.events(0, 'desire_fulfilled')).toMatchObject([{ entity: 'pet', subject: 'peixe', by: 'comeu', trigger: { item: 'peixe' } }]);
+    expect(notes()).toContain('Mimi estava mesmo com vontade de comer peixe! Parece muito feliz.');
+    expect((g.getState({ ids: ['pet'] }).entities[0].bonds!.voce.value) - bondBefore).toBeGreaterThan(0.07);
+    expect(g.getState({ ids: ['pet'] }).entities[0].journal!.last).toContain('Estava com vontade de comer peixe e você deu.');
+    g.perform([{ type: 'wait', ms: 1000 }]);
+    expect(balloon()).toBe(0);
+
+    // "Something crunchy": an apple is not it (it eats and keeps wanting); the biscuit is.
+    api().pet.needs.fome = 40;
+    api().desejar({ tipo: 'tag', tag: 'crocante' });
+    expect(notes().at(-1)).toBe('Mimi parece querer algo crocante.');
+    offer('maca');
+    expect(g.events(0, 'desire_fulfilled')).toHaveLength(1);
+    expect(api().desejo()).toMatchObject({ subject: 'crocante' });
+    offer('biscoito');
+    expect(g.events(0, 'desire_fulfilled').at(-1)).toMatchObject({ subject: 'crocante', trigger: { item: 'biscoito' } });
+    expect(notes()).toContain('Era isso! Mimi queria algo crocante, e o biscoito caiu muito bem.');
+    g.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'diarioAba2' }, { type: 'wait', ms: 50 }]);
+    expect(g.entity('diarioTexto')!.components.Text!.text).toMatch(/(adore|goste|gostar de) coisas crocantes/);
+    g.perform([{ type: 'click', entity: 'diario' }, { type: 'wait', ms: 50 }]);
+
+    // Ignored, it passes (an impatient one gives up sooner): no punishment, just the chance gone.
+    api().desejar({ tipo: 'novidade' });
+    expect(notes().at(-1)).toBe('Mimi está farejando o ar, curioso. Parece querer provar algo novo.');
+    g.apply({ op: 'advanceClock', ms: 25 * 60_000 });
+    g.perform([{ type: 'wait', ms: 170_000 }]);
+    expect(g.events(0, 'desire_expired')).toMatchObject([{ entity: 'pet', data: { tipo: 'novidade' } }]);
+    expect(notes()).toContain('Mimi parou de farejar o ar.');
+    expect(g.console.read(0, 'error')).toEqual([]);
+    expect(g.events(0, 'script_error')).toEqual([]);
+  });
+
   it('minigames: Brincar opens Pega-pega or Caixinhas with who the pet is, and the room comes back with fun, clues about its tastes, coins and a diary page', () => {
     const t = Date.parse('2026-03-10T14:00:00Z');
     const pet = {

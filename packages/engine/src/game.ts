@@ -25,6 +25,7 @@ import { habitOf } from './routine';
 import { Economy } from './economy';
 import { recall } from './memory';
 import { listBonds } from './relationship';
+import { DesireRunner, desireViews } from './desires';
 import { KNOWLEDGE_LEVELS, levelIndex } from './knowledge';
 import { Notifier, type NotifyOptions } from './notifier';
 import { jsonCopy, type MinigameCall, type MinigameHost, type MinigameInfo, type MinigameRequest } from './minigame';
@@ -205,6 +206,8 @@ export interface EntitySnapshot {
   knowledge?: Record<string, string>;
   /** Relationship: bond (0..1) and level per subject. */
   bonds?: Record<string, { value: number; level: number }>;
+  /** Desires: what it wants now, with the game-clock minutes left. */
+  desires?: { id: string; kind: string; subject?: string; minutesLeft: number }[];
   /** Journal: how many entries and the 3 newest texts. */
   journal?: { count: number; last: string[] };
   /** AudioSource: clip, whether it plays (a loop sounding / a one-shot about to play), and volume / pan as heard now. */
@@ -302,6 +305,8 @@ export class Game implements SlotHost, MinigameHost {
   readonly economy: Economy;
   /** Observations shown to the player, with cooldowns and priority (game.notify). */
   readonly notifications: Notifier;
+  /** Life cycle of the Desires of every scene (fulfillment by events, expiry). */
+  readonly desires: DesireRunner;
   /** Music asset playing (for the `music` event when a scene without music follows one with music). */
   private music: string | null = null;
 
@@ -322,6 +327,12 @@ export class Game implements SlotHost, MinigameHost {
       realMs: () => Math.round((this.world?.time ?? 0) * 1000),
       world: () => this.world,
       config: () => this.project.config.notifications ?? { minGapMs: 0, logSize: 50 },
+    });
+    this.desires = new DesireRunner({
+      clock: this.clock,
+      world: () => this.world,
+      ensure: (e) => this.individuals.ensure(e),
+      touch: (e) => this.individuals.touch(e),
     });
     this.loadScene(options.scene ?? project.config.startScene, {});
   }
@@ -547,6 +558,7 @@ export class Game implements SlotHost, MinigameHost {
         animationSystem(w, dt);
         audioSourceSystem(w);
         this.soundDirector.run();
+        this.desires.run();
         this.scriptRunner.events();
         this.individuals.flush();
         w.flushDestroyed();
@@ -784,6 +796,7 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean, clockHour:
     const bonds = listBonds(e, clockNow);
     if (bonds.length) s.bonds = Object.fromEntries(bonds.map((b) => [b.subject, { value: b.value, level: b.level }]));
   }
+  if (e.components.Desires) s.desires = desireViews(e, clockNow).map((d) => ({ id: d.id, kind: d.kind, ...(d.subject !== undefined && { subject: d.subject }), minutesLeft: d.minutesLeft }));
   if (e.components.Preferences) s.prefs = Object.fromEntries(Object.keys(e.components.Preferences.values).map((k) => [k, affinityOf(e, k)]));
   const props = e.components.Script?.props;
   if (props && Object.keys(props).length) s.props = { ...props };

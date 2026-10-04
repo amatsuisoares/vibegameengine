@@ -287,6 +287,11 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
 - **Vínculo** (V0.8, `engine/src/relationship.ts`): `Relationship.values` = `{value, peak, t, today}` por alvo. Ganho
   com retorno decrescente (`× (1 − valor)`) e teto diário por motivo; o enfraquecimento é calculado na leitura (meia-vida
   sobre o que passa do piso `keep × peak`) e gravado só quando muda. Persistido pelo `IndividualRunner`.
+- **Desejos** (V0.8, `engine/src/desires.ts`): os ativos ficam em `Desires.active` (persistidos pelo
+  `IndividualRunner`); o `DesireRunner` é um por `Game` (sobrevive a trocas de cena) e roda a cada frame logo antes de
+  `scriptRunner.events()`: casa os eventos novos do frame com os `fulfillOn` e depois expira pelo relógio, então o
+  `onEvent` recebe o evento e o atendimento juntos. O tempo real de começo e o último fim por entidade ficam só em
+  memória (uma sessão nova começa sem intervalo real).
 - **`Text.maxWidth`** (V0.7): `buildDrawList` continua puro e só repassa `maxWidth` no `TextCmd`; a quebra
   (`wrapLines`, testável com uma medida falsa) acontece no `paint`, onde há `measureText`.
 - **Notifier** (V0.7, `engine/src/notifier.ts`): um por `Game` (sobrevive a trocas de cena). Cooldowns de relógio e

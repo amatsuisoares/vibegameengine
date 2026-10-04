@@ -458,11 +458,41 @@ export const RelationshipSchema = z
   })
   .refine((r) => r.levels.every((v, i) => i === 0 || r.levels[i - 1] <= v), 'levels must be ascending');
 
+export const DesireTriggerSchema = z.strictObject({
+  event: z.string().min(1).describe('Event type that fulfills the desire (e.g. "item_used", or one the game emits).'),
+  match: z
+    .record(z.string(), z.unknown())
+    .default(() => ({}))
+    .describe('Fields the event must have; "$self" = this entity\'s id; an array field (e.g. tags) matches if it contains the value.'),
+});
+
+export const DesireSchema = z.strictObject({
+  id: z.string().min(1),
+  kind: z.string().min(1).describe('What kind of desire ("food", "play", "quiet"...): the game decides.'),
+  subject: z.string().optional().describe('What exactly it wants (an item id, a tag...), if anything.'),
+  data: z.record(z.string(), z.unknown()).default(() => ({})).describe('Anything else the game keeps with it (icon, how it was shown...).'),
+  since: z.number().describe('Game clock (ms) when it started.'),
+  until: z.number().describe('Game clock (ms) when it expires.'),
+  minRealSeconds: z.number().min(0).optional().describe('Does not expire before this much real (simulated) time in the session, however fast the clock runs.'),
+  fulfillOn: z.array(DesireTriggerSchema).default(() => []).describe('Events that fulfill it automatically.'),
+});
+
+export const DesiresSchema = z.strictObject({
+  max: z.number().int().min(1).default(1).describe('Most desires active at once.'),
+  minGapMinutes: z.number().min(0).default(0).describe('Game-clock minutes between the end (or start) of one desire and the start of the next.'),
+  minGapRealSeconds: z.number().min(0).default(0).describe('Real (simulated) seconds between them too, so a fast clock does not rain desires.'),
+  maxPerDay: z.number().int().min(0).default(0).describe('Most desires started per game-clock day (0 = no limit).'),
+  active: z.array(DesireSchema).default(() => []).describe('Desires now (filled by self.desires.start; kept by Persist).'),
+  last: z.number().optional().describe('Game clock (ms) of the last start or end.'),
+  today: z.strictObject({ day: z.number().int(), count: z.number().int().min(0) }).optional(),
+  seq: z.number().int().min(0).default(0).describe('Counter for desire ids.'),
+});
+
 export const PersistSchema = z.strictObject({
   key: z
     .string()
     .min(1)
-    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship) across sessions and scenes.'),
+    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship, Desires) across sessions and scenes.'),
 });
 
 /** Registry of all built-in components. Add new component types here. */
@@ -496,6 +526,7 @@ export const ComponentSchemas = {
   Knowledge: KnowledgeSchema,
   Journal: JournalSchema,
   Relationship: RelationshipSchema,
+  Desires: DesiresSchema,
   Persist: PersistSchema,
   Script: ScriptSchema,
 } as const;
@@ -533,7 +564,8 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Knowledge: 'What the PLAYER knows about the entity: evidence per key (e.g. "likes:apple") that grows into possible / observed / confirmed (event discovery); knows() in expressions. Nothing is revealed for free.',
   Journal: 'A chronicle of the entity: entries with category, text, importance and a dedup key ("first time it..."), capped by dropping the least important; the base of a diary.',
   Relationship: 'Bonds with others ("player", an entity id...): 0..1, earned slowly (gains shrink near the top, daily caps per reason), fading without contact toward a floor that remembers the best it was; levels with event relationship_level; bond() in expressions.',
-  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship) in game.storage under a key: loaded before onStart, saved when it changes.',
+  Desires: 'What the entity wants now ({kind, subject, data}): started by its script with a game-clock duration, at most max at once, with gaps (clock and real) and a daily limit; fulfilled automatically by a matching event (fulfillOn) or by the script, or expires; events desire_start / desire_fulfilled / desire_expired / desire_cancelled; wants() in expressions.',
+  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship, Desires) in game.storage under a key: loaded before onStart, saved when it changes.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -568,6 +600,7 @@ export const ComponentsSchema = z.strictObject({
   Knowledge: KnowledgeSchema.optional(),
   Journal: JournalSchema.optional(),
   Relationship: RelationshipSchema.optional(),
+  Desires: DesiresSchema.optional(),
   Persist: PersistSchema.optional(),
   Script: ScriptSchema.optional(),
 });

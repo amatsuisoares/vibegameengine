@@ -1,4 +1,4 @@
-import { JournalEntrySchema, MemoryEntrySchema, type Components } from '@vibe/shared';
+import { DesireSchema, JournalEntrySchema, MemoryEntrySchema, type Components } from '@vibe/shared';
 import type { Entity } from './entity';
 import { itemTags } from './items';
 import { Rng } from './rng';
@@ -17,6 +17,7 @@ import type { World } from './world';
  *   Knowledge    what the player knows about it (see knowledge.ts)
  *   Journal      its chronicle (see journal.ts)
  *   Relationship its bonds with others (see relationship.ts)
+ *   Desires      what it wants now (see desires.ts)
  *   Persist      keeps them in game.storage[key]: loaded before the entity's first onStart, drawn
  *                when missing, saved at the end of any frame in which they changed
  *
@@ -50,6 +51,7 @@ export interface PersistedIndividual {
   knowledge?: Record<string, { evidence: number; first: number; last: number }>;
   journal?: unknown[];
   relationship?: Record<string, unknown>;
+  desires?: { active?: unknown[]; last?: number; today?: { day: number; count: number }; seq?: number };
 }
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -174,6 +176,10 @@ export function persistedOf(c: Components): PersistedIndividual {
   if (c.Knowledge) out.knowledge = structuredClone(c.Knowledge.values);
   if (c.Journal) out.journal = structuredClone(c.Journal.entries);
   if (c.Relationship) out.relationship = structuredClone(c.Relationship.values);
+  if (c.Desires) {
+    const d = c.Desires;
+    out.desires = { active: structuredClone(d.active), seq: d.seq, ...(d.last !== undefined && { last: d.last }), ...(d.today && { today: { ...d.today } }) };
+  }
   return out;
 }
 
@@ -224,6 +230,13 @@ function applyPersisted(c: Components, saved: unknown): boolean {
       c.Relationship.values[subject] = { value, peak, t: b.t, ...(today && { today }) };
     }
   }
+  if (c.Desires && s.desires && typeof s.desires === 'object') {
+    const d = s.desires;
+    if (Array.isArray(d.active)) c.Desires.active = d.active.filter((x) => DesireSchema.safeParse(x).success).map((x) => DesireSchema.parse(x));
+    if (typeof d.last === 'number' && Number.isFinite(d.last)) c.Desires.last = d.last;
+    if (d.today && Number.isInteger(d.today.day) && Number.isInteger(d.today.count) && d.today.count >= 0) c.Desires.today = { day: d.today.day, count: d.today.count };
+    if (Number.isInteger(d.seq) && (d.seq as number) >= 0) c.Desires.seq = d.seq as number;
+  }
   return true;
 }
 
@@ -239,7 +252,7 @@ export class IndividualRunner {
   private readonly dirty = new Set<Entity>();
   private resets = 0;
   /** Values the entity was authored with (before loading and drawing), for reset. */
-  private readonly authored = new WeakMap<Entity, { traits?: Record<string, number>; preferences?: PersistedIndividual['preferences']; routine?: Record<string, number[]>; memory?: unknown[]; knowledge?: unknown; journal?: unknown[]; relationship?: unknown }>();
+  private readonly authored = new WeakMap<Entity, { traits?: Record<string, number>; preferences?: PersistedIndividual['preferences']; routine?: Record<string, number[]>; memory?: unknown[]; knowledge?: unknown; journal?: unknown[]; relationship?: unknown; desires?: unknown }>();
 
   constructor(
     private readonly world: World,
@@ -255,12 +268,13 @@ export class IndividualRunner {
   ensure(e: Entity) {
     if (this.ready.has(e)) return;
     const c = e.components;
-    if (!c.Traits && !c.Preferences && !c.Routine && !c.Memory && !c.Knowledge && !c.Journal && !c.Relationship) return;
+    if (!c.Traits && !c.Preferences && !c.Routine && !c.Memory && !c.Knowledge && !c.Journal && !c.Relationship && !c.Desires) return;
     this.ready.add(e);
     this.authored.set(e, { traits: c.Traits && { ...c.Traits.values }, preferences: c.Preferences && structuredClone(c.Preferences.values), routine: c.Routine && structuredClone(c.Routine.values), memory: c.Memory && structuredClone(c.Memory.entries),
       knowledge: c.Knowledge && structuredClone(c.Knowledge.values),
       journal: c.Journal && structuredClone(c.Journal.entries),
       relationship: c.Relationship && structuredClone(c.Relationship.values),
+      desires: c.Desires && structuredClone(c.Desires.active),
     });
     const key = c.Persist?.key;
     const loaded = key !== undefined && applyPersisted(c, this.host.storage.get(key));
@@ -309,6 +323,11 @@ export class IndividualRunner {
     if (c.Knowledge) c.Knowledge.values = structuredClone((authored?.knowledge ?? {}) as typeof c.Knowledge.values);
     if (c.Journal) c.Journal.entries = structuredClone((authored?.journal ?? []) as typeof c.Journal.entries);
     if (c.Relationship) c.Relationship.values = structuredClone((authored?.relationship ?? {}) as typeof c.Relationship.values);
+    if (c.Desires) {
+      c.Desires.active = structuredClone((authored?.desires ?? []) as typeof c.Desires.active);
+      delete c.Desires.last;
+      delete c.Desires.today;
+    }
     const key = c.Persist?.key;
     if (key !== undefined) this.host.storage.remove(key);
     this.dirty.delete(e);

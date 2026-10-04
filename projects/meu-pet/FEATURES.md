@@ -507,6 +507,30 @@ topo pede os desejos e eventos.
 - Pesa na forma adulta (seção 10) e na frase de por que cresceu ("confia muito em você", "gosta da sua companhia"...).
 - Saves de antes do vínculo começam de onde a relação antiga estava (lembranças e contadores), sem festa no diário.
 
+## 10c. Desejos (V0.8: componente `Desires`)
+
+De vez em quando ele **quer** alguma coisa: aparece um **balão de pensamento** acima da cabeça (nuvem com o ícone do que
+quer, que balança de leve) e uma observação. Ele estava esperando você: o primeiro vem entre 45 s e 1 min 45 s depois de
+abrir o jogo (mais cedo para os grudentos), os seguintes 10–25 min (reais) depois do fim do anterior. Um por vez, até 12
+por dia; nunca dormindo, doente, comendo ou de barriga cheia (fome > 80); pegar no sono desfaz a vontade.
+
+| Desejo | Quem quer mais | Balão | Observação | Atende |
+|---|---|---|---|---|
+| uma comida de que gosta ou adora (não enjoada); às vezes uma que nunca provou e você nem tem | guloso | o ícone da comida | "{n} parece com vontade de comer peixe." | dar aquela comida |
+| algo com um jeito de que ele gosta: docinho 🍬, crocante 🥨, salgado 🧂, fresquinho 🌿, uma fruta 🍇, de leite 🧈 | — | o ícone do jeito | "{n} parece querer algo crocante." | qualquer comida com esse jeito (é um palpite) |
+| algo que nunca provou | curioso | ✨ | "{n} está farejando o ar, curioso. Parece querer provar algo novo." | qualquer comida nova para ele |
+
+- Dura 20–45 min de relógio pela paciência (e nunca menos de 2,5–5 min reais, mesmo acelerado). Ignorado, passa sem
+  castigo: "{n} parece ter desistido do peixe." (o impaciente desiste antes, e isso conta como sinal do jeito).
+- Errar não conta e não pune: ele come o que você deu normalmente e continua querendo. Comer só um pouco (comida de que
+  não gosta) também não atende.
+- Atender: ♥♥ e pulinhos, afeto +8, diversão +5, **vínculo** (+0,1, teto do dia 0,25), lembrança, +2 moedas, uma pista
+  forte do gosto (para o jeito: "Talvez adore coisas crocantes." na aba Gostos, em Comidas) e, na primeira vez de cada
+  tipo, uma página do diário ("Estava com vontade de comer peixe e você deu."). A observação é a do desejo ("{n} estava
+  mesmo com vontade de comer peixe! Parece muito feliz."), no lugar da de sempre da comida.
+- Com vontade de uma comida, ele aceita mesmo de barriga cheia.
+- O desejo fica salvo: fechar e abrir o jogo mantém o balão (se ainda não passou da hora).
+
 ## 11. Coleção ("pokédex") e novo pet
 
 - Toda forma alcançada fica registrada (com o nome do pet que a revelou), mesmo depois de trocar de pet.
@@ -544,6 +568,6 @@ Playbooks de regressão em `playbooks/` (rodar com `run_playbooks`): `limpar_suj
 - Cenário e objetos são formas simples; não há trilha sonora; os sons são efeitos sintetizados.
 - Balanceamento é um primeiro chute: ritmos das necessidades, 12 h / 36 h para evoluir, limites de doença.
 - O pet adulto não envelhece nem muda depois de adulto; não há morte (decisão de design).
-- Um único quarto; a loja tem 13 itens e há 2 minigames (prova de conceito da arquitetura).
+- Um único quarto; a loja tem 15 itens e há 2 minigames (prova de conceito da arquitetura).
 - Com os outros traços iguais, um pet ativo dorme ~40% do dia e um calmo ~45%: a diferença existe, mas é pequena.
 - Sem acessibilidade de teclado para as ações (só mouse, exceto digitar o nome).

@@ -320,7 +320,8 @@
             "desejo": 0.25,
             "evento": 0.2
           }
-        }
+        },
+        "Desires": { "max": 1, "minGapMinutes": 10, "minGapRealSeconds": 240, "maxPerDay": 12 }
       }
     },
     {
@@ -728,6 +729,63 @@
           "align": "center",
           "screenSpace": false,
           "layer": 3
+        }
+      }
+    },
+    {
+      "id": "balaoBolha2",
+      "transform": { "x": -100, "y": -100 },
+      "components": {
+        "Sprite": {
+          "shape": "circle",
+          "color": "#ffffff",
+          "width": 11,
+          "height": 10,
+          "layer": 42,
+          "opacity": 0
+        }
+      }
+    },
+    {
+      "id": "balaoBolha1",
+      "transform": { "x": -100, "y": -100 },
+      "components": {
+        "Sprite": {
+          "shape": "circle",
+          "color": "#ffffff",
+          "width": 19,
+          "height": 16,
+          "layer": 42,
+          "opacity": 0
+        }
+      }
+    },
+    {
+      "id": "balao",
+      "transform": { "x": -100, "y": -100 },
+      "components": {
+        "Sprite": {
+          "shape": "circle",
+          "color": "#ffffff",
+          "width": 78,
+          "height": 62,
+          "layer": 43,
+          "opacity": 0
+        }
+      }
+    },
+    {
+      "id": "balaoIcone",
+      "transform": { "x": -100, "y": -100 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 34,
+          "font": "sans-serif",
+          "align": "center",
+          "screenSpace": false,
+          "layer": 44,
+          "opacity": 0
         }
       }
     }

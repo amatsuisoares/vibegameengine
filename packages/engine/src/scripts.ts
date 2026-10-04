@@ -16,6 +16,7 @@ import { knowledgeLevel, listKnowledge, observeKnowledge, type KnowledgeLevel, t
 import { envAt } from './ambient';
 import { addEntry, hasEntry, journalEntries, removeEntry, type JournalAdd, type JournalEntry } from './journal';
 import { addBond, bondLevel, bondOf, listBonds, type BondChange, type BondView } from './relationship';
+import type { DesireBlock, DesireRunner, DesireSpec, DesireView } from './desires';
 import type { BuyOptions, BuyResult, Economy, Inventory, Wallet } from './economy';
 import { affinityOf, evaluate, evaluateItem, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
@@ -71,6 +72,7 @@ export interface ScriptHost extends SlotHost, MinigameHost {
   readonly items: ItemCatalog;
   readonly economy: Economy;
   readonly notifications: Notifier;
+  readonly desires: DesireRunner;
   useItem(itemId: string, target: Entity, by?: Entity): { handled: boolean; result: unknown };
 }
 
@@ -158,6 +160,25 @@ export interface ScriptRelationship {
   level(subject: string): number;
   /** Every bond, strongest first. */
   list(): BondView[];
+}
+
+/** self.desires: what the entity wants now (Desires). */
+export interface ScriptDesires {
+  /**
+   * Starts a desire for `minutes` of game clock: {kind, subject?, data?, minutes, minRealSeconds?, fulfillOn?, force?}.
+   * fulfillOn: {event, match} (or a list) that fulfills it by itself. Null when blocked (see blocked()).
+   */
+  start(spec: DesireSpec): DesireView | null;
+  /** Why a new desire cannot start now ("max", "gap", "day"), or null. */
+  blocked(): DesireBlock | null;
+  /** Ends a desire as fulfilled (by id or kind; "*" = any): event desire_fulfilled {by: "script"}. */
+  fulfill(ref: string, data?: Record<string, unknown>): DesireView | null;
+  /** Drops a desire without fulfilling it: event desire_cancelled. */
+  cancel(ref: string): DesireView | null;
+  /** A desire by id or kind ("*" = any), or null. */
+  get(ref: string): DesireView | null;
+  /** Desires now. */
+  list(): DesireView[];
 }
 
 /** self.persist: where the individual data is kept (Persist). */
@@ -336,6 +357,8 @@ export interface ScriptEntity {
   readonly journal: ScriptJournal;
   /** The entity's bonds (Relationship). */
   readonly relationship: ScriptRelationship;
+  /** What the entity wants now (Desires). */
+  readonly desires: ScriptDesires;
   /** The entity's Persist. */
   readonly persist: ScriptPersist;
   /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
@@ -858,7 +881,7 @@ class ScriptApi {
         return k;
       },
     };
-    const need = (c: 'Knowledge' | 'Journal' | 'Relationship') => {
+    const need = (c: 'Knowledge' | 'Journal' | 'Relationship' | 'Desires') => {
       if (!e.components[c]) throw new Error(`entity "${e.id}" has no ${c}`);
       individuals.ensure(e);
     };
@@ -904,6 +927,14 @@ class ScriptApi {
       level: (subject) => (need('Relationship'), bondLevel(e.components.Relationship!, bondOf(e, host.clock.now, String(subject)))),
       list: () => (need('Relationship'), listBonds(e, host.clock.now)),
     };
+    const desires: ScriptDesires = {
+      start: (spec) => (need('Desires'), host.desires.start(e, spec)),
+      blocked: () => (need('Desires'), host.desires.blocked(e)),
+      fulfill: (ref, data) => (need('Desires'), host.desires.fulfill(e, String(ref), data)),
+      cancel: (ref) => (need('Desires'), host.desires.cancel(e, String(ref))),
+      get: (ref) => (need('Desires'), host.desires.get(e, String(ref))),
+      list: () => (need('Desires'), host.desires.list(e)),
+    };
     const persist: ScriptPersist = {
       get key() {
         return e.components.Persist?.key ?? null;
@@ -925,6 +956,7 @@ class ScriptApi {
       knowledge,
       journal,
       relationship,
+      desires,
       persist,
       get x() {
         return e.x;

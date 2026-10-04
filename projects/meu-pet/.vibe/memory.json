@@ -277,6 +277,14 @@
       "status": "verified",
       "evidence": "teste 'beds: one bed in use...' (troca, reação, chão, sono 1 h a 60x melhor na quentinha, save); screenshots da cama quentinha, fresquinha e da caixa de Coisas",
       "updatedAt": "2026-10-04T00:42:16.720Z"
+    },
+    {
+      "id": "f25",
+      "kind": "feature",
+      "text": "Desejos de comida (Desires): balão de pensamento com o ícone + observação; comida que gosta (às vezes que você não tem), por jeito (tag) ou novidade; atender pelo evento \"comeu\" rende ♥♥, vínculo, moedas, pista do gosto e diário; errar não conta; ignorar passa",
+      "status": "verified",
+      "evidence": "teste 'desires: soon after you arrive...' (primeiro desejo no 1º minuto, peixe comprado e atendido mesmo satisfeito, maçã não serve para crocante, biscoito sim, diário 'coisas crocantes', novidade expira); screenshots do balão no bebê e no adulto e da observação do desejo atendido",
+      "updatedAt": "2026-10-04T15:42:32.044Z"
     }
   ],
   "plans": []

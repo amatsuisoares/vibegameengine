@@ -5,6 +5,7 @@ import { affinityOf, evaluateItem, traitOf } from './individual';
 import { habitOf } from './routine';
 import { feelingOf } from './memory';
 import { bondOf } from './relationship';
+import { wantsOf } from './desires';
 import { envAt } from './ambient';
 import { KNOWLEDGE_LEVELS, knowledgeLevel } from './knowledge';
 import { screenToWorld } from './systems/camera';
@@ -19,6 +20,7 @@ import { screenToWorld } from './systems/camera';
  *   functions    entity(id) exists(id) hasSlot(name) count(tag) events(type) distance(a,b) pathDistance(a,b) abs(x) min(a,b) max(a,b) clamp(x,lo,hi)
  *                trait([entity,] axis) likes([entity,] subject or item id)   (one argument = self)   item(id)
  *                itemCount(id [, inventory]) currency([name]) habit([entity,] activity) bond([entity,] subject)
+ *                wants([entity,] kind) (subject of the desire of that kind now, true without one, false if none; "*" = any)
  *                memory(subject [, type]) / memory(entity, subject, type)  knows([entity,] key) 0..3
  *                env(prop [, entity | x, y]) (what reaches that place; 0 if nothing)
  *   operators    .field  !  unary -  * /  + -  < <= > >=  == !=  &&  ||
@@ -301,6 +303,15 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
           game.individuals.ensure(be);
           return bondOf(be, game.clock.now, String(args[args.length - 1]));
         }
+        case 'wants': {
+          if (args.length !== 1 && args.length !== 2) throw new ExprError('wants() takes 1 or 2 arguments ([entity,] kind)', src);
+          const wid = args.length === 2 ? idOf(args[0]) : (scope.self ?? null);
+          if (wid === null) throw new ExprError("wants() with one argument needs \"self\"; pass the entity: wants('id', kind)", src);
+          const we = game.entity(wid);
+          if (!we || !we.components.Desires) return null;
+          game.individuals.ensure(we);
+          return wantsOf(we, String(args[args.length - 1]));
+        }
         case 'env': {
           // Environment at self, at an entity (id, or target), or at a point.
           if (args.length < 1 || args.length > 3) throw new ExprError('env() takes 1 to 3 arguments (prop [, entity | x, y])', src);
@@ -361,7 +372,7 @@ function evaluate(n: Node, scope: ExprScope, src: string): unknown {
         case 'max':
           return Math.max(...args.map(Number));
         default:
-          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, habit, memory, bond, knows, env, item, itemCount, currency)`, src);
+          throw new ExprError(`Unknown function "${n.fn}" (entity, exists, hasSlot, count, events, distance, pathDistance, abs, min, max, clamp, trait, likes, habit, memory, bond, wants, knows, env, item, itemCount, currency)`, src);
       }
     }
     case 'unary': {

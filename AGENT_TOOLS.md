@@ -451,6 +451,27 @@ outra entidade...), de 0 a 1, **conquistado devagar**:
 - Expressões: `bond('alvo')` ou `bond('id', 'alvo')` → 0..1. Estado: `bonds: {alvo: {value, level}}`. Guardado pelo
   `Persist` (inclusive o que cada motivo já somou hoje).
 
+## Desejos (`Desires`)
+
+Implementado na V0.8 (`engine/src/desires.ts`). O que uma entidade **quer agora** (`{kind, subject?, data}`: comer
+peixe, algo crocante, brincar, ficar quieto...). O jogo decide o que ela quer e como mostra; a engine cuida do ciclo:
+
+- `self.desires.start({kind, subject?, data?, minutes, minRealSeconds?, fulfillOn?, force?})` → o desejo
+  (`{id, kind, subject, data, since, until, minutesLeft}`) ou `null` se bloqueado; `blocked()` diz por quê: `"max"`
+  (já há `max` ativos), `"gap"` (`minGapMinutes` de relógio ou `minGapRealSeconds` reais desde o fim ou o começo do
+  anterior), `"day"` (`maxPerDay`). `force` ignora o intervalo e o limite do dia (não o `max`).
+- **Atendimento automático**: `fulfillOn: {event, match}` (ou uma lista). Um evento do tipo com todos os campos de
+  `match` atende o desejo no mesmo frame, antes dos scripts verem o evento: `"$self"` = o id da entidade, e um campo
+  que é lista (como `tags`) casa se contém o valor — `{"event": "item_used", "match": {"target": "$self", "tags": "doce"}}`.
+  Evento `desire_fulfilled {entity, id, kind, subject, data, by: tipo do evento, trigger: o evento}`.
+- Pelo script: `fulfill(id | kind, data?)` (`by: "script"`), `cancel(id | kind)` (`desire_cancelled`), `get`, `list`
+  (`"*"` = qualquer um).
+- **Expira** quando o relógio passa de `until` e, com `minRealSeconds`, depois de pelo menos esse tempo real na sessão
+  (a 600× o relógio voa, o jogador não): `desire_expired`. Começar é `desire_start`.
+- Expressões: `wants('kind')` / `wants('id', 'kind')` → o `subject` do desejo desse tipo, `true` sem subject, `false`
+  sem desejo. Estado: `desires: [{id, kind, subject, minutesLeft}]`. Guardado pelo `Persist` (os ativos, o último
+  horário e a contagem do dia).
+
 ## Texto com quebra de linha (`Text.maxWidth`)
 
 `Text.maxWidth` (px) quebra as linhas mais largas que isso, palavra por palavra (`
@@ -879,7 +900,7 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
   uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
-  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `bond([id,] alvo)`, `knows([id,] chave)` (0..3), `env(prop, [id | x, y])`, `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
+  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `bond([id,] alvo)`, `wants([id,] tipo)`, `knows([id,] chave)` (0..3), `env(prop, [id | x, y])`, `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").

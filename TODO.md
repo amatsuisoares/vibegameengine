@@ -369,7 +369,13 @@ que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
   nível vira ♥♥, observação e página do diário; saves antigos migram. **Camas** (pedido da usuária): uma cama só, a em
   uso — simples, cestinha, quentinha 🧣, fresquinha ❄️ (gostos novos quentinho/fresquinho); comprar põe em uso, a caixa
   de Coisas troca; dorme melhor na que gosta e no chão se detesta a cama (486 testes)
-- [ ] **Fase 3 — Desejos de comida** (`Desires`, `wants()`; balão 💭; específica, por tag, novidade)
+- [x] **Fase 3 — Desejos de comida**: engine `Desires` (ciclo de vida: começar com duração no relógio, no máximo N, intervalo
+  de relógio e real, limite por dia; atendimento automático por evento `fulfillOn {event, match}` com `$self` e tags,
+  no mesmo frame; expira sem sumir antes de um mínimo real; eventos `desire_start/fulfilled/expired/cancelled`; `wants()`
+  nas expressões; `desires` no estado; salvo pelo `Persist`). No meu-pet: no primeiro minuto da visita e depois a cada
+  10–25 min ele quer uma comida de que gosta (às vezes uma que você não tem), algo com um jeito (crocante, docinho,
+  salgado, fresquinho, fruta, de leite) ou algo que nunca provou — balão de pensamento com o ícone e observação;
+  atender rende ♥♥, vínculo, moedas, pista do gosto e página do diário; errar não conta, ignorar só passa (492 testes)
 - [ ] **Fase 4 — Outros desejos** (brinquedo, brincar com você, carinho, ficar quieto, ambiente)
 - [ ] **Fase 5 — Eventos aleatórios** (`Happenings`; passarinho, borboleta, achado, amostra grátis, espirros)
 - [ ] **Fase 6 — Mais eventos e participação** (tempestade, pesadelo, bagunça, vendedor, presente)

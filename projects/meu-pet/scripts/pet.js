@@ -8,6 +8,7 @@
 //   Routine      hábitos por hora do dia, aprendidos do que ele faz (self.routine.record)
 //   Memory       o que ele viveu (susto, comida adorada, brincar com você), enfraquecendo com o tempo
 //   Relationship o vínculo com você ("voce"): cresce devagar pelo que você faz por ele, enfraquece devagar sem você
+//   Desires      o que ele quer agora (comer peixe, algo crocante, algo novo), mostrado num balão de pensamento
 //   Persist      tudo isso fica em storage.petIndividuo e volta em toda sessão
 // Aqui só se decide o que cada traço e cada gosto MUDA no comportamento.
 
@@ -90,6 +91,8 @@ let gameRef = null; // o game (para reveal, chamado de muitos lugares)
 let pedindoBola = -99; // tempo real em que foi até a bola pedir para brincar
 let lastLookBowl = -99;
 let realTime = 0;
+let proximoDesejo = 0; // tempo real a partir do qual ele pode querer algo (ver desejos)
+let balaoAlpha = 0;
 
 // ---------------------------------------------------------------- utilidades
 
@@ -274,6 +277,182 @@ function migrarVinculo() {
   const inicial = 0.2;
   me.relationship.add(VOCE, (antiga / 100 - inicial) / (1 - inicial));
   calarVinculoAte = realTime + 0.5;
+}
+
+// ---------------------------------------------------------------- desejos (componente Desires da engine)
+//
+// De vez em quando ele QUER alguma coisa e mostra num balão de pensamento (💭 com um ícone) e numa observação. Desejos
+// de comida: uma comida de que ele gosta (às vezes uma que você não tem: vale ir à loja), algo com um jeito (crocante,
+// docinho, salgado... qualquer comida com esse jeito serve — é um palpite) ou algo que ele nunca provou. Atender (ele
+// comer o que queria) rende ♥♥, vínculo ("desejo"), uma lembrança, um pouco de moeda, uma pista do gosto e, na primeira
+// vez de cada tipo, uma página do diário. Errar não pune (ele come normalmente e continua querendo); deixar passar só
+// perde a chance. A engine cuida do ciclo (um por vez, intervalo, limite por dia, atender pelo evento "comeu", expirar).
+const TAGS_DESEJO = {
+  doce: { frase: 'algo docinho', icone: '🍬', gosto: 'coisas doces' },
+  crocante: { frase: 'algo crocante', icone: '🥨', gosto: 'coisas crocantes' },
+  salgado: { frase: 'algo salgado', icone: '🧂', gosto: 'coisas salgadas' },
+  fresco: { frase: 'algo fresquinho', icone: '🌿', gosto: 'comida fresca' },
+  fruta: { frase: 'uma fruta', icone: '🍇', gosto: 'frutas' },
+  laticinio: { frase: 'algo de leite', icone: '🧈', gosto: 'coisas de leite' },
+};
+const DESEJO_PRIMEIRO = [45, 105]; // segundos reais depois de abrir o jogo (ele estava esperando você), pelo jeito
+const DESEJO_DEPOIS = [10, 25]; // minutos reais entre um desejo e a vontade seguinte
+
+const comerOuTomar = (item) => (item.tags.includes('liquido') ? 'tomar' : 'comer');
+const serveProDesejo = (d, item, novo) =>
+  !!d && (d.data.tipo === 'especifica' ? d.subject === item.id : d.data.tipo === 'tag' ? item.tags.includes(d.subject) : d.data.tipo === 'novidade' && novo);
+
+/** O que ele pode querer comer agora, com o peso de cada vontade. */
+function vontadesDeComida(game) {
+  const comidas = game.items.list({ category: 'comida' }).filter((it) => it.id !== 'racao');
+  const provou = pet.provou || {};
+  const apetite = 0.6 + T('apetite');
+  const out = [];
+  for (const it of comidas) {
+    const g = gostoAgora(it);
+    if (g.enjoado || (g.level !== 'love' && g.level !== 'like')) continue;
+    // Gosta e não enjoou: quer de novo. Uma que nunca provou (você talvez nem tenha) também, um pouco menos.
+    out.push({ tipo: 'especifica', item: it, peso: (g.level === 'love' ? 3 : 1.5) * (provou[it.id] ? 1 : 0.6) * apetite });
+  }
+  for (const [tag, t] of Object.entries(TAGS_DESEJO)) {
+    const gosto = me.prefs.of(tag);
+    const serve = comidas.some((it) => it.tags.includes(tag) && !['hate', 'dislike'].includes(gostoAgora(it).level));
+    if (gosto > 0.15 && serve) out.push({ tipo: 'tag', tag, t, peso: 1.2 * (0.5 + gosto) });
+  }
+  const novas = comidas.filter((it) => !provou[it.id]);
+  if (novas.length) out.push({ tipo: 'novidade', peso: 2.2 * T('curiosidade') });
+  return out;
+}
+
+/** Monta o desejo para a engine (Desires.start): quanto dura, o que o atende e como aparece. */
+function desejoDe(v) {
+  const paciencia = T('paciencia');
+  const base = { kind: 'comida', minutes: Math.round(20 + 25 * paciencia), minRealSeconds: Math.round(150 + 150 * paciencia) };
+  if (v.tipo === 'especifica') {
+    return { ...base, subject: v.item.id, data: { tipo: 'especifica', icone: v.item.icon || '🍽️' }, fulfillOn: { event: 'comeu', match: { entity: '$self', item: v.item.id } } };
+  }
+  if (v.tipo === 'tag') return { ...base, subject: v.tag, data: { tipo: 'tag', icone: v.t.icone }, fulfillOn: { event: 'comeu', match: { entity: '$self', tags: v.tag } } };
+  return { ...base, data: { tipo: 'novidade', icone: '✨' }, fulfillOn: { event: 'comeu', match: { entity: '$self', novo: true } } };
+}
+
+function fraseDoDesejo(game, d) {
+  if (d.data.tipo === 'especifica') {
+    const item = game.items.get(d.subject);
+    return `{n} parece com vontade de ${comerOuTomar(item)} ${nomeDe(item)}.`;
+  }
+  if (d.data.tipo === 'tag') return `{n} parece querer ${TAGS_DESEJO[d.subject].frase}.`;
+  return '{n} está farejando o ar, curioso. Parece querer provar algo novo.';
+}
+
+/** Começa um desejo (sorteado entre as vontades, ou o pedido: {tipo, item | tag}); devolve o desejo ou null. */
+function desejar(game, self, pedido) {
+  let v = null;
+  if (pedido) {
+    v = pedido.tipo === 'especifica' ? { tipo: 'especifica', item: game.items.get(pedido.item) } : pedido.tipo === 'tag' ? { tipo: 'tag', tag: pedido.tag, t: TAGS_DESEJO[pedido.tag] } : { tipo: 'novidade' };
+    if ((v.tipo === 'especifica' && !v.item) || (v.tipo === 'tag' && !v.t)) return null;
+  } else {
+    const vontades = vontadesDeComida(game);
+    const total = vontades.reduce((a, x) => a + x.peso, 0);
+    if (!(total > 0)) return null;
+    let r = game.random() * total;
+    v = vontades.find((x) => (r -= x.peso) < 0) || vontades[vontades.length - 1];
+  }
+  const d = me.desires.start({ ...desejoDe(v), ...(pedido && { force: true }) });
+  if (!d) return null;
+  proximoDesejo = Infinity; // a próxima vontade é contada do fim desta
+  balaoAlpha = 0;
+  observe(game, `desejo:${d.data.tipo}`, fraseDoDesejo(game, d), 0, 2);
+  // Parado: vem para perto de você e olha (o balão diz o resto).
+  if (mind.act === 'idle' || mind.act === 'investigate') {
+    mind = { act: 'greet', t: 2.5 };
+    self.get('Sprite').flipX = false;
+  }
+  return d;
+}
+
+/** A cada segundo: dormindo não deseja nada; acordado, quando chega a hora, pode querer algo. */
+function pensarEmDesejo(game, self) {
+  const d = me.desires.get('*');
+  if (d && (pet.asleep || mind.act === 'nap')) {
+    me.desires.cancel(d.id); // pegou no sono: a vontade passa
+    proximoDesejo = realTime + 60;
+    return;
+  }
+  if (d || realTime < proximoDesejo) return;
+  if (pet.asleep || pet.sick || refeicao || pet.needs.fome > 80 || ['sleep', 'nap', 'evolve', 'eat', 'yawn'].includes(mind.act)) return;
+  if (me.desires.blocked()) {
+    proximoDesejo = realTime + 30;
+    return;
+  }
+  if (!desejar(game, self)) proximoDesejo = realTime + 120;
+}
+
+/** Um desejo terminou (atendido ou o tempo passou). */
+function fimDoDesejo(game, self, ev) {
+  proximoDesejo = realTime + lerp(DESEJO_DEPOIS[0], DESEJO_DEPOIS[1], T('independencia')) * 60;
+  const tipo = ev.data && ev.data.tipo;
+  if (ev.type === 'desire_expired') {
+    const item = tipo === 'especifica' && game.items.get(ev.subject);
+    const frase = item ? `{n} parece ter desistido ${doItem(item)}.` : tipo === 'tag' ? `{n} parece ter desistido de ${TAGS_DESEJO[ev.subject].frase}.` : '{n} parou de farejar o ar.';
+    observe(game, 'desejoPassou', frase, 0, 0);
+    if (T('paciencia') < LOW) reveal('paciencia', 'baixo', 0.3); // desistiu rápido
+    return;
+  }
+  if (ev.type !== 'desire_fulfilled') return;
+  const item = game.items.get(String(ev.trigger && ev.trigger.item));
+  if (!item) return;
+  const n = pet.needs;
+  n.afeto = clamp(n.afeto + 8);
+  n.diversao = clamp(n.diversao + 5);
+  vinculo('desejo', 0.1);
+  lembrar('desejoAtendido', VOCE, 1, 0.6);
+  ganhar(game, 2, 'desejo');
+  emote(game, self, '♥', '#ff8fab');
+  self.after(250, () => emote(game, self, '♥', '#ff8fab'));
+  mind = { act: 'happy', t: 1.6 };
+  if (tipo === 'especifica') {
+    observe(game, 'desejoAtendido', `{n} estava mesmo com vontade de ${comerOuTomar(item)} ${nomeDe(item)}! Parece muito feliz.`, 0, 2);
+    anotar(game, 'desejo', `Estava com vontade de ${comerOuTomar(item)} ${nomeDe(item)} e você deu.`, 'desejo:especifica', 0.6);
+    gostoVisto(game, item.id, me.prefs.item(item.id).level); // querer é uma pista forte
+  } else if (tipo === 'tag') {
+    const t = TAGS_DESEJO[ev.subject];
+    observe(game, 'desejoAtendido', `Era isso! {n} queria ${t.frase}, e ${oItem(item)} caiu muito bem.`, 0, 2);
+    anotar(game, 'desejo', `Queria ${t.frase} e você acertou com ${oItem(item)}.`, 'desejo:tag', 0.6);
+    gostoVisto(game, ev.subject, me.prefs.level(me.prefs.of(ev.subject)));
+  } else {
+    observe(game, 'desejoAtendido', `{n} parece contente por ter provado algo novo: ${nomeDe(item)}!`, 0, 2);
+    anotar(game, 'desejo', `Estava curioso por algo novo e você trouxe ${oItem(item)}.`, 'desejo:novidade', 0.6);
+    reveal('curiosidade', 'alto');
+  }
+}
+
+/** O balão de pensamento acima da cabeça (💭 com o ícone do desejo): aparece e some devagar, balança de leve. */
+function mostrarBalao(game, self, dt) {
+  const partes = ['balao', 'balaoBolha1', 'balaoBolha2', 'balaoIcone'].map((id) => game.entity(id));
+  if (partes.some((e) => !e)) return;
+  const d = me.desires.get('*');
+  const show = !!d && !pet.asleep && mind.act !== 'nap';
+  balaoAlpha = Math.max(0, Math.min(1, balaoAlpha + (show ? 3 : -4) * dt));
+  const size = pet_size();
+  const lado = self.x > 700 ? -1 : 1; // perto da parede direita, o balão vai para a esquerda
+  const bob = Math.sin(anim * 2.4) * 4;
+  const cx = self.x + lado * size * 0.3;
+  const cy = self.y - size * 0.44 + bob;
+  const [balao, b1, b2, icone] = partes;
+  balao.x = cx;
+  balao.y = cy;
+  b1.x = self.x + lado * size * 0.19;
+  b1.y = self.y - size * 0.28 + bob * 0.6;
+  b2.x = self.x + lado * size * 0.13;
+  b2.y = self.y - size * 0.2 + bob * 0.3;
+  icone.x = cx;
+  icone.y = cy - 2;
+  if (d) icone.get('Text').text = d.data.icone || '?';
+  const pop = balaoAlpha < 1 ? 0.6 + balaoAlpha * 0.4 : 1;
+  for (const e of [balao, b1, b2]) e.get('Sprite').opacity = balaoAlpha * 0.95;
+  icone.get('Text').opacity = balaoAlpha;
+  balao.scaleX = pop;
+  balao.scaleY = pop;
 }
 
 function emote(game, self, glyph, color) {
@@ -1479,6 +1658,12 @@ function makeApi(game, self) {
     salvar() {
       save(game);
     },
+    /** Começa um desejo agora (sem esperar a hora): {tipo: 'especifica', item} | {tipo: 'tag', tag} | {tipo: 'novidade'}; sem pedido, sorteia. */
+    desejar(pedido) {
+      return desejar(game, self, pedido || null);
+    },
+    /** O desejo de agora ou null. */
+    desejo: () => me.desires.get('*'),
     adulto: () => isAdult(),
     /** Só na fase adulta: o pet vai para a coleção e um novo pet pode chegar. */
     novoPet() {
@@ -1594,6 +1779,7 @@ function abaGostos(game) {
     // Comida sem artigo ("adora maçã"); brinquedo com ("adora a bola").
     if (item && item.category !== 'comida') brinquedos.push(`· ${fraseGosto(g.level, g.nivel, oItem(item))}`);
     else if (item) comidas.push(`· ${fraseGosto(g.level, g.nivel, nomeDe(item))}`);
+    else if (TAGS_DESEJO[g.subject]) comidas.push(`· ${fraseGosto(g.level, g.nivel, TAGS_DESEJO[g.subject].gosto)}`);
     else if (OUTROS[g.subject]) outros.push(`· ${fraseGosto(g.level, g.nivel, OUTROS[g.subject])}`);
   }
   const fav = me.knowledge.list({ prefix: 'favorito:' })[0];
@@ -1713,6 +1899,7 @@ function onEvent(self, ev, game) {
   if (ev.type === 'minigame_end') return voltouDoJogo(game, self, ev);
   if (ev.type === 'preference_change' && ev.entity === self.id) return mudouGosto(game, ev);
   if (ev.type === 'relationship_level' && ev.entity === self.id && ev.subject === VOCE) return mudouVinculo(game, self, ev);
+  if ((ev.type === 'desire_fulfilled' || ev.type === 'desire_expired') && ev.entity === self.id) return fimDoDesejo(game, self, ev);
   if (ev.type !== 'memory_forgotten' || ev.entity !== self.id || ev.memory !== 'susto' || ev.importance < 0.7) return;
   const item = game.items.get(String(ev.subject));
   if (item) anotar(game, 'lembranca', `Parece ter esquecido o susto com ${oItem(item)}.`, `esqueceu:susto:${item.id}`, 0.4);
@@ -1784,7 +1971,10 @@ function onItem(self, item, game) {
     observe(game, 'ofertaDormindo', '{n} está dormindo.', 1);
     return { consumed: false, reason: 'dormindo' };
   }
-  if (pet.needs.fome > (T('apetite') < LOW ? 78 : 92)) {
+  const novo = !(pet.provou || {})[item.id];
+  const desejada = serveProDesejo(me.desires.get('comida'), item, novo);
+  // Satisfeito, recusa — menos o que ele estava com vontade de comer.
+  if (!desejada && pet.needs.fome > (T('apetite') < LOW ? 78 : 92)) {
     observe(game, 'semFome', '{n} não parece estar com fome agora.', 1);
     reveal('apetite', 'baixo');
     return { consumed: false, reason: 'satisfeito' };
@@ -1814,7 +2004,7 @@ function onItem(self, item, game) {
   const food = game.spawn('oferta', self.x + dir * 70, FEET_Y - 12);
   food.get('Text').text = item.icon || '•';
   const agora = gostoAgora(item);
-  refeicao = { item, level: agora.level, base: agora.base, enjoado: agora.enjoado, fome: pet.needs.fome, food, dir };
+  refeicao = { item, level: agora.level, base: agora.base, enjoado: agora.enjoado, fome: pet.needs.fome, food, dir, novo };
   // Primeiro cheira (inclina a cabeça); a reação vem depois. O que ele lembra de ter adorado: nem precisa cheirar.
   if (lembra >= 0.5) {
     emote(game, self, '♥', '#ff8fab');
@@ -1849,10 +2039,15 @@ function react(game, self) {
  */
 function terminarRefeicao(game, self, reagir) {
   if (!refeicao) return;
-  const { item, level, food, base, enjoado, fome } = refeicao;
+  const { item, level, food, base, enjoado, fome, novo } = refeicao;
   refeicao = null;
   sumir(food, 0.3);
   if (level === 'hate') return;
+  // Comeu de verdade (não só beliscou): é o que atende um desejo de comida (Desires.fulfillOn).
+  const atende = level !== 'dislike' && serveProDesejo(me.desires.get('comida'), item, novo);
+  if (level !== 'dislike') game.emit('comeu', { entity: me.id, item: item.id, tags: [...item.tags], novo: !!novo, level });
+  // Era o que ele queria: quem fala é o desejo atendido (fimDoDesejo), não a observação de sempre.
+  const dizer = atende ? () => false : observe;
   // A memória e o diário ficam com o gosto de verdade (enjoar passa); repetir enjoa um pouco mais.
   const real = base || level;
   lembrar('comida', item.id, { love: 1, like: 0.5, neutral: 0.05, dislike: -0.6 }[real], { love: 0.8, like: 0.4, neutral: 0.2, dislike: 0.6 }[real]);
@@ -1876,14 +2071,14 @@ function terminarRefeicao(game, self, reagir) {
     n.diversao = clamp(n.diversao + 5);
     vinculo('comida', 0.03);
     reveal('apetite', 'alto');
-    observe(game, `comida:${item.id}`, `{n} parece ter adorado ${oItem(item)}!`);
+    dizer(game, `comida:${item.id}`, `{n} parece ter adorado ${oItem(item)}!`);
   } else if (level === 'like') {
     n.afeto = clamp(n.afeto + 5);
     vinculo('comida', 0.02);
-    observe(game, `comida:${item.id}`, `{n} parece ter gostado ${doItem(item)}.`);
-  } else if (level === 'neutral') observe(game, `comida:${item.id}`, `{n} comeu ${oItem(item)} sem muito entusiasmo.`);
+    dizer(game, `comida:${item.id}`, `{n} parece ter gostado ${doItem(item)}.`);
+  } else if (level === 'neutral') dizer(game, `comida:${item.id}`, `{n} comeu ${oItem(item)} sem muito entusiasmo.`);
   else {
-    observe(game, `comida:${item.id}`, `{n} comeu só um pouco ${doItem(item)}. Não parece ter gostado muito.`);
+    dizer(game, `comida:${item.id}`, `{n} comeu só um pouco ${doItem(item)}. Não parece ter gostado muito.`);
     if (reagir) naoGostou(game, me);
   }
   if (!reagir) return;
@@ -1947,6 +2142,7 @@ function onStart(self, game) {
   }
   migrarDiario(game);
   migrarVinculo();
+  proximoDesejo = lerp(DESEJO_PRIMEIRO[0], DESEJO_PRIMEIRO[1], T('independencia'));
   const cfg = game.storage.get('config');
   if (cfg && cfg.speed) game.clock.speed = cfg.speed;
   lastNow = now;
@@ -1965,6 +2161,7 @@ function onStart(self, game) {
     economiaDoDia(game);
     if (mind.act === 'sleep' || mind.act === 'nap') sonoVisivel(game);
     checkObservations(game, self);
+    pensarEmDesejo(game, self);
     bemNoQuarto(game, self);
     checkEvolution(game, self);
   }, 'observar');
@@ -2002,6 +2199,7 @@ function onUpdate(self, game, dt) {
   updateDirt(game);
   behave(self, game, dt);
   animate(self, game);
+  mostrarBalao(game, self, dt);
 
   game.vars.fome = Math.round(pet.needs.fome);
   game.vars.energia = Math.round(pet.needs.energia);
