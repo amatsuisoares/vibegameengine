@@ -24,6 +24,7 @@ import { ItemCatalog } from './items';
 import { habitOf } from './routine';
 import { Economy } from './economy';
 import { recall } from './memory';
+import { listBonds } from './relationship';
 import { KNOWLEDGE_LEVELS, levelIndex } from './knowledge';
 import { Notifier, type NotifyOptions } from './notifier';
 import { jsonCopy, type MinigameCall, type MinigameHost, type MinigameInfo, type MinigameRequest } from './minigame';
@@ -202,6 +203,8 @@ export interface EntitySnapshot {
   ambient?: { emits: Record<string, number>; enabled: boolean; radius?: number };
   /** Knowledge: level of each key the player has some evidence of. */
   knowledge?: Record<string, string>;
+  /** Relationship: bond (0..1) and level per subject. */
+  bonds?: Record<string, { value: number; level: number }>;
   /** Journal: how many entries and the 3 newest texts. */
   journal?: { count: number; last: string[] };
   /** AudioSource: clip, whether it plays (a loop sounding / a one-shot about to play), and volume / pan as heard now. */
@@ -777,6 +780,10 @@ function snapshotEntity(w: World, e: Entity, withComponents: boolean, clockHour:
   }
   const j = e.components.Journal;
   if (j && j.entries.length) s.journal = { count: j.entries.length, last: j.entries.map((x, i) => ({ x, i })).sort((a, b) => b.x.t - a.x.t || b.i - a.i).slice(0, 3).map(({ x }) => x.text) };
+  if (e.components.Relationship) {
+    const bonds = listBonds(e, clockNow);
+    if (bonds.length) s.bonds = Object.fromEntries(bonds.map((b) => [b.subject, { value: b.value, level: b.level }]));
+  }
   if (e.components.Preferences) s.prefs = Object.fromEntries(Object.keys(e.components.Preferences.values).map((k) => [k, affinityOf(e, k)]));
   const props = e.components.Script?.props;
   if (props && Object.keys(props).length) s.props = { ...props };

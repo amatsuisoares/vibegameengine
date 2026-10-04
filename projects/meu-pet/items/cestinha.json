@@ -1,11 +1,10 @@
 {
   "name": "Cestinha fofa",
-  "category": "ambiente",
+  "category": "cama",
   "icon": "🧺",
   "tags": ["macio", "aconchego"],
   "consumable": false,
   "price": 14,
-  "prefab": "movel",
-  "description": "Um cantinho macio para dormir e cochilar.",
-  "props": { "artigo": "a", "lugar": 620, "conforto": 0.9, "raio": 75 }
+  "description": "Uma cama de vime, funda e macia, para se aninhar.",
+  "props": { "artigo": "a", "conforto": 0.9, "cor": "#b8864b", "travesseiro": "#f3e3c3", "enfeite": "🧺" }
 }

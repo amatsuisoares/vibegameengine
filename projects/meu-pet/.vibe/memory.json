@@ -261,6 +261,22 @@
       "text": "Diferença de sono entre ativo e calmo é pequena (~40% × ~45% do dia, demais traços iguais)",
       "status": "open",
       "updatedAt": "2026-10-03T14:04:07.154Z"
+    },
+    {
+      "id": "f23",
+      "kind": "feature",
+      "text": "Vínculo com você (Relationship \"voce\"): carinho, brincar, minigames, comida e cuidados com teto por dia; níveis viram observação e página do diário; aba Jeito \"Com você\"; peso 0,4 na forma adulta; saves antigos migram sem festa",
+      "status": "verified",
+      "evidence": "teste 'bond: what you do for it builds a bond slowly...' (teto do carinho, nível 1 com remédio e comidas adoradas, diário); screenshot da aba Jeito com 'Com você'",
+      "updatedAt": "2026-10-04T00:42:16.720Z"
+    },
+    {
+      "id": "f24",
+      "kind": "feature",
+      "text": "Camas: uma só em uso (simples, cestinha, quentinha, fresquinha); comprar põe em uso, Coisas troca; gostos quentinho/fresquinho; dorme melhor na preferida e no chão se detesta",
+      "status": "verified",
+      "evidence": "teste 'beds: one bed in use...' (troca, reação, chão, sono 1 h a 60x melhor na quentinha, save); screenshots da cama quentinha, fresquinha e da caixa de Coisas",
+      "updatedAt": "2026-10-04T00:42:16.720Z"
     }
   ],
   "plans": []

@@ -1,0 +1,10 @@
+{
+  "name": "Cama quentinha",
+  "category": "cama",
+  "icon": "🧣",
+  "tags": ["quentinho", "macio", "aconchego"],
+  "consumable": false,
+  "price": 18,
+  "description": "Cobertor de flanela: para quem gosta de se enrolar no quentinho.",
+  "props": { "artigo": "a", "conforto": 0.85, "cor": "#c4614e", "travesseiro": "#f6d7b0", "enfeite": "🧣" }
+}

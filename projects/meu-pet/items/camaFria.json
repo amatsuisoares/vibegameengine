@@ -1,0 +1,10 @@
+{
+  "name": "Cama fresquinha",
+  "category": "cama",
+  "icon": "❄️",
+  "tags": ["fresquinho"],
+  "consumable": false,
+  "price": 18,
+  "description": "Colchão de gel geladinho: para quem esquenta fácil.",
+  "props": { "artigo": "a", "conforto": 0.75, "cor": "#7fcfd6", "travesseiro": "#e6fbff", "enfeite": "❄️" }
+}

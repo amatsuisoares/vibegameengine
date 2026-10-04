@@ -115,7 +115,7 @@ ficou com ele."). Mal resolvidos ou ignorados: só a chance perdida (sem puniç�
 | Fase | Engine | meu-pet |
 |---|---|---|
 | 1 ✅ | análise (este documento) | — |
-| 2 | `Relationship`, `bond()` | vínculo com você no lugar da `relacao`; migração; diário; evolução adulta pelo vínculo |
+| 2 ✅ | `Relationship`, `bond()` | vínculo com você no lugar da `relacao`; migração; diário; evolução adulta pelo vínculo; camas que se trocam (uma em uso) |
 | 3 | `Desires` (ciclo de vida, atendimento por evento, expiração), `wants()` | balão 💭; desejos de comida (específica, por tag, novidade — inclusive o que você não tem) |
 | 4 | — | desejos de brinquedo, brincar com você, carinho, ficar quieto, ambiente; quem deseja o quê pela personalidade |
 | 5 | `Happenings` (baralho, sorteio no relógio, um por vez) | passarinho, borboleta, achado, amostra grátis, espirros |

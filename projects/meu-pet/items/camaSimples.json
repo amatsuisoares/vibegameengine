@@ -1,0 +1,9 @@
+{
+  "name": "Cama simples",
+  "category": "cama",
+  "icon": "🛏️",
+  "tags": ["macio"],
+  "consumable": false,
+  "description": "A cama que vem com o quarto.",
+  "props": { "artigo": "a", "conforto": 0.6, "cor": "#7b9acc", "travesseiro": "#eef2fb", "enfeite": "" }
+}

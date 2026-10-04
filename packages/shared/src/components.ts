@@ -430,11 +430,39 @@ export const JournalSchema = z.strictObject({
   entries: z.array(JournalEntrySchema).default(() => []).describe('The chronicle (filled by self.journal.add; kept by Persist).'),
 });
 
+export const RelationshipSchema = z
+  .strictObject({
+    initial: z.number().min(0).max(1).default(0.2).describe('Bond with someone never met (and the lowest it fades to).'),
+    levels: z
+      .array(z.number().min(0).max(1))
+      .default(() => [0.35, 0.6, 0.85])
+      .describe('Thresholds, ascending: level = how many the bond reached (event relationship_level when it changes).'),
+    halfLifeHours: z.number().positive().default(72).describe('Without new gains, what is above the floor weighs half after this many hours of game clock.'),
+    keep: z.number().min(0).max(1).default(0.5).describe('The floor it fades to: keep × the best bond ever reached (a long friendship is not lost in a week).'),
+    dailyCaps: z
+      .record(z.string(), z.number().min(0).max(1))
+      .default(() => ({}))
+      .describe('Most a reason can add per game-clock day, e.g. {"petting": 0.03, "wish": 0.12}; reasons not listed are not capped.'),
+    values: z
+      .record(
+        z.string(),
+        z.strictObject({
+          value: z.number().min(0).max(1),
+          peak: z.number().min(0).max(1),
+          t: z.number().describe('Game clock (ms) of the last change (fading starts here).'),
+          today: z.strictObject({ day: z.number().int(), gains: z.record(z.string(), z.number().min(0)) }).optional(),
+        }),
+      )
+      .default(() => ({}))
+      .describe('Bond per subject (filled by self.relationship.add; kept by Persist).'),
+  })
+  .refine((r) => r.levels.every((v, i) => i === 0 || r.levels[i - 1] <= v), 'levels must be ascending');
+
 export const PersistSchema = z.strictObject({
   key: z
     .string()
     .min(1)
-    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences, Routine, Memory, Knowledge, Journal) across sessions and scenes.'),
+    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship) across sessions and scenes.'),
 });
 
 /** Registry of all built-in components. Add new component types here. */
@@ -467,6 +495,7 @@ export const ComponentSchemas = {
   Ambient: AmbientSchema,
   Knowledge: KnowledgeSchema,
   Journal: JournalSchema,
+  Relationship: RelationshipSchema,
   Persist: PersistSchema,
   Script: ScriptSchema,
 } as const;
@@ -503,7 +532,8 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Ambient: 'Environment emitter: light, noise, comfort, music... with a radius (or the whole scene); env(prop) / game.env(x, y) sums what reaches a point, so behavior can depend on the place.',
   Knowledge: 'What the PLAYER knows about the entity: evidence per key (e.g. "likes:apple") that grows into possible / observed / confirmed (event discovery); knows() in expressions. Nothing is revealed for free.',
   Journal: 'A chronicle of the entity: entries with category, text, importance and a dedup key ("first time it..."), capped by dropping the least important; the base of a diary.',
-  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory, Knowledge, Journal) in game.storage under a key: loaded before onStart, saved when it changes.',
+  Relationship: 'Bonds with others ("player", an entity id...): 0..1, earned slowly (gains shrink near the top, daily caps per reason), fading without contact toward a floor that remembers the best it was; levels with event relationship_level; bond() in expressions.',
+  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship) in game.storage under a key: loaded before onStart, saved when it changes.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -537,6 +567,7 @@ export const ComponentsSchema = z.strictObject({
   Ambient: AmbientSchema.optional(),
   Knowledge: KnowledgeSchema.optional(),
   Journal: JournalSchema.optional(),
+  Relationship: RelationshipSchema.optional(),
   Persist: PersistSchema.optional(),
   Script: ScriptSchema.optional(),
 });

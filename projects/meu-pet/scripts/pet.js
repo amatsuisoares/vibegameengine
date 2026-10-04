@@ -7,6 +7,7 @@
 //   Preferences  gostos por assunto: itens (maçã, bola...), tags (fruta, doce...) e contextos (carinho, escuro)
 //   Routine      hábitos por hora do dia, aprendidos do que ele faz (self.routine.record)
 //   Memory       o que ele viveu (susto, comida adorada, brincar com você), enfraquecendo com o tempo
+//   Relationship o vínculo com você ("voce"): cresce devagar pelo que você faz por ele, enfraquece devagar sem você
 //   Persist      tudo isso fica em storage.petIndividuo e volta em toda sessão
 // Aqui só se decide o que cada traço e cada gosto MUDA no comportamento.
 
@@ -236,6 +237,45 @@ function reveal(axis, dir, weight = 0.5) {
   saber(gameRef, `jeito:${axis}:${dir}`, weight);
 }
 
+// ---------------------------------------------------------------- vínculo (componente Relationship da engine)
+//
+// O quanto ele confia em você. Cresce devagar pelo que você faz por ele (cada motivo tem um teto por dia, em
+// Relationship.dailyCaps: carinho, brincar, jogo, comida, cuidado — e, nas próximas fases, desejo e evento), fica
+// mais difícil perto do topo e enfraquece devagar quando você some (nunca abaixo da metade do melhor que já foi).
+// Pesa na forma adulta (cuidado()) e aparece no diário (aba Jeito, "Com você") sem números.
+const VOCE = 'voce';
+const VINCULO = ['Ainda está se acostumando com você.', 'Gosta da sua companhia.', 'Confia em você.', 'Confia em você de olhos fechados.'];
+const VINCULO_SUBIU = [null, '{n} parece gostar cada vez mais da sua companhia.', '{n} parece confiar em você.', '{n} parece confiar em você de olhos fechados.'];
+const VINCULO_DIARIO = [null, 'Passou a gostar da sua companhia.', 'Passou a confiar em você.', 'Passou a confiar em você de olhos fechados.'];
+
+function vinculo(reason, amount) {
+  return me.relationship.add(VOCE, amount, { reason });
+}
+
+/** Mudou de nível: subir é uma festa (♥, observação, página do diário); descer, só um aviso. */
+function mudouVinculo(game, self, ev) {
+  if (realTime < calarVinculoAte) return; // o nível que um save antigo já tinha não é novidade
+  if (ev.level > ev.from) {
+    emote(game, self, '♥', '#ff8fab');
+    emote(game, self, '♥', '#ff8fab');
+    observe(game, `vinculo:${ev.level}`, VINCULO_SUBIU[ev.level], 0, 1);
+    anotar(game, 'vinculo', VINCULO_DIARIO[ev.level], `vinculo:${ev.level}`, 0.8);
+  } else observe(game, 'vinculoCaiu', '{n} parece um pouco mais distante de você.', 240, 0);
+}
+
+/** Saves de antes do vínculo: ele começa de onde a relação antiga estava (lembranças e contadores). */
+let calarVinculoAte = -1;
+
+function migrarVinculo() {
+  if (me.relationship.list().length) return;
+  const c = pet.care || {};
+  if (!(c.carinhos || c.brincadeiras || c.refeicoes || c.petiscos)) return;
+  const antiga = Math.max(0, Math.min(100, 30 + lembranca(VOCE, 'carinho') * 40 + lembranca(VOCE, 'brincouComVoce') * 30 + Math.min(25, (c.carinhos + c.brincadeiras) * 2)));
+  const inicial = 0.2;
+  me.relationship.add(VOCE, (antiga / 100 - inicial) / (1 - inicial));
+  calarVinculoAte = realTime + 0.5;
+}
+
 function emote(game, self, glyph, color) {
   const e = game.spawn('emote', self.x + (game.random() - 0.5) * 40, self.y - pet_size() * 0.32);
   const t = e.get('Text');
@@ -292,11 +332,11 @@ function decay(game, h, at) {
 
 // ---------------------------------------------------------------- ambiente e sono (componente Ambient da engine)
 //
-// A lâmpada e a janela põem luz no quarto, a cama e a cestinha conforto, a caixinha de música música e um
+// A lâmpada e a janela põem luz no quarto, a cama em uso (simples, cestinha, quentinha, fresquinha) conforto, a caixinha de música música e um
 // pouco de ruído (cada uma com seu alcance). game.env(lugar) soma o que chega ali, e o pet sente isso pelo
 // jeito e pelos gostos dele: onde dorme, como dorme, onde cochila, se dança ou se afasta.
 
-/** Quanto um lugar de dormir (tag "lugarDeDormir": a cama, a cestinha...) agrada este pet. */
+/** Quanto um lugar de dormir (tag "lugarDeDormir": a cama em uso) agrada este pet. */
 function notaDoLugar(game, e) {
   const env = game.env(e);
   const item = e.props.item && game.items.get(String(e.props.item));
@@ -310,15 +350,23 @@ function lugarDeDormir(game) {
     const n = notaDoLugar(game, e);
     if (!best || n > best.n) best = { e, n };
   }
+  // Uma cama de que ele não gosta nada: prefere dormir no chão.
+  if (best && best.e.props.item && me.prefs.item(String(best.e.props.item)).score <= -0.45) return null;
   return best ? best.e : game.entity('cama');
 }
 
-/** Onde o corpo fica ao deitar num lugar: numa cestinha um pouco ao lado (para ela aparecer atrás dele). */
-const xDeitado = (e) => e.x + (e.props.item ? 45 : 0);
+/** A cama em uso (item do catálogo) ou null. */
+function camaEmUso(game) {
+  const cama = game.entity('cama');
+  return cama && cama.props.item ? game.items.get(String(cama.props.item)) : null;
+}
+
+/** Onde o corpo fica ao deitar num lugar: num móvel do chão um pouco ao lado (para ele aparecer atrás). */
+const xDeitado = (e) => e.x + (e.hasTag('movel') ? 45 : 0);
 
 const xDeDormir = (game) => {
   const e = lugarDeDormir(game);
-  return e ? xDeitado(e) : 480;
+  return e ? xDeitado(e) : 640; // sem cama boa: no chão, longe dela
 };
 
 /** Luz no quarto numa hora: a lâmpada (se acesa) e a janela (de dia). Calculada, para valer também no tempo fora. */
@@ -346,8 +394,13 @@ function sono(game, at) {
   const pesoLuz = luz * (0.12 + Math.max(0, escuro) * 0.45 + Math.max(0, sens - 0.5) * 0.4) - luz * Math.max(0, -escuro) * 0.12;
   const pesoRuido = (env.noise || 0) * (0.2 + sens * 0.7);
   const musica = (env.music || 0) * likesTag('musica') * 0.25;
-  const q = 0.45 + (env.comfort || 0) * 0.45 - pesoLuz - pesoRuido + musica;
-  const causa = pesoLuz >= pesoRuido && pesoLuz > 0.15 ? 'a luz' : pesoRuido > 0.15 ? 'o barulho' : null;
+  // A cama: a que ele adora embala; a que ele não gosta atrapalha.
+  const onde = ondeDorme(game);
+  const gostoCama = onde.id && game.items.get(onde.id) ? me.prefs.item(onde.id).score : 0;
+  const pesoCama = Math.max(0, -gostoCama) * 0.35;
+  const q = 0.45 + (env.comfort || 0) * 0.45 - pesoLuz - pesoRuido + musica + Math.max(0, gostoCama) * 0.2 - pesoCama;
+  const pior = Math.max(pesoLuz, pesoRuido, pesoCama);
+  const causa = pior <= 0.15 ? null : pior === pesoLuz ? 'a luz' : pior === pesoRuido ? 'o barulho' : 'a cama';
   return { q: Math.max(0, Math.min(1, q)), causa };
 }
 
@@ -361,7 +414,7 @@ function lightBothers() {
   return me.prefs.of('escuro') > 0.2 || T('sensibilidade') > 0.8;
 }
 
-/** Onde ele está dormindo, para as frases (" na cestinha", " na cama"). */
+/** Onde ele está dormindo, para as frases (" na cama", " na cestinha fofa", " na cama quentinha"). */
 function ondeDorme(game) {
   let best = null;
   for (const e of game.find('lugarDeDormir')) {
@@ -369,14 +422,21 @@ function ondeDorme(game) {
     if (d < 90 && (!best || d < best.d)) best = { e, d };
   }
   const item = best && best.e.props.item && game.items.get(String(best.e.props.item));
-  if (item) return { id: item.id, frase: ` ${noItem(item)}` };
+  if (item) return { id: item.id, frase: item.id === 'camaSimples' ? ' na cama' : ` ${noItem(item)}` };
   return best ? { id: best.e.id, frase: ' na cama' } : { id: null, frase: '' };
 }
 
 /** Adormeceu (de noite ou num cochilo): a primeira vez em cada lugar novo entra na história. */
 function adormeceu(game) {
   const onde = ondeDorme(game);
-  if (onde.id && onde.id !== 'cama') anotar(game, 'lembranca', `Dormiu pela primeira vez${onde.frase}.`, `dormiu:${onde.id}`, 0.5);
+  if (onde.id && onde.id !== 'camaSimples') anotar(game, 'lembranca', `Dormiu pela primeira vez${onde.frase}.`, `dormiu:${onde.id}`, 0.5);
+  const cama = camaEmUso(game);
+  if (!onde.id && cama) {
+    // Não gosta nada da cama: dormiu no chão (dá para ver, e conta como pista do gosto).
+    observe(game, 'dormiuNoChao', `{n} preferiu dormir no chão, longe ${doItem(cama)}.`, 120);
+    gostoVisto(game, cama.id, me.prefs.item(cama.id).level);
+    anotar(game, 'lembranca', `Preferiu dormir no chão a deitar ${noItem(cama)}.`, `chao:${cama.id}`, 0.5);
+  }
 }
 
 /** Como ele dorme dá para ver: tranquilo (z devagar) ou se revirando (~). De vez em quando, uma observação. */
@@ -391,14 +451,14 @@ function sonoVisivel(game) {
   } else if (s.q >= 0.7) {
     if (pet.lightOn) reveal('sensibilidade', 'baixo'); // dorme bem mesmo com a luz acesa
     const onde = ondeDorme(game);
-    if (observe(game, 'dormeBem', `{n} está dormindo tranquilo${onde.frase}.`, 120, 0) && onde.id && onde.id !== 'cama') {
+    if (observe(game, 'dormeBem', `{n} está dormindo tranquilo${onde.frase}.`, 120, 0) && onde.id) {
       gostoVisto(game, onde.id, me.prefs.item(onde.id).level, 0.5);
     }
   }
 }
 
 /**
- * Uma coisa nova no quarto (cestinha, caixinha): o pet vai conferir. Um lugar de dormir que ele gosta, ele
+ * Uma coisa nova no quarto (uma cama, a caixinha de música): o pet vai conferir. Um lugar de dormir que ele gosta, ele
  * experimenta na hora (se deita um pouco); do que não gosta, cheira e se afasta.
  */
 function verCoisa(game, self, id) {
@@ -704,12 +764,12 @@ function historia() {
   return { ativo, calmo, linha: ativo >= calmo ? 1 : 2, top };
 }
 
-/** Como foi cuidado (0..100): bem-estar médio, a relação com você e a variedade de comida. */
+/** Como foi cuidado (0..100): bem-estar médio, o vínculo com você e a variedade de comida. */
 function cuidado() {
   const provou = Object.keys(pet.provou || {}).length;
-  const relacao = Math.max(0, Math.min(100, 30 + lembranca('voce', 'carinho') * 40 + lembranca('voce', 'brincouComVoce') * 30 + Math.min(25, (pet.care.carinhos + pet.care.brincadeiras) * 2) - (lembranca('voce', 'acordado') < -0.3 ? 15 : 0)));
+  const relacao = Math.round(me.relationship.get(VOCE) * 100);
   const variedade = Math.min(100, provou * 18);
-  const nota = pet.wellbeing * 0.6 + relacao * 0.25 + variedade * 0.15;
+  const nota = pet.wellbeing * 0.45 + relacao * 0.4 + variedade * 0.15;
   return { nota, relacao, provou, tier: nota >= 70 ? '1' : nota >= 45 ? '2' : '3' };
 }
 
@@ -723,7 +783,7 @@ function porQueCresceu(next) {
   }
   const c = cuidado();
   const partes = [c.nota >= 70 ? 'foi muito bem cuidado' : c.nota >= 45 ? 'foi bem cuidado' : 'passou por uns apertos'];
-  partes.push(c.relacao >= 70 ? 'confia muito em você' : c.relacao >= 45 ? 'gosta da sua companhia' : 'se acostumou a ficar sozinho');
+  partes.push(['se acostumou a ficar sozinho', 'gosta da sua companhia', 'confia em você', 'confia muito em você'][me.relationship.level(VOCE)]);
   if (c.provou >= 4) partes.push('come de tudo um pouco');
   else if (c.provou <= 1) partes.push('quase só conheceu ração');
   const frase = juntar(partes);
@@ -1099,6 +1159,7 @@ function finish(game, self) {
     n.afeto = clamp(n.afeto + 5 * lerp(0.4, 1.6, T('sociabilidade')));
     pet.care.brincadeiras++;
     ganhar(game, 2, 'brincar', 30);
+    vinculo('brincar', { love: 0.05, like: 0.04, neutral: 0.025 }[b.level] ?? 0.01);
     reveal('brincadeira', 'alto');
     lembrar('brincouComVoce', 'voce', { love: 1, like: 0.7, neutral: 0.35 }[b.level] ?? 0.1, 0.6);
     gostoVisto(game, 'bola', b.level);
@@ -1182,6 +1243,7 @@ function voltouDoJogo(game, self, ev) {
   n.fome = clamp(n.fome + j.fome);
   pet.care.brincadeiras++;
   lembrar('brincouComVoce', 'voce', 1, 0.6);
+  vinculo('jogo', 0.03 + animo * 0.05);
   me.routine.record('brincar');
   // As reações que você viu no jogo são pistas dos gostos (mais fracas do que dar de comer, mas uma partida já dá um "talvez").
   for (const [id, nivel] of Object.entries(r.reacoes || {})) if (game.items.get(id) && VERBO[nivel]) gostoVisto(game, id, nivel, 0.6);
@@ -1236,6 +1298,7 @@ function makeApi(game, self) {
           naoGostou(game, self);
           observe(game, 'acordado', '{n} acordou e não parece gostar disso.', 5);
           lembrar('acordado', 'voce', -1, 0.7);
+          vinculo('acordado', -0.03);
           anotar(game, 'lembranca', 'Ficou chateado quando você o acordou.', 'acordado', 0.5);
           wake(game, self, true);
           reveal('paciencia', 'baixo');
@@ -1255,6 +1318,7 @@ function makeApi(game, self) {
         n.afeto = clamp(n.afeto - 3);
         reveal('paciencia', 'baixo');
         lembrar('carinho', 'voce', -0.6, 0.4);
+        vinculo('chateado', -0.01);
         me.prefs.learn('carinho', -0.3);
         naoGostou(game, self);
         observe(game, 'carinhoRuim', '{n} não parece gostar disso agora.', 2);
@@ -1273,6 +1337,7 @@ function makeApi(game, self) {
         n.diversao = clamp(n.diversao + 3);
         emote(game, self, '♥', '#ff8fab');
         reveal('sociabilidade', 'alto');
+        vinculo('carinho', level === 'love' ? 0.04 : 0.03);
         lembrar('carinho', 'voce', level === 'love' ? 1 : 0.6, 0.4);
         me.prefs.learn('carinho', 0.3);
         gostoVisto(game, 'carinho', level);
@@ -1282,6 +1347,7 @@ function makeApi(game, self) {
       } else if (level === 'neutral') {
         n.afeto = clamp(n.afeto + 8);
         lembrar('carinho', 'voce', 0.1, 0.3);
+        vinculo('carinho', 0.015);
         reveal('sociabilidade', 'baixo');
         gostoVisto(game, 'carinho', level);
         anotar(game, 'lembranca', 'Recebeu o primeiro carinho, sem muita empolgação.', 'carinho', 0.4);
@@ -1305,6 +1371,7 @@ function makeApi(game, self) {
         observe(game, 'tigelaCheia', 'A tigela já está cheia.', 1);
         return;
       }
+      if (pet.needs.fome < 50) vinculo('cuidado', 0.02); // encheu quando ele precisava
       pet.bowl = 3;
       game.playSound('sfx_tigela');
       if (awake() && pet.needs.fome < 70) go(game, spot(game, 'tigela') + 55, 'eat');
@@ -1316,6 +1383,7 @@ function makeApi(game, self) {
       }
       pet.sick = false;
       pet.needs.saude = clamp(pet.needs.saude + 25);
+      vinculo('cuidado', 0.04);
       observe(game, 'remedio', '{n} parece estar se sentindo melhor.', 2);
     },
     /** Você mexeu num brinquedo: reage pelo jeito com ele (verBrinquedo). */
@@ -1326,7 +1394,7 @@ function makeApi(game, self) {
     brinquedoNovo(id, como) {
       const e = game.entity(id);
       const item = e && game.items.get(String(e.props.item));
-      if (item && item.category === 'ambiente') verCoisa(game, self, id);
+      if (item && (item.category === 'ambiente' || item.category === 'cama')) verCoisa(game, self, id);
       else verBrinquedo(game, self, id, como || 'novo');
     },
     /** Brincar junto (minigame "pegar" ou "caixinhas"): {ok} ou {ok: false, reason} se ele não quer agora. */
@@ -1391,6 +1459,7 @@ function makeApi(game, self) {
       pet.needs.higiene = clamp(Math.max(pet.needs.higiene + 18, level));
       pet.care.limpezas++;
       ganhar(game, 1, 'limpar');
+      vinculo('cuidado', 0.01);
       if (pet.dirt === 0) observe(game, 'limpo', '{n} parece mais à vontade com o quarto limpo.', 60);
     },
     alternarLuz() {
@@ -1500,6 +1569,7 @@ function abaJeito(game) {
   const jeitos = me.knowledge.list({ prefix: 'jeito:' }).filter((k) => JEITO[k.key.slice(6)]);
   if (jeitos.length) for (const k of jeitos.slice(0, 6)) lines.push(`· ${fraseJeito(k.level, JEITO[k.key.slice(6)])}`);
   else lines.push('· Ainda observando... cada coisa que ele faz conta.');
+  lines.push('', 'Com você', `· ${VINCULO[me.relationship.level(VOCE)]}`);
   lines.push('', 'Hábitos');
   const habitos = [];
   for (const h of me.routine.patterns()) {
@@ -1560,7 +1630,7 @@ function diaryPages(game, aba) {
   body.forEach((line, i) => {
     const n = linhasDe(line);
     const titulo = line && !line.startsWith('·') && body[i + 1] && body[i + 1].startsWith('·');
-    if (used + n + (titulo ? 1 : 0) > LINHAS_POR_PAGINA && used > 0) {
+    if (used + n + (titulo ? linhasDe(body[i + 1]) : 0) > LINHAS_POR_PAGINA && used > 0) {
       pages.push([]);
       used = 0;
     }
@@ -1642,6 +1712,7 @@ function mudouGosto(game, ev) {
 function onEvent(self, ev, game) {
   if (ev.type === 'minigame_end') return voltouDoJogo(game, self, ev);
   if (ev.type === 'preference_change' && ev.entity === self.id) return mudouGosto(game, ev);
+  if (ev.type === 'relationship_level' && ev.entity === self.id && ev.subject === VOCE) return mudouVinculo(game, self, ev);
   if (ev.type !== 'memory_forgotten' || ev.entity !== self.id || ev.memory !== 'susto' || ev.importance < 0.7) return;
   const item = game.items.get(String(ev.subject));
   if (item) anotar(game, 'lembranca', `Parece ter esquecido o susto com ${oItem(item)}.`, `esqueceu:susto:${item.id}`, 0.4);
@@ -1803,10 +1874,12 @@ function terminarRefeicao(game, self, reagir) {
   if (level === 'love') {
     n.afeto = clamp(n.afeto + 10);
     n.diversao = clamp(n.diversao + 5);
+    vinculo('comida', 0.03);
     reveal('apetite', 'alto');
     observe(game, `comida:${item.id}`, `{n} parece ter adorado ${oItem(item)}!`);
   } else if (level === 'like') {
     n.afeto = clamp(n.afeto + 5);
+    vinculo('comida', 0.02);
     observe(game, `comida:${item.id}`, `{n} parece ter gostado ${doItem(item)}.`);
   } else if (level === 'neutral') observe(game, `comida:${item.id}`, `{n} comeu ${oItem(item)} sem muito entusiasmo.`);
   else {
@@ -1873,6 +1946,7 @@ function onStart(self, game) {
     anotar(game, 'evolucao', 'Chegou ao quarto.', 'nasceu', 1);
   }
   migrarDiario(game);
+  migrarVinculo();
   const cfg = game.storage.get('config');
   if (cfg && cfg.speed) game.clock.speed = cfg.speed;
   lastNow = now;

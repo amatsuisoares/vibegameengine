@@ -107,7 +107,8 @@
       "transform": { "x": 150, "y": 452 },
       "components": {
         "Sprite": { "width": 190, "height": 46, "color": "#7b9acc", "layer": 1 },
-        "Ambient": { "emits": { "comfort": 0.6 }, "radius": 100, "falloff": "none" }
+        "Ambient": { "emits": { "comfort": 0.6 }, "radius": 100, "falloff": "none" },
+        "Script": { "src": "scripts/cama.js" }
       },
       "tags": ["pontoCurioso", "lugarDeDormir"]
     },
@@ -274,7 +275,12 @@
             "chocalho": { "min": -1.2, "max": 1.2 },
             "musica": { "min": -0.8, "max": 1, "traits": { "sensibilidade": -0.4, "atividade": 0.3 } },
             "cestinha": { "min": -0.6, "max": 0.6 },
-            "caixinhaMusica": { "min": -0.6, "max": 0.6 }
+            "caixinhaMusica": { "min": -0.6, "max": 0.6 },
+            "quentinho": { "min": -1, "max": 1, "traits": { "sensibilidade": 0.35, "atividade": -0.35 } },
+            "fresquinho": { "min": -1, "max": 1, "traits": { "atividade": 0.4, "sensibilidade": -0.25 } },
+            "camaSimples": { "min": -0.3, "max": 0.3 },
+            "camaQuentinha": { "min": -0.6, "max": 0.6 },
+            "camaFria": { "min": -0.6, "max": 0.6 }
           },
           "subjectWeight": 0.4,
           "tagBlend": 0.7,
@@ -299,7 +305,22 @@
           "minStrength": 0.05
         },
         "Knowledge": { "possible": 1, "observed": 3, "confirmed": 6 },
-        "Journal": { "capacity": 80 }
+        "Journal": { "capacity": 80 },
+        "Relationship": {
+          "initial": 0.2,
+          "levels": [0.35, 0.6, 0.85],
+          "halfLifeHours": 72,
+          "keep": 0.5,
+          "dailyCaps": {
+            "carinho": 0.08,
+            "brincar": 0.1,
+            "jogo": 0.14,
+            "comida": 0.06,
+            "cuidado": 0.06,
+            "desejo": 0.25,
+            "evento": 0.2
+          }
+        }
       }
     },
     {
@@ -694,6 +715,20 @@
         "Sprite": { "width": 140, "color": "#4d3a63" },
         "Text": { "text": "Caixinhas" },
         "Script": { "props": { "acao": "jogo", "jogo": "caixinhas" } }
+      }
+    },
+    {
+      "id": "camaEnfeite",
+      "transform": { "x": 222, "y": 446 },
+      "components": {
+        "Text": {
+          "text": "",
+          "fontSize": 30,
+          "font": "sans-serif",
+          "align": "center",
+          "screenSpace": false,
+          "layer": 3
+        }
       }
     }
   ]

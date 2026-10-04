@@ -434,6 +434,23 @@ graça**.
     category, text, key?}`. Estado: `journal: {count, last}` (3 mais novas).
 - Os dois são guardados pelo `Persist`, junto com o resto do indivíduo.
 
+## Vínculo (`Relationship`)
+
+Implementado na V0.8 (`engine/src/relationship.ts`). O quanto uma entidade está ligada a alguém (`"player"`, o id de
+outra entidade...), de 0 a 1, **conquistado devagar**:
+
+- Um ganho vale `quantia × (1 − vínculo)`: perto do topo fica mais difícil. Perdas (quantia negativa) valem inteiras.
+- `dailyCaps` limita quanto cada **motivo** pode somar por dia do relógio (`{"carinho": 0.08, "desejo": 0.25}`): cinquenta
+  carinhos seguidos valem o teto. Motivos fora da lista não têm teto.
+- Sem ganhos novos, o que está acima do piso cai pela metade a cada `halfLifeHours` (72) do relógio; o piso é
+  `max(initial, keep × o melhor que já foi)` — uma semana fora não apaga uma amizade longa.
+- `levels` (padrão `[0.35, 0.6, 0.85]`): nível = quantos limites o vínculo alcançou; mudar de nível é o evento
+  `relationship_level {entity, subject, level, from, value}`.
+- Scripts: `self.relationship.add(alvo, quantia, {reason?})` → `{subject, value, level, peak, delta, from}`;
+  `get(alvo)` (com o enfraquecimento; `initial` para quem nunca viu); `level(alvo)`; `list()` (mais forte primeiro).
+- Expressões: `bond('alvo')` ou `bond('id', 'alvo')` → 0..1. Estado: `bonds: {alvo: {value, level}}`. Guardado pelo
+  `Persist` (inclusive o que cada motivo já somou hoje).
+
 ## Texto com quebra de linha (`Text.maxWidth`)
 
 `Text.maxWidth` (px) quebra as linhas mais largas que isso, palavra por palavra (`
@@ -862,7 +879,7 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
   uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
-  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `knows([id,] chave)` (0..3), `env(prop, [id | x, y])`, `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
+  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `bond([id,] alvo)`, `knows([id,] chave)` (0..3), `env(prop, [id | x, y])`, `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").

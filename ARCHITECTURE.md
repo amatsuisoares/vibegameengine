@@ -284,6 +284,9 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   (nível calculado pelos limites do componente, evento `discovery` ao subir) e `Journal.entries` (deduplicação por chave,
   corte pela menor importância). Ambos persistidos pelo `IndividualRunner`. A engine não sabe o que é "gosto" ou "jeito":
   as chaves e os textos são do jogo.
+- **Vínculo** (V0.8, `engine/src/relationship.ts`): `Relationship.values` = `{value, peak, t, today}` por alvo. Ganho
+  com retorno decrescente (`× (1 − valor)`) e teto diário por motivo; o enfraquecimento é calculado na leitura (meia-vida
+  sobre o que passa do piso `keep × peak`) e gravado só quando muda. Persistido pelo `IndividualRunner`.
 - **`Text.maxWidth`** (V0.7): `buildDrawList` continua puro e só repassa `maxWidth` no `TextCmd`; a quebra
   (`wrapLines`, testável com uma medida falsa) acontece no `paint`, onde há `measureText`.
 - **Notifier** (V0.7, `engine/src/notifier.ts`): um por `Game` (sobrevive a trocas de cena). Cooldowns de relógio e

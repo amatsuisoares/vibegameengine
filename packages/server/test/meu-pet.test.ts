@@ -199,13 +199,13 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     const game = new Game(load(), { seed: 4, clock: { start: '2026-03-10T10:00:00Z' } });
     game.perform([{ type: 'wait', ms: 200 }, { type: 'type', text: 'Mimi\n' }, { type: 'wait', ms: 500 }]);
     expect(game.getState().wallet).toEqual({ moedas: 15 });
-    expect(game.getState().inventories).toEqual({ default: { maca: 1, cenoura: 1, leite: 1, biscoito: 1, bola: 1 } }); // the ball comes with the room
+    expect(game.getState().inventories).toEqual({ default: { maca: 1, cenoura: 1, leite: 1, biscoito: 1, bola: 1, camaSimples: 1 } }); // the ball comes with the room
     expect(game.entity('botaoLoja')!.components.Text!.text).toBe('Loja · 15 🪙');
 
     // Shop: 7 foods for sale; buy a fish (8) and two carrots (2 each); then not enough for cheese (6 > 3).
     game.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 50 }]);
     const shop = game.world.withTag('cartaLoja');
-    expect(shop.map((c) => c.components.Script!.props.item)).toEqual(['banana', 'biscoito', 'caixinhaMusica', 'cenoura', 'cestinha', 'chocalho', 'leite', 'maca', 'peixe', 'pelucia', 'queijo']);
+    expect(shop.map((c) => c.components.Script!.props.item)).toEqual(['banana', 'biscoito', 'caixinhaMusica', 'camaFria', 'camaQuentinha', 'cenoura', 'cestinha', 'chocalho', 'leite', 'maca', 'peixe', 'pelucia', 'queijo']);
     const at = (id: string) => shop.find((c) => c.components.Script!.props.item === id)!;
     for (const id of ['peixe', 'cenoura', 'cenoura', 'queijo']) game.perform([{ type: 'click', x: at(id).x, y: at(id).y }, { type: 'wait', ms: 50 }]);
     expect(game.getState().wallet).toEqual({ moedas: 3 });
@@ -417,7 +417,7 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     // Toy box: one card per toy owned; clicking stores it (leaves the room), clicking again puts it back.
     game.perform([{ type: 'click', entity: 'botaoBrinquedos' }, { type: 'wait', ms: 50 }]);
     expect(game.world.withTag('cartaLoja')).toEqual([]); // the other panels close
-    expect(game.world.withTag('cartaBrinquedo').map((c) => c.components.Text!.text)).toEqual(['⚽ Bola\nno quarto', '🧸 Pelúcia\nno quarto']);
+    expect(game.world.withTag('cartaBrinquedo').map((c) => c.components.Text!.text)).toEqual(['🛏️ Cama simples\nem uso', '⚽ Bola\nno quarto', '🧸 Pelúcia\nno quarto']);
     game.perform([{ type: 'click', entity: card('cartaBrinquedo', 'bola').id }, { type: 'wait', ms: 50 }]);
     expect(game.entity('bola')).toBeUndefined();
     expect(card('cartaBrinquedo', 'bola').components.Text!.text).toBe('⚽ Bola\nguardado');
@@ -590,10 +590,11 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     const kinds = (g: Game) => g.events(0, 'notification').map((e) => String(e.kind));
     const petOf = (g: Game) => g.getState({ ids: ['pet'] }).entities[0];
 
-    // Night, tired, a dark-loving sensitive pet that likes soft things: it goes to the basket and, with the lamp on, sleeps badly.
-    const night = start('2026-03-10T23:30:00Z', petAt('2026-03-10T23:30:00Z', { energia: 30 }), calm, { escuro: p(1), macio: p(0.8), cestinha: p(0.6), aconchego: p(0.5) }, { cestinha: 1, bola: 1 });
+    // Night, tired, a dark-loving sensitive pet that likes soft things: it goes to its bed (the basket) and, with the lamp on, sleeps badly.
+    const night = start('2026-03-10T23:30:00Z', petAt('2026-03-10T23:30:00Z', { energia: 30 }), calm, { escuro: p(1), macio: p(0.8), cestinha: p(0.6), aconchego: p(0.5) }, { cestinha: 1, bola: 1 }, { cama: 'cestinha' });
     night.perform([{ type: 'wait', ms: 20000 }]);
-    const basket = night.entity('cestinha')!;
+    const basket = night.entity('cama')!;
+    expect(basket.components.Script!.props.item).toBe('cestinha');
     expect(petOf(night).state).toBe('sleep');
     expect(Math.abs(night.entity('pet')!.x - basket.x)).toBeLessThan(60); // lies down by its side
     night.perform([{ type: 'wait', ms: 3000 }]);
@@ -612,15 +613,15 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(kinds(night)).toContain('dormeBem');
     expect(petOf(night).journal!.last.join(' ')).toContain('Dormiu pela primeira vez na cestinha fofa.');
 
-    // Day: a calm, somewhat tired pet naps in the basket within a few real minutes at 1x.
-    const day = start('2026-03-10T14:00:00Z', petAt('2026-03-10T14:00:00Z', { energia: 55 }), calm, { macio: p(0.8), cestinha: p(0.6) }, { cestinha: 1 });
+    // Day: a calm, somewhat tired pet naps in its bed within a few real minutes at 1x.
+    const day = start('2026-03-10T14:00:00Z', petAt('2026-03-10T14:00:00Z', { energia: 55 }), calm, { macio: p(0.8), cestinha: p(0.6) }, { cestinha: 1 }, { cama: 'cestinha' });
     let napped = false;
     for (let s = 0; s < 240 && !napped; s++) {
       day.perform([{ type: 'wait', ms: 1000 }]);
       napped = petOf(day).state === 'nap';
     }
     expect(napped).toBe(true);
-    expect(Math.abs(day.entity('pet')!.x - day.entity('cestinha')!.x)).toBeLessThan(60);
+    expect(Math.abs(day.entity('pet')!.x - day.entity('cama')!.x)).toBeLessThan(60);
 
     // Music: a lively music lover dances by the box; a sensitive one that dislikes it walks away.
     const box = (prefs: Record<string, unknown>, traits: Record<string, number>) => {
@@ -839,7 +840,7 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(game.world.scene.id).toBe('inicio');
     game.perform([{ type: 'type', text: 'Novo\n' }, { type: 'wait', ms: 500 }]);
     expect(game.world.scene.id).toBe('quarto');
-    expect(game.getState().inventories).toEqual({ default: { maca: 1, cenoura: 1, leite: 1, biscoito: 1, bola: 1 } }); // the welcome basket and the ball
+    expect(game.getState().inventories).toEqual({ default: { maca: 1, cenoura: 1, leite: 1, biscoito: 1, bola: 1, camaSimples: 1 } }); // the welcome basket and the ball
     expect(game.getState().wallet).toEqual({ moedas: 15 });
     expect(game.storage.get('quarto')).not.toMatchObject({ cortina: true });
     expect((game.storage.get('colecao') as { pets: { nome: string }[] }).pets.map((p) => p.nome)).toEqual(['Velho']);
@@ -939,6 +940,128 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(jeito).toContain('Talvez seja pouco curioso.');
     expect(jeito).toContain('Talvez seja de pouco apetite.');
     expect(jeito).toContain('Talvez seja reservado.');
+    expect(g.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('beds: one bed in use, swapped in the Coisas box or by buying one; it sleeps better in the one it likes and on the floor if it hates it', () => {
+    const day = '2026-03-10T14:00:00Z';
+    const night = '2026-03-10T23:00:00Z';
+    const t = Date.parse(day);
+    const petAt = (iso: string, energia: number) => ({ ...pet, needs: { ...pet.needs, energia }, lastSeen: Date.parse(iso) });
+    const pet = {
+      version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 90, energia: 90, diversao: 80, higiene: 95, saude: 100, afeto: 80 }, sick: false,
+      asleep: false, lightOn: false, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const traits = { atividade: 0.3, sociabilidade: 0.5, curiosidade: 0.6, independencia: 0.5, sensibilidade: 0.5, apetite: 0.5, paciencia: 0.7, brincadeira: 0.4 };
+    const prefs = { quentinho: p(1), camaQuentinha: p(0.6), fresquinho: p(-1), camaFria: p(-0.8), macio: p(0.3), escuro: p(0) };
+    const start = (iso: string, storage: Record<string, unknown> = {}) =>
+      new Game(load(), {
+        seed: 3, scene: 'quarto', clock: { start: iso },
+        storage: { pet: petAt(iso, iso === day ? 90 : 30), petIndividuo: { version: 1, traits, preferences: prefs }, 'vibe.inventory': { default: {} }, 'vibe.wallet': { moedas: 60 }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) }, ...storage },
+      });
+    const g = start(day);
+    g.perform([{ type: 'wait', ms: 300 }]);
+    const cama = () => g.entity('cama')!;
+    const kinds = () => g.events(0, 'notification').map((e) => String(e.kind));
+    const card = (tag: string, item: string) => g.world.withTag(tag).find((c) => c.components.Script!.props.item === item)!;
+    expect(cama().components.Script!.props.item).toBe('camaSimples'); // comes with the room
+    expect(g.economy.inventory().count('camaSimples')).toBe(1);
+
+    // Buying a bed puts it in use at once (the bed changes look), and the pet goes to try it.
+    g.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 50 }]);
+    g.perform([{ type: 'click', entity: card('cartaLoja', 'camaQuentinha').id }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 9000 }]);
+    expect(cama().components.Script!.props.item).toBe('camaQuentinha');
+    expect(cama().components.Sprite!.color).toBe('#c4614e');
+    expect(g.entity('camaEnfeite')!.components.Text!.text).toBe('🧣');
+    expect(g.world.withTag('lugarDeDormir')).toHaveLength(1); // still one bed
+    expect(g.events(0, 'notification').map((e) => e.text)).toContain('Mimi deitou na cama quentinha para experimentar. Parece ter gostado!');
+
+    // The Coisas box lists the beds: the one in use, and the others to swap to.
+    g.perform([{ type: 'click', entity: 'botaoBrinquedos' }, { type: 'wait', ms: 50 }]);
+    expect(g.world.withTag('cartaBrinquedo').map((c) => c.components.Text!.text)).toEqual(['🧣 Cama quentinha\nem uso', '🛏️ Cama simples\nusar esta']);
+    g.perform([{ type: 'click', entity: card('cartaBrinquedo', 'camaSimples').id }, { type: 'wait', ms: 50 }]);
+    expect(cama().components.Script!.props.item).toBe('camaSimples');
+    expect(card('cartaBrinquedo', 'camaQuentinha').components.Text!.text).toBe('🧣 Cama quentinha\nusar esta');
+    g.perform([{ type: 'click', entity: 'caixa' }, { type: 'wait', ms: 50 }]);
+
+    // A bed it hates: it sniffs and walks away...
+    g.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 50 }]);
+    g.perform([{ type: 'click', entity: card('cartaLoja', 'camaFria').id }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 9000 }]);
+    expect(g.events(0, 'notification').map((e) => e.text)).toContain('Mimi cheirou a cama fresquinha e se afastou.');
+    expect(cama().components.Script!.props.item).toBe('camaFria');
+    // ...and at bedtime it sleeps on the floor, away from it.
+    const floor = start(night, { 'vibe.inventory': { default: { camaSimples: 1, camaFria: 1 } }, quarto: { bolaDada: true, brinquedos: {}, cama: 'camaFria' } });
+    expect(floor.waitUntil((x) => (x.storage.get('pet') as { asleep: boolean }).asleep, 120_000).ok).toBe(true);
+    floor.perform([{ type: 'wait', ms: 2000 }]);
+    expect(floor.events(0, 'notification').map((e) => e.text)).toContain('Mimi preferiu dormir no chão, longe da cama fresquinha.');
+    expect(Math.abs(floor.entity('pet')!.x - floor.entity('cama')!.x)).toBeGreaterThan(300);
+
+    // In the warm bed it loves it sleeps well, recovering more than in the plain one.
+    const sleepGain = (bed: string) => {
+      const s = start(night, { 'vibe.inventory': { default: { camaSimples: 1, camaQuentinha: 1 } }, quarto: { bolaDada: true, brinquedos: {}, cama: bed } });
+      s.waitUntil((x) => (x.storage.get('pet') as { asleep: boolean }).asleep, 120_000);
+      s.perform([{ type: 'wait', ms: 3000 }]);
+      const energia = () => (s.storage.get('pet') as { needs: { energia: number } }).needs.energia;
+      const e0 = energia();
+      s.clock.speed = 60; // an hour of sleep
+      s.perform([{ type: 'wait', ms: 60_000 }]);
+      expect(Math.abs(s.entity('pet')!.x - s.entity('cama')!.x)).toBeLessThan(60);
+      return energia() - e0;
+    };
+    expect(sleepGain('camaQuentinha')).toBeGreaterThan(sleepGain('camaSimples') * 1.15);
+
+    // The bed in use is kept with the save.
+    const again = new Game(load(), { seed: 4, scene: 'quarto', clock: { start: '2026-03-11T08:00:00Z' }, storage: g.storage.snapshot() });
+    again.step(2);
+    expect(again.entity('cama')!.components.Script!.props.item).toBe('camaFria');
+    for (const x of [g, floor, again]) expect(x.console.read(0, 'error')).toEqual([]);
+  });
+
+  it('bond: what you do for it builds a bond slowly (capped per day), a new level shows and goes to the diary, and the adult form weighs it', () => {
+    const iso = '2026-03-10T14:00:00Z';
+    const t = Date.parse(iso);
+    const pet = {
+      version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 15, energia: 90, diversao: 80, higiene: 95, saude: 50, afeto: 60 }, sick: true,
+      asleep: false, lightOn: true, bowl: 0, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const g = new Game(load(), {
+      seed: 2, scene: 'quarto', clock: { start: iso },
+      storage: {
+        pet, petIndividuo: { version: 1, traits: { atividade: 0.4, sociabilidade: 0.8, curiosidade: 0.5, independencia: 0.3, sensibilidade: 0.4, apetite: 0.6, paciencia: 0.8, brincadeira: 0.5 }, preferences: { carinho: p(1), maca: p(1), banana: p(1), leite: p(1), fruta: p(1), laticinio: p(1) } },
+        'vibe.inventory': { default: { maca: 1, banana: 1, leite: 1 } }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+      },
+    });
+    const bond = () => g.getState({ ids: ['pet'] }).entities[0].bonds?.voce?.value ?? 0.2;
+    g.perform([{ type: 'wait', ms: 500 }]);
+    expect(bond()).toBe(0.2);
+    const diary = () => {
+      g.perform([{ type: 'click', entity: 'botaoDiario' }, { type: 'wait', ms: 50 }, { type: 'click', entity: 'diarioAba1' }, { type: 'wait', ms: 50 }]);
+      const text = g.entity('diarioTexto')!.components.Text!.text;
+      g.perform([{ type: 'click', entity: 'diario' }, { type: 'wait', ms: 50 }]);
+      return text;
+    };
+    expect(diary()).toContain('Com você\n· Ainda está se acostumando com você.');
+
+    // Petting it likes: up, but a day of petting only goes so far.
+    for (let i = 0; i < 6; i++) g.perform([{ type: 'click', entity: 'pet' }, { type: 'wait', ms: 7000 }]);
+    const afterPetting = bond();
+    expect(afterPetting).toBeGreaterThan(0.26);
+    expect(afterPetting).toBeLessThanOrEqual(0.2801);
+    // Medicine when it is sick and foods it loves add their part.
+    g.perform([{ type: 'click', entity: 'botaoRemedio' }, { type: 'wait', ms: 1000 }]);
+    for (let i = 0; i < 3; i++) {
+      g.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 80 }]);
+      g.perform([{ type: 'click', entity: g.world.withTag('cartaComida')[0].id }, { type: 'wait', ms: 6000 }]);
+    }
+    expect(bond()).toBeGreaterThan(0.35);
+    expect(g.events(0, 'relationship_level')).toMatchObject([{ entity: 'pet', subject: 'voce', from: 0, level: 1 }]);
+    expect(g.events(0, 'notification').map((e) => e.text)).toContain('Mimi parece gostar cada vez mais da sua companhia.');
+    expect(g.getState({ ids: ['pet'] }).entities[0].journal!.last).toContain('Passou a gostar da sua companhia.');
+    expect(diary()).toContain('Com você\n· Gosta da sua companhia.');
     expect(g.console.read(0, 'error')).toEqual([]);
   });
 

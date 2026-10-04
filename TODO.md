@@ -362,7 +362,13 @@ O pet passa a querer coisas e acontecimentos quebram a rotina; atender e partici
 que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
 
 - [x] **Fase 1 — Análise e arquitetura** (`docs/V08_DESEJOS.md`)
-- [ ] **Fase 2 — Vínculo** (`Relationship`, `bond()`; substitui a relação da evolução adulta)
+- [x] **Fase 2 — Vínculo + camas**: engine `Relationship` (vínculo 0..1 por alvo: ganho com retorno decrescente, teto por
+  motivo por dia, enfraquece sem contato até `keep` × o melhor que já foi, níveis com evento `relationship_level`,
+  `bond()` nas expressões, `bonds` no estado, salvo pelo `Persist`). No meu-pet: vínculo com você (carinho, brincar,
+  minigames, comida, cuidados) no lugar da relação antiga, com peso 0,4 na forma adulta; aba Jeito "Com você"; subir de
+  nível vira ♥♥, observação e página do diário; saves antigos migram. **Camas** (pedido da usuária): uma cama só, a em
+  uso — simples, cestinha, quentinha 🧣, fresquinha ❄️ (gostos novos quentinho/fresquinho); comprar põe em uso, a caixa
+  de Coisas troca; dorme melhor na que gosta e no chão se detesta a cama (486 testes)
 - [ ] **Fase 3 — Desejos de comida** (`Desires`, `wants()`; balão 💭; específica, por tag, novidade)
 - [ ] **Fase 4 — Outros desejos** (brinquedo, brincar com você, carinho, ficar quieto, ambiente)
 - [ ] **Fase 5 — Eventos aleatórios** (`Happenings`; passarinho, borboleta, achado, amostra grátis, espirros)

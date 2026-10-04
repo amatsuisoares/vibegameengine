@@ -15,6 +15,7 @@ import type { NotificationEntry, Notifier, NotifyOptions } from './notifier';
 import { knowledgeLevel, listKnowledge, observeKnowledge, type KnowledgeLevel, type KnowledgeView } from './knowledge';
 import { envAt } from './ambient';
 import { addEntry, hasEntry, journalEntries, removeEntry, type JournalAdd, type JournalEntry } from './journal';
+import { addBond, bondLevel, bondOf, listBonds, type BondChange, type BondView } from './relationship';
 import type { BuyOptions, BuyResult, Economy, Inventory, Wallet } from './economy';
 import { affinityOf, evaluate, evaluateItem, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
@@ -145,6 +146,18 @@ export interface ScriptJournal {
   entries(query?: { category?: string; limit?: number }): JournalEntry[];
   has(key: string): boolean;
   remove(key: string): boolean;
+}
+
+/** self.relationship: the entity's bonds with others (Relationship). */
+export interface ScriptRelationship {
+  /** Gains (scaled by how far from the top, capped per day by reason) or loses bond with `subject`. Saved with Persist. */
+  add(subject: string, amount: number, options?: { reason?: string }): BondChange;
+  /** Bond 0..1 now (fading included); `initial` for someone never met. */
+  get(subject: string): number;
+  /** How many of the level thresholds the bond reached. */
+  level(subject: string): number;
+  /** Every bond, strongest first. */
+  list(): BondView[];
 }
 
 /** self.persist: where the individual data is kept (Persist). */
@@ -321,6 +334,8 @@ export interface ScriptEntity {
   readonly knowledge: ScriptKnowledge;
   /** The entity's chronicle (Journal). */
   readonly journal: ScriptJournal;
+  /** The entity's bonds (Relationship). */
+  readonly relationship: ScriptRelationship;
   /** The entity's Persist. */
   readonly persist: ScriptPersist;
   /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
@@ -843,7 +858,7 @@ class ScriptApi {
         return k;
       },
     };
-    const need = (c: 'Knowledge' | 'Journal') => {
+    const need = (c: 'Knowledge' | 'Journal' | 'Relationship') => {
       if (!e.components[c]) throw new Error(`entity "${e.id}" has no ${c}`);
       individuals.ensure(e);
     };
@@ -877,6 +892,18 @@ class ScriptApi {
         return ok;
       },
     };
+    const relationship: ScriptRelationship = {
+      add: (subject, amount, options) => {
+        need('Relationship');
+        const r = addBond(e, host.clock.now, String(subject), finite(amount, 'amount'), options?.reason === undefined ? undefined : String(options.reason));
+        if (r.delta !== 0) individuals.touch(e);
+        if (r.level !== r.from) w.emit('relationship_level', { entity: e.id, subject: r.subject, level: r.level, from: r.from, value: r.value });
+        return r;
+      },
+      get: (subject) => (need('Relationship'), bondOf(e, host.clock.now, String(subject))),
+      level: (subject) => (need('Relationship'), bondLevel(e.components.Relationship!, bondOf(e, host.clock.now, String(subject)))),
+      list: () => (need('Relationship'), listBonds(e, host.clock.now)),
+    };
     const persist: ScriptPersist = {
       get key() {
         return e.components.Persist?.key ?? null;
@@ -897,6 +924,7 @@ class ScriptApi {
       memory,
       knowledge,
       journal,
+      relationship,
       persist,
       get x() {
         return e.x;

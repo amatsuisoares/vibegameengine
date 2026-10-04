@@ -232,16 +232,29 @@ Cada coisa do quarto põe algo no ambiente (`Ambient`, com alcance), e o pet sen
 |---|---|---|
 | lâmpada (acesa) | luz 1 | quarto todo |
 | janela | luz 0,8 de dia → 0 à noite (segue o céu) | quarto todo |
-| cama | conforto 0,6 | 100 px, plano |
-| **cestinha fofa** 🧺 (loja, 14; macia, aconchego) | conforto 0,9 | 75 px, plano |
+| cama (a que está em uso) | conforto da cama: simples 0,6 · cestinha 0,9 · quentinha 0,85 · fresquinha 0,75 | 100 px, plano |
 | **caixinha de música** 🎶 (loja, 16; clique liga/desliga) | música 1 e ruído 0,35 (notas ♪ e uma melodia de 3 notas enquanto toca) | 520 px |
 
-- **Onde dorme** (`lugarDeDormir`: cama, cestinha): o de maior conforto + gosto pelo item − ruído × sensibilidade. Na
-  cestinha ele deita ao lado dela (ela aparece atrás). Primeira vez num lugar novo: "Dormiu pela primeira vez na
-  cestinha fofa." no diário.
+- **Camas** (V0.8, `scripts/cama.js`): o quarto tem **uma cama só**, a que está em uso — trocar a cama muda a cor, o
+  travesseiro e o enfeite dela, e o conforto que põe no quarto. Itens da categoria `cama`:
+
+  | Cama | Como é | Tags | Preço |
+  |---|---|---|---|
+  | simples 🛏️ | azul, a que vem com o quarto | macio | — |
+  | cestinha fofa 🧺 | vime, funda | macio, aconchego | 14 |
+  | quentinha 🧣 | flanela vermelha | quentinho, macio, aconchego | 18 |
+  | fresquinha ❄️ | gel azul-claro | fresquinho | 18 |
+
+  Gostos novos: **quentinho** (puxa para os sensíveis e calmos) e **fresquinho** (para os ativos), sorteados também para
+  pets que já existiam. Comprar uma cama já a põe em uso; a caixa de **Coisas** lista as camas que você tem ("em uso" /
+  "usar esta") e troca com um clique. O pet confere a cama nova na hora: deita para experimentar se gosta, cheira e se
+  afasta se não gosta. Saves em que a cestinha estava no chão passam a usá-la como cama.
+- **Onde dorme**: na cama em uso; se ele **não gosta nada** dela (afinidade ≤ −0,45), dorme **no chão**, longe dela
+  ("{n} preferiu dormir no chão, longe da cama fresquinha.", pista do gosto e página do diário). Primeira vez numa cama
+  nova: "Dormiu pela primeira vez na cama quentinha." no diário.
 - **Qualidade do sono** (0..1) = 0,45 + conforto × 0,45 − luz × (0,12 + gosto por escuro × 0,45 + sensibilidade acima de 0,5
   × 0,4) (+ um pouco para quem gosta de claridade) − ruído × (0,2 + sensibilidade × 0,7) + música × gosto por música ×
-  0,25. A energia recuperada por hora vai de ×0,55 a ×1,35. **Dá para ver:** bem (≥ 0,7) = "z" devagar e "{n} está
+  0,25 + gosto pela cama × 0,2 (se gosta) − desgosto pela cama × 0,35 (se não gosta: "incomodado com a cama"). A energia recuperada por hora vai de ×0,55 a ×1,35. **Dá para ver:** bem (≥ 0,7) = "z" devagar e "{n} está
   dormindo tranquilo na cestinha fofa."; mal (< 0,4) = "~", balança e vira de lado, "{n} está dormindo mal: parece
   incomodado com a luz / o barulho." (vira evidência de gosto por escuro e de sensibilidade no diário).
 - **Cochilo** (UtilityAI `cochilar`, alvo um lugar de dormir, de dia, energia < 80, 90 s de intervalo): nota =
@@ -438,9 +451,9 @@ brincar agora." · "{n} parece ter gostado do petisco." ·
   descansar, cochilar, vir até você (**calmo**), mais brincadeiras com você ×1,5 (ativo) e carinhos ×1,5 (calmo).
   Ativo → **Jovem 1**; calmo e carinhoso → **Jovem 2**. Como as decisões vêm do jeito dele e do que você faz, a forma
   é dos dois.
-- **Adulto** (como foi cuidado): nota = bem-estar médio × 0,6 + relação com você × 0,25 + variedade de comida × 0,15
-  (relação: parte de 30, + lembranças de carinho e de brincar com você, + até 25 pelas interações, − se foi acordado
-  há pouco; variedade: 18 por comida provada). ≥ 70 → **1**, ≥ 45 → **2**, abaixo → **3**. A letra vem da linha do
+- **Adulto** (como foi cuidado): nota = bem-estar médio × 0,45 + **vínculo** com você × 0,4 + variedade de comida × 0,15
+  (vínculo 0..100, ver seção 10b; variedade: 18 por comida provada). Desde a V0.8 o cuidado básico não basta para a
+  melhor forma: o vínculo pesa quase tanto quanto o bem-estar. ≥ 70 → **1**, ≥ 45 → **2**, abaixo → **3**. A letra vem da linha do
   jovem: Jovem 1 → **a**, Jovem 2 → **b**. São 6 adultos diferentes (1a, 2a, 3a, 1b, 2b, 3b).
 - **O diário explica**: ao crescer, "{n} cresceu! Passou a infância brincando e explorando o quarto." / "…Foi muito bem
   cuidado, confia muito em você e come de tudo um pouco." (ou "passou por uns apertos", "gosta da sua companhia", "se
@@ -468,6 +481,31 @@ brincar agora." · "{n} parece ter gostado do petisco." ·
   por partida, 15 por dia em jogos); página "Brincou de Pega-pega com você pela primeira vez" e "foi melhor do que
   nunca" num recorde; observação "{n} adorou brincar de Pega-pega com você!".
 - **Recusa**: dormindo, doente, cansado demais ou com fome demais, ele não vai (e a observação diz por quê).
+
+## 10b. Vínculo com você (V0.8: componente `Relationship`)
+
+O quanto ele confia em você (0..1, começa em 0,2), sem número na tela. Cresce devagar com o que você faz por ele — cada
+ganho vale `quantia × (1 − vínculo)` e cada motivo tem um **teto por dia**:
+
+| Motivo | Quanto | Teto/dia |
+|---|---|---|
+| carinho de que gosta / adora (neutro: 0,015) | 0,03 / 0,04 | 0,08 |
+| brincar de bola com você (pelo gosto pela bola) | 0,01–0,05 | 0,10 |
+| minigame (pelo ânimo da partida) | 0,03–0,08 | 0,14 |
+| comida que gosta / adora | 0,02 / 0,03 | 0,06 |
+| cuidado: encher a tigela com fome < 50 / remédio doente / limpar | 0,02 / 0,04 / 0,01 | 0,06 |
+| desejos atendidos e eventos (próximas fases) | — | 0,25 / 0,20 |
+
+Perde um pouco se o impaciente se irrita com o carinho (−0,01) ou é acordado (−0,03). Sem você, o que passa do piso cai
+pela metade a cada 72 h, mas nunca abaixo da metade do melhor que já foi. Só com o cuidado básico um dia rende ~+0,3; o
+topo pede os desejos e eventos.
+
+- **Níveis** (0,35 · 0,6 · 0,85) — aba Jeito, "Com você": "Ainda está se acostumando com você." → "Gosta da sua
+  companhia." → "Confia em você." → "Confia em você de olhos fechados.". Subir de nível: ♥♥, observação ("{n} parece
+  confiar em você.") e página do diário ("Passou a confiar em você."); descer: "{n} parece um pouco mais distante de
+  você.".
+- Pesa na forma adulta (seção 10) e na frase de por que cresceu ("confia muito em você", "gosta da sua companhia"...).
+- Saves de antes do vínculo começam de onde a relação antiga estava (lembranças e contadores), sem festa no diário.
 
 ## 11. Coleção ("pokédex") e novo pet
 
