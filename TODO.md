@@ -357,11 +357,23 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
   em 36 h para 4 em ~2 min; história inteira no diário em páginas; "sociável"; observações que dizem do quê; contração
   nos gostos que mudam; preferido já sabido não repete; resumo das Caixinhas conta quando o pet não esperou (480 testes)
 
-## V0.8 — App (em andamento)
-Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` (Capacitor). Análise e fases em
-`docs/V08_APP.md`.
+## V0.8 — Desejos, eventos e vínculo (em andamento)
+O pet passa a querer coisas e acontecimentos quebram a rotina; atender e participar do jeito certo aumenta o vínculo,
+que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
 
-- [x] **Fase 1 — Análise e arquitetura** (`docs/V08_APP.md`)
+- [x] **Fase 1 — Análise e arquitetura** (`docs/V08_DESEJOS.md`)
+- [ ] **Fase 2 — Vínculo** (`Relationship`, `bond()`; substitui a relação da evolução adulta)
+- [ ] **Fase 3 — Desejos de comida** (`Desires`, `wants()`; balão 💭; específica, por tag, novidade)
+- [ ] **Fase 4 — Outros desejos** (brinquedo, brincar com você, carinho, ficar quieto, ambiente)
+- [ ] **Fase 5 — Eventos aleatórios** (`Happenings`; passarinho, borboleta, achado, amostra grátis, espirros)
+- [ ] **Fase 6 — Mais eventos e participação** (tempestade, pesadelo, bagunça, vendedor, presente)
+- [ ] **Fase 7 — Balanceamento a 1× e avaliação**
+
+## V0.9 — App (planejada, depois da V0.8)
+Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` (Capacitor). Análise e fases em
+`docs/V09_APP.md`.
+
+- [x] **Fase 1 — Análise e arquitetura** (`docs/V09_APP.md`)
 - [ ] **Fase 2 — Player standalone + `vibe export`** (projeto embutido, save no aparelho, escala com letterbox)
 - [ ] **Fase 3 — Celular no navegador** (teclado virtual para texto, som no primeiro toque, paisagem, salvar ao ir
   para o fundo)

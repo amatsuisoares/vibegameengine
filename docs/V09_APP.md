@@ -1,4 +1,4 @@
-# V0.8 — App (análise e arquitetura)
+# V0.9 — App (análise e arquitetura)
 
 Objetivo: um jogo feito na engine vira **app instalável** — `.exe` no Windows (Electron) e `.apk` no Android
 (Capacitor) — que roda sem o servidor de desenvolvimento, sem o editor e sem internet. O primeiro alvo é o `meu-pet`,
