@@ -1143,7 +1143,145 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(g.events(0, 'script_error')).toEqual([]);
   });
 
-  it('minigames: Brincar opens Pega-pega or Caixinhas with who the pet is, and the room comes back with fun, clues about its tastes, coins and a diary page', () => {
+  it('desires beyond food: a toy, playing with you, petting, being left alone, the room — each fulfilled its own way; who it is shapes what it wants', () => {
+    const iso = '2026-03-10T14:00:00Z';
+    const t = Date.parse(iso);
+    const pet = {
+      version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 70, energia: 95, diversao: 50, higiene: 95, saude: 100, afeto: 60 }, sick: false,
+      asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+      wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+    };
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const make = (traits: Record<string, number>, prefs: Record<string, ReturnType<typeof p>>) =>
+      new Game(load(), {
+        seed: 6, scene: 'quarto', clock: { start: iso },
+        storage: {
+          pet: structuredClone(pet), petIndividuo: { version: 1, traits: { atividade: 0.5, sociabilidade: 0.5, curiosidade: 0.5, independencia: 0.5, sensibilidade: 0.5, apetite: 0.5, paciencia: 0.5, brincadeira: 0.5, ...traits }, preferences: prefs },
+          'vibe.inventory': { default: { bola: 1, pelucia: 1 } }, quarto: { bolaDada: true, brinquedos: { pelucia: { guardado: true } } }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+        },
+      });
+    type Api = { desejar(p?: unknown): unknown; desejo(): { kind: string } | null; vontades(): Record<string, number> };
+    const apiOf = (g: Game) => (g as unknown as { scriptRunner: { api: { entity(e: unknown): { state: { api: Api } } } } }).scriptRunner.api.entity(g.entity('pet')).state.api;
+    const notesOf = (g: Game) => g.events(0, 'notification').map((e) => e.text as string);
+
+    // Who it is shapes what it wants: the independent one thinks of being alone, the cuddly one of you.
+    const loner = make({ independencia: 0.95, sociabilidade: 0.1 }, { carinho: p(-0.5) });
+    const cuddly = make({ independencia: 0.1, sociabilidade: 0.95 }, { carinho: p(1) });
+    loner.perform([{ type: 'wait', ms: 300 }]);
+    cuddly.perform([{ type: 'wait', ms: 300 }]);
+    expect(apiOf(loner).vontades().quieto).toBeGreaterThan(0);
+    expect(apiOf(loner).vontades().carinho).toBeUndefined();
+    expect(apiOf(cuddly).vontades().carinho).toBeGreaterThan(0);
+    expect(apiOf(cuddly).vontades().quieto).toBeUndefined();
+
+    const g = make({ independencia: 0.9, sociabilidade: 0.6, sensibilidade: 0.7 }, { carinho: p(1), pelucia: p(1), bola: p(0.8), escuro: p(1) });
+    g.perform([{ type: 'wait', ms: 300 }]);
+    const api = apiOf(g);
+    const done = () => g.events(0, 'desire_fulfilled').map((e) => e.kind);
+
+    // A toy it likes, put away in the box: it looks at the box; taking it out is what it wanted.
+    api.desejar({ tipo: 'brinquedo', item: 'pelucia' });
+    expect(notesOf(g).at(-1)).toBe('Mimi está olhando para a caixa de coisas... parece querer a pelúcia.');
+    g.perform([{ type: 'wait', ms: 50 }]);
+    expect(g.entity('balaoIcone')!.components.Text!.text).toBe('🧸');
+    g.perform([{ type: 'click', entity: 'botaoBrinquedos' }, { type: 'wait', ms: 80 }]);
+    g.perform([{ type: 'click', entity: g.world.withTag('cartaBrinquedo').find((c) => c.components.Script!.props.item === 'pelucia')!.id }, { type: 'wait', ms: 80 }, { type: 'click', entity: 'caixa' }, { type: 'wait', ms: 1000 }]);
+    expect(done()).toEqual(['brinquedo']);
+    expect(notesOf(g)).toContain('Mimi queria mesmo a pelúcia! Foi direto brincar.');
+
+    // Playing with you: throwing the ball is it.
+    api.desejar({ tipo: 'brincar' });
+    expect(notesOf(g).at(-1)).toBe('Mimi foi buscar a bola e está olhando para você. Parece querer brincar.');
+    g.perform([{ type: 'wait', ms: 3000 }, { type: 'click', entity: 'bola' }, { type: 'wait', ms: 500 }]);
+    expect(done()).toEqual(['brinquedo', 'brincar']);
+    expect(notesOf(g)).toContain('Era isso! Mimi queria brincar com você.');
+
+    // Petting, when it comes to lean on you.
+    g.perform([{ type: 'wait', ms: 4000 }]);
+    api.desejar({ tipo: 'carinho' });
+    expect(notesOf(g).at(-1)).toBe('Mimi veio se encostar em você. Parece querer carinho.');
+    g.perform([{ type: 'wait', ms: 2000 }, { type: 'click', entity: 'pet' }, { type: 'wait', ms: 300 }]);
+    expect(done()).toEqual(['brinquedo', 'brincar', 'carinho']);
+
+    // Being left alone: petting it then breaks it; leaving it be is what it wanted.
+    g.perform([{ type: 'wait', ms: 8000 }]);
+    api.desejar({ tipo: 'quieto' });
+    expect(notesOf(g).at(-1)).toBe('Mimi foi para um canto. Parece querer ficar sozinho um pouco.');
+    g.perform([{ type: 'wait', ms: 4000 }, { type: 'click', entity: 'pet' }, { type: 'wait', ms: 300 }]);
+    expect(api.desejo()).toBeNull();
+    expect(notesOf(g).at(-1)).toBe('Mimi queria ficar quieto um pouco e se afastou.');
+    expect(g.events(0, 'desire_cancelled').map((e) => e.kind)).toEqual(['quieto']);
+    api.desejar({ tipo: 'quieto' });
+    const bondBefore = g.getState({ ids: ['pet'] }).entities[0].bonds!.voce.value;
+    for (let i = 0; i < 4; i++) g.perform([{ type: 'wait', ms: 46_000 }]);
+    expect(g.events(0, 'desire_expired').map((e) => e.kind)).toEqual(['quieto']);
+    expect(notesOf(g)).toContain('Mimi voltou do canto, tranquilo. Parece agradecer o espaço que você deu.');
+    expect(g.getState({ ids: ['pet'] }).entities[0].bonds!.voce.value).toBeGreaterThan(bondBefore);
+
+    // The room: it likes the dark and squints at the bright room — light off is half of it, the curtain the rest.
+    api.desejar({ tipo: 'ambiente', subject: 'luz' });
+    expect(notesOf(g).at(-1)).toBe('Mimi está apertando os olhos com a claridade e olhando para a cortina.');
+    g.perform([{ type: 'wait', ms: 50 }]);
+    expect(g.entity('balaoIcone')!.components.Text!.text).toBe('🌙');
+    g.perform([{ type: 'click', entity: 'lampada' }, { type: 'wait', ms: 1500 }]);
+    expect(api.desejo()).toMatchObject({ kind: 'ambiente' });
+    g.perform([{ type: 'click', entity: 'cortinaE' }, { type: 'wait', ms: 1500 }]);
+    expect(api.desejo()).toBeNull();
+    expect(notesOf(g)).toContain('Mimi parece aliviado: era assim que queria o quarto.');
+    expect(g.getState({ ids: ['pet'] }).entities[0].journal!.count).toBeGreaterThanOrEqual(5);
+    expect(g.console.read(0, 'error')).toEqual([]);
+    expect(g.events(0, 'script_error')).toEqual([]);
+  });
+
+  it('waking it up: one poke while it sleeps only stirs it; poking again and again wakes it, grumpy for a while, and it stays awake long enough to eat', () => {
+    const iso = '2026-03-10T23:30:00Z';
+    const t = Date.parse(iso);
+    const g = new Game(load(), {
+      seed: 3, scene: 'quarto', clock: { start: iso },
+      storage: {
+        pet: {
+          version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 25, energia: 50, diversao: 60, higiene: 95, saude: 100, afeto: 60 }, sick: false,
+          asleep: true, lightOn: false, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+          wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+        },
+        petIndividuo: { version: 1, traits: { atividade: 0.5, sociabilidade: 0.5, curiosidade: 0.5, independencia: 0.5, sensibilidade: 0.5, apetite: 0.5, paciencia: 0.8, brincadeira: 0.5 }, preferences: { carinho: { innate: 0.8, learned: 0, n: 0 } } },
+        economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+      },
+    });
+    const notes = () => g.events(0, 'notification').map((e) => e.text as string);
+    const bond = () => g.entity('pet')!.components.Relationship!.values.voce?.value ?? 0.2; // never met: the initial bond
+    g.perform([{ type: 'wait', ms: 500 }]);
+    expect(g.world.vars.dormindo).toBe(true);
+    const before = bond();
+
+    // A patient pet only stirs at the first pokes...
+    g.perform([{ type: 'click', entity: 'pet' }, { type: 'wait', ms: 600 }]);
+    expect(notes()).toContain('Mimi se mexeu um pouco, ainda dormindo.');
+    g.perform([{ type: 'click', entity: 'pet' }, { type: 'wait', ms: 600 }, { type: 'click', entity: 'pet' }, { type: 'wait', ms: 600 }]);
+    expect(notes()).toContain('Mimi resmungou e se encolheu, ainda dormindo.');
+    expect(g.world.vars.dormindo).toBe(true);
+    // ...and the fourth in a row wakes it, grumpy: the bond drops a little.
+    g.perform([{ type: 'click', entity: 'pet' }, { type: 'wait', ms: 300 }]);
+    expect(g.world.vars.dormindo).toBe(false);
+    expect(notes()).toContain('Mimi acordou e não parece gostar disso.');
+    expect(bond()).toBeLessThan(before);
+
+    // Still upset: petting now is turned down.
+    g.perform([{ type: 'wait', ms: 3000 }, { type: 'click', entity: 'pet' }, { type: 'wait', ms: 300 }]);
+    expect(notes()).toContain('Mimi ainda parece chateado por ter sido acordado.');
+
+    // Sleepy at night, but it stays up long enough to go to the bowl and eat.
+    g.perform([{ type: 'wait', ms: 40_000 }]);
+    expect(g.world.vars.dormindo).toBe(false);
+    expect(g.world.vars.fome as number).toBeGreaterThan(25);
+    // A couple of minutes later, still night and tired, it goes back to bed.
+    g.perform([{ type: 'wait', ms: 60_000 }, { type: 'wait', ms: 60_000 }, { type: 'wait', ms: 20_000 }]);
+    expect(g.world.vars.dormindo).toBe(true);
+    expect(g.console.read(0, 'error')).toEqual([]);
+    expect(g.events(0, 'script_error')).toEqual([]);
+  });
+
+  it('minigames:Brincar opens Pega-pega or Caixinhas with who the pet is, and the room comes back with fun, clues about its tastes, coins and a diary page', () => {
     const t = Date.parse('2026-03-10T14:00:00Z');
     const pet = {
       version: 2, name: 'Mimi', born: t - 5 * 3_600_000, stage: 'bebe', needs: { fome: 80, energia: 90, diversao: 40, higiene: 95, saude: 100, afeto: 60 }, sick: false,

@@ -8,7 +8,8 @@
 //   Routine      hábitos por hora do dia, aprendidos do que ele faz (self.routine.record)
 //   Memory       o que ele viveu (susto, comida adorada, brincar com você), enfraquecendo com o tempo
 //   Relationship o vínculo com você ("voce"): cresce devagar pelo que você faz por ele, enfraquece devagar sem você
-//   Desires      o que ele quer agora (comer peixe, algo crocante, algo novo), mostrado num balão de pensamento
+//   Desires      o que ele quer agora (comer peixe, um brinquedo, brincar, carinho, ficar quieto, o quarto escuro...),
+//                mostrado num balão de pensamento
 //   Persist      tudo isso fica em storage.petIndividuo e volta em toda sessão
 // Aqui só se decide o que cada traço e cada gosto MUDA no comportamento.
 
@@ -88,6 +89,12 @@ let localOffset = 0;
 let anim = 0;
 let lastPetReal = -99;
 let gameRef = null; // o game (para reveal, chamado de muitos lugares)
+// Cutucado dormindo: com várias cutucadas seguidas ele acorda (de mau humor) e fica acordado um pouco.
+const CUTUCADAS_PARA_ACORDAR = 4;
+const CUTUCADAS_JANELA = 8; // segundos reais entre a primeira e a última
+const ACORDADO_SEGS = 150; // segundos reais sem voltar a dormir depois de acordado por você
+let cutucadas = [];
+let acordadoAte = -1;
 let pedindoBola = -99; // tempo real em que foi até a bola pedir para brincar
 let lastLookBowl = -99;
 let realTime = 0;
@@ -281,12 +288,19 @@ function migrarVinculo() {
 
 // ---------------------------------------------------------------- desejos (componente Desires da engine)
 //
-// De vez em quando ele QUER alguma coisa e mostra num balão de pensamento (💭 com um ícone) e numa observação. Desejos
-// de comida: uma comida de que ele gosta (às vezes uma que você não tem: vale ir à loja), algo com um jeito (crocante,
-// docinho, salgado... qualquer comida com esse jeito serve — é um palpite) ou algo que ele nunca provou. Atender (ele
-// comer o que queria) rende ♥♥, vínculo ("desejo"), uma lembrança, um pouco de moeda, uma pista do gosto e, na primeira
-// vez de cada tipo, uma página do diário. Errar não pune (ele come normalmente e continua querendo); deixar passar só
-// perde a chance. A engine cuida do ciclo (um por vez, intervalo, limite por dia, atender pelo evento "comeu", expirar).
+// De vez em quando ele QUER alguma coisa e mostra num balão de pensamento (💭 com um ícone), no jeito de agir e numa
+// observação. O que ele quer depende de quem ele é (o guloso pensa em comida, o brincalhão em brinquedo, o sociável
+// em você, o independente em ficar quieto, o sensível no quarto) e do momento:
+//   comida      uma comida de que gosta (às vezes uma que você não tem), algo com um jeito (crocante, docinho...) ou
+//               algo que nunca provou — atende ele COMER (evento "comeu")
+//   brinquedo   um brinquedo de que gosta que não está no quarto (guardado ou que você nem tem) — atende ele aparecer
+//   brincar     brincar com você — atende jogar a bola ou um minigame
+//   carinho     se gosta de carinho, vem se encostar — atende um carinho que ele aceita
+//   quieto      o independente vai para um canto — atende NÃO mexer nele (carinho, comida) até passar
+//   ambiente    a luz do jeito dele, ou música — atende arrumar luz e cortina, ou ligar a caixinha
+// Atender rende ♥♥, vínculo ("desejo"), uma lembrança, um pouco de moeda, uma pista e, na primeira vez de cada tipo,
+// uma página do diário. Errar não pune; deixar passar só perde a chance. A engine cuida do ciclo (um por vez,
+// intervalo, limite por dia, atender pelos eventos, expirar); o que o evento não diz, o pet confere a cada segundo.
 const TAGS_DESEJO = {
   doce: { frase: 'algo docinho', icone: '🍬', gosto: 'coisas doces' },
   crocante: { frase: 'algo crocante', icone: '🥨', gosto: 'coisas crocantes' },
@@ -300,77 +314,162 @@ const DESEJO_DEPOIS = [10, 25]; // minutos reais entre um desejo e a vontade seg
 
 const comerOuTomar = (item) => (item.tags.includes('liquido') ? 'tomar' : 'comer');
 const serveProDesejo = (d, item, novo) =>
-  !!d && (d.data.tipo === 'especifica' ? d.subject === item.id : d.data.tipo === 'tag' ? item.tags.includes(d.subject) : d.data.tipo === 'novidade' && novo);
+  !!d && d.kind === 'comida' && (d.data.tipo === 'especifica' ? d.subject === item.id : d.data.tipo === 'tag' ? item.tags.includes(d.subject) : d.data.tipo === 'novidade' && novo);
+const querQuieto = () => !!me.desires.get('quieto');
+const musicaTocando = (game) => game.find('musica').some((b) => b.props.tocando);
 
-/** O que ele pode querer comer agora, com o peso de cada vontade. */
+/** Comida: uma de que gosta (não enjoada), um jeito de que gosta, ou algo novo. */
 function vontadesDeComida(game) {
   const comidas = game.items.list({ category: 'comida' }).filter((it) => it.id !== 'racao');
   const provou = pet.provou || {};
-  const apetite = 0.6 + T('apetite');
   const out = [];
+  if (pet.needs.fome > 80) return out;
   for (const it of comidas) {
     const g = gostoAgora(it);
     if (g.enjoado || (g.level !== 'love' && g.level !== 'like')) continue;
     // Gosta e não enjoou: quer de novo. Uma que nunca provou (você talvez nem tenha) também, um pouco menos.
-    out.push({ tipo: 'especifica', item: it, peso: (g.level === 'love' ? 3 : 1.5) * (provou[it.id] ? 1 : 0.6) * apetite });
+    out.push({ tipo: 'especifica', item: it, peso: (g.level === 'love' ? 3 : 1.5) * (provou[it.id] ? 1 : 0.6) });
   }
   for (const [tag, t] of Object.entries(TAGS_DESEJO)) {
     const gosto = me.prefs.of(tag);
     const serve = comidas.some((it) => it.tags.includes(tag) && !['hate', 'dislike'].includes(gostoAgora(it).level));
     if (gosto > 0.15 && serve) out.push({ tipo: 'tag', tag, t, peso: 1.2 * (0.5 + gosto) });
   }
-  const novas = comidas.filter((it) => !provou[it.id]);
-  if (novas.length) out.push({ tipo: 'novidade', peso: 2.2 * T('curiosidade') });
+  if (comidas.some((it) => !provou[it.id])) out.push({ tipo: 'novidade', peso: 2.2 * T('curiosidade') });
+  return out;
+}
+
+/** O que ele pode querer agora, de todos os tipos: [{kind, tipo?, peso, ...}], com o peso do jeito dele em cada tipo. */
+function vontades(game) {
+  const n = pet.needs;
+  const porTipo = {
+    comida: [0.5 + T('apetite'), vontadesDeComida(game)],
+    brinquedo: [0.2 + T('brincadeira') * 0.9, []],
+    brincar: [0.1 + (T('sociabilidade') + T('brincadeira') + T('atividade')) / 3, []],
+    carinho: [Math.max(0, T('sociabilidade') * 1.2 - T('independencia') * 0.6), []],
+    quieto: [Math.max(0, T('independencia') - 0.55) * 2.5, []],
+    ambiente: [0.2 + T('sensibilidade'), []],
+  };
+  // Brinquedo de que gosta que não está no quarto: guardado na caixa ou que você nem tem.
+  if (n.energia > 25) {
+    for (const it of game.items.list({ category: 'brinquedo' })) {
+      const jeito = jeitoCom(game, it.id);
+      if (game.entity(it.id) || (jeito !== 'favorito' && jeito !== 'gosta')) continue;
+      porTipo.brinquedo[1].push({ item: it, peso: (jeito === 'favorito' ? 2 : 1) * (game.inventory().has(it.id) ? 1 : 0.7) });
+    }
+  }
+  if (n.energia > 35 && n.diversao < 90) porTipo.brincar[1].push({ peso: 1 });
+  const carinho = feel('carinho').level;
+  if ((carinho === 'love' || carinho === 'like') && (lastPetReal < 0 || realTime - lastPetReal > 120)) porTipo.carinho[1].push({ peso: 1 });
+  if (T('independencia') > 0.55 && carinho !== 'love') porTipo.quieto[1].push({ peso: 1 });
+  // O quarto: a luz que ele não gosta agora (o jeito dele com a claridade), ou a música que ele gosta e não toca.
+  const jeito = jeitoComLuz();
+  if (jeito !== 'indiferente' && satisfacaoLuz(game, jeito, pet.lightOn, cortinaFechada(game)) < 2) porTipo.ambiente[1].push({ subject: 'luz', jeito, peso: 1.5 });
+  if (game.find('musica').length && !musicaTocando(game) && me.prefs.item('caixinhaMusica').score >= 0.2) porTipo.ambiente[1].push({ subject: 'musica', peso: 1 });
+  const out = [];
+  for (const [kind, [peso, lista]] of Object.entries(porTipo)) {
+    const total = lista.reduce((a, x) => a + x.peso, 0);
+    if (peso > 0 && total > 0) for (const x of lista) out.push({ ...x, kind, peso: (peso * x.peso) / total });
+  }
   return out;
 }
 
 /** Monta o desejo para a engine (Desires.start): quanto dura, o que o atende e como aparece. */
-function desejoDe(v) {
+function desejoDe(game, v) {
   const paciencia = T('paciencia');
-  const base = { kind: 'comida', minutes: Math.round(20 + 25 * paciencia), minRealSeconds: Math.round(150 + 150 * paciencia) };
-  if (v.tipo === 'especifica') {
-    return { ...base, subject: v.item.id, data: { tipo: 'especifica', icone: v.item.icon || '🍽️' }, fulfillOn: { event: 'comeu', match: { entity: '$self', item: v.item.id } } };
+  const dura = (min, max, realMin, realMax) => ({ minutes: Math.round(lerp(min, max, paciencia)), minRealSeconds: Math.round(lerp(realMin, realMax, paciencia)) });
+  const self = { entity: '$self' };
+  if (v.kind === 'comida') {
+    const base = { kind: 'comida', ...dura(20, 45, 150, 300) };
+    if (v.tipo === 'especifica') return { ...base, subject: v.item.id, data: { tipo: 'especifica', icone: v.item.icon || '🍽️' }, fulfillOn: { event: 'comeu', match: { ...self, item: v.item.id } } };
+    if (v.tipo === 'tag') return { ...base, subject: v.tag, data: { tipo: 'tag', icone: v.t.icone }, fulfillOn: { event: 'comeu', match: { ...self, tags: v.tag } } };
+    return { ...base, data: { tipo: 'novidade', icone: '✨' }, fulfillOn: { event: 'comeu', match: { ...self, novo: true } } };
   }
-  if (v.tipo === 'tag') return { ...base, subject: v.tag, data: { tipo: 'tag', icone: v.t.icone }, fulfillOn: { event: 'comeu', match: { entity: '$self', tags: v.tag } } };
-  return { ...base, data: { tipo: 'novidade', icone: '✨' }, fulfillOn: { event: 'comeu', match: { entity: '$self', novo: true } } };
+  if (v.kind === 'brinquedo') {
+    return { kind: 'brinquedo', subject: v.item.id, ...dura(20, 45, 150, 300), data: { tipo: 'brinquedo', icone: v.item.icon || '🧸', tem: game.inventory().has(v.item.id) }, fulfillOn: { event: 'brinquedoNoQuarto', match: { ...self, item: v.item.id } } };
+  }
+  if (v.kind === 'brincar') return { kind: 'brincar', ...dura(10, 25, 120, 240), data: { tipo: 'brincar', icone: (game.items.get('bola') || {}).icon || '⚽' }, fulfillOn: { event: 'brincouComVoce', match: self } };
+  if (v.kind === 'carinho') return { kind: 'carinho', ...dura(8, 18, 90, 180), data: { tipo: 'carinho', icone: '💗' }, fulfillOn: { event: 'carinhoBom', match: self } };
+  // Ficar quieto: atende o tempo passar sem você mexer nele (ver fimDoDesejo).
+  if (v.kind === 'quieto') return { kind: 'quieto', minutes: 3, minRealSeconds: 180, data: { tipo: 'quieto', icone: '🍃' } };
+  const icone = v.subject === 'musica' ? '♪' : v.jeito === 'escuro' ? '🌙' : '💡';
+  return { kind: 'ambiente', subject: v.subject, ...dura(15, 30, 150, 300), data: { tipo: 'ambiente', icone, ...(v.jeito && { jeito: v.jeito }) } };
 }
 
 function fraseDoDesejo(game, d) {
-  if (d.data.tipo === 'especifica') {
-    const item = game.items.get(d.subject);
-    return `{n} parece com vontade de ${comerOuTomar(item)} ${nomeDe(item)}.`;
+  if (d.kind === 'comida') {
+    if (d.data.tipo === 'especifica') {
+      const item = game.items.get(d.subject);
+      return `{n} parece com vontade de ${comerOuTomar(item)} ${nomeDe(item)}.`;
+    }
+    if (d.data.tipo === 'tag') return `{n} parece querer ${TAGS_DESEJO[d.subject].frase}.`;
+    return '{n} está farejando o ar, curioso. Parece querer provar algo novo.';
   }
-  if (d.data.tipo === 'tag') return `{n} parece querer ${TAGS_DESEJO[d.subject].frase}.`;
-  return '{n} está farejando o ar, curioso. Parece querer provar algo novo.';
+  if (d.kind === 'brinquedo') {
+    const item = game.items.get(d.subject);
+    return d.data.tem ? `{n} está olhando para a caixa de coisas... parece querer ${oItem(item)}.` : `{n} parece sonhar com ${item.props.artigo === 'a' ? 'uma' : 'um'} ${nomeDe(item)}.`;
+  }
+  if (d.kind === 'brincar') return game.entity('bola') ? '{n} foi buscar a bola e está olhando para você. Parece querer brincar.' : '{n} está pulando em volta, olhando para você. Parece querer brincar.';
+  if (d.kind === 'carinho') return '{n} veio se encostar em você. Parece querer carinho.';
+  if (d.kind === 'quieto') return '{n} foi para um canto. Parece querer ficar sozinho um pouco.';
+  if (d.subject === 'musica') return '{n} está olhando para a caixinha de música.';
+  return d.data.jeito === 'escuro' ? '{n} está apertando os olhos com a claridade e olhando para a cortina.' : '{n} parece incomodado com o escuro e olha para a lâmpada.';
 }
 
-/** Começa um desejo (sorteado entre as vontades, ou o pedido: {tipo, item | tag}); devolve o desejo ou null. */
+/** Como ele mostra (além do balão): vai até onde a coisa está e olha para você. */
+function mostrarDesejo(game, self, d) {
+  const olhar = (t) => {
+    mind = { act: 'greet', t };
+    self.get('Sprite').flipX = false;
+  };
+  if (d.kind === 'brinquedo') return go(game, 800, () => olhar(2.5));
+  if (d.kind === 'brincar') {
+    const ball = game.entity('bola');
+    if (ball) return go(game, Math.max(MIN_X, ball.x - 50), () => olhar(3));
+    return olhar(2.5);
+  }
+  if (d.kind === 'carinho') return go(game, 480, () => olhar(3));
+  if (d.kind === 'quieto') return go(game, self.x < 480 ? MIN_X + 10 : MAX_X - 10, 'idle');
+  if (d.kind === 'ambiente') {
+    const alvo = d.subject === 'musica' ? game.find('musica')[0] : game.entity(d.data.jeito === 'escuro' ? 'janela' : 'lampada');
+    if (alvo) return go(game, Math.max(MIN_X, Math.min(MAX_X, alvo.x)), () => (mind = { act: 'investigate', t: 2 }));
+  }
+  if (mind.act === 'idle' || mind.act === 'investigate') olhar(2.5);
+}
+
+/**
+ * Começa um desejo (sorteado entre as vontades, ou o pedido); devolve o desejo ou null. Pedido:
+ * {tipo: 'especifica', item} | {tipo: 'tag', tag} | {tipo: 'novidade'} | {tipo: 'brinquedo', item} | {tipo: 'brincar'} |
+ * {tipo: 'carinho'} | {tipo: 'quieto'} | {tipo: 'ambiente', subject: 'luz' | 'musica'}.
+ */
 function desejar(game, self, pedido) {
   let v = null;
   if (pedido) {
-    v = pedido.tipo === 'especifica' ? { tipo: 'especifica', item: game.items.get(pedido.item) } : pedido.tipo === 'tag' ? { tipo: 'tag', tag: pedido.tag, t: TAGS_DESEJO[pedido.tag] } : { tipo: 'novidade' };
-    if ((v.tipo === 'especifica' && !v.item) || (v.tipo === 'tag' && !v.t)) return null;
+    const t = pedido.tipo;
+    if (t === 'especifica' || t === 'tag' || t === 'novidade') v = { kind: 'comida', tipo: t, item: pedido.item && game.items.get(pedido.item), tag: pedido.tag, t: TAGS_DESEJO[pedido.tag] };
+    else if (t === 'brinquedo') v = { kind: 'brinquedo', item: game.items.get(pedido.item) };
+    else if (t === 'ambiente') v = { kind: 'ambiente', subject: pedido.subject || 'luz', jeito: jeitoComLuz() };
+    else v = { kind: t };
+    if ((t === 'especifica' || t === 'brinquedo') && !v.item) return null;
+    if (t === 'tag' && !v.t) return null;
+    if (!['comida', 'brinquedo', 'brincar', 'carinho', 'quieto', 'ambiente'].includes(v.kind)) return null;
   } else {
-    const vontades = vontadesDeComida(game);
-    const total = vontades.reduce((a, x) => a + x.peso, 0);
+    const lista = vontades(game);
+    const total = lista.reduce((a, x) => a + x.peso, 0);
     if (!(total > 0)) return null;
     let r = game.random() * total;
-    v = vontades.find((x) => (r -= x.peso) < 0) || vontades[vontades.length - 1];
+    v = lista.find((x) => (r -= x.peso) < 0) || lista[lista.length - 1];
   }
-  const d = me.desires.start({ ...desejoDe(v), ...(pedido && { force: true }) });
+  const d = me.desires.start({ ...desejoDe(game, v), ...(pedido && { force: true }) });
   if (!d) return null;
   proximoDesejo = Infinity; // a próxima vontade é contada do fim desta
   balaoAlpha = 0;
-  observe(game, `desejo:${d.data.tipo}`, fraseDoDesejo(game, d), 0, 2);
-  // Parado: vem para perto de você e olha (o balão diz o resto).
-  if (mind.act === 'idle' || mind.act === 'investigate') {
-    mind = { act: 'greet', t: 2.5 };
-    self.get('Sprite').flipX = false;
-  }
+  observe(game, `desejo:${d.kind}`, fraseDoDesejo(game, d), 0, 2);
+  if (!refeicao && !['sleep', 'nap', 'evolve', 'eat', 'chase', 'dance'].includes(mind.act)) mostrarDesejo(game, self, d);
   return d;
 }
 
-/** A cada segundo: dormindo não deseja nada; acordado, quando chega a hora, pode querer algo. */
+/** A cada segundo: dormindo não deseja nada; o que o evento não diz (o quarto), confere aqui; na hora, pode querer algo. */
 function pensarEmDesejo(game, self) {
   const d = me.desires.get('*');
   if (d && (pet.asleep || mind.act === 'nap')) {
@@ -378,8 +477,13 @@ function pensarEmDesejo(game, self) {
     proximoDesejo = realTime + 60;
     return;
   }
+  if (d && d.kind === 'ambiente') {
+    const pronto = d.subject === 'musica' ? musicaTocando(game) : satisfacaoLuz(game, d.data.jeito || jeitoComLuz(), pet.lightOn, cortinaFechada(game)) >= 2;
+    if (pronto) me.desires.fulfill(d.id);
+    return;
+  }
   if (d || realTime < proximoDesejo) return;
-  if (pet.asleep || pet.sick || refeicao || pet.needs.fome > 80 || ['sleep', 'nap', 'evolve', 'eat', 'yawn'].includes(mind.act)) return;
+  if (pet.asleep || pet.sick || refeicao || ['sleep', 'nap', 'evolve', 'eat', 'yawn'].includes(mind.act)) return;
   if (me.desires.blocked()) {
     proximoDesejo = realTime + 30;
     return;
@@ -387,20 +491,42 @@ function pensarEmDesejo(game, self) {
   if (!desejar(game, self)) proximoDesejo = realTime + 120;
 }
 
-/** Um desejo terminou (atendido ou o tempo passou). */
+/** Ele queria ficar quieto e você mexeu nele (carinho, comida): a vontade passa e ele se afasta um pouco. */
+function incomodou(game, self) {
+  if (!querQuieto()) return false;
+  me.desires.cancel('quieto');
+  proximoDesejo = realTime + lerp(DESEJO_DEPOIS[0], DESEJO_DEPOIS[1], T('independencia')) * 60;
+  naoGostou(game, self);
+  observe(game, 'quietoIncomodado', '{n} queria ficar quieto um pouco e se afastou.', 0, 2);
+  go(game, self.x < 480 ? MIN_X : MAX_X, 'idle');
+  return true;
+}
+
+const ATENDIDO = {
+  brinquedo: (item) => [`{n} queria mesmo ${oItem(item)}! Foi direto brincar.`, `Queria brincar com ${oItem(item)} e você trouxe.`],
+  brincar: () => ['Era isso! {n} queria brincar com você.', 'Chamou você para brincar e você topou.'],
+  carinho: () => ['{n} estava querendo exatamente esse carinho.', 'Veio pedir carinho e você deu.'],
+  quieto: () => ['{n} voltou do canto, tranquilo. Parece agradecer o espaço que você deu.', 'Quis ficar sozinho um pouco e você respeitou.'],
+  musica: () => ['{n} queria mesmo ouvir música!', 'Queria música e você ligou a caixinha.'],
+  luz: () => ['{n} parece aliviado: era assim que queria o quarto.', 'Queria o quarto de outro jeito e você percebeu.'],
+};
+
+/** Um desejo terminou: atendido (ou, ficar quieto, o tempo passou sem você mexer nele) ou passou. */
 function fimDoDesejo(game, self, ev) {
   proximoDesejo = realTime + lerp(DESEJO_DEPOIS[0], DESEJO_DEPOIS[1], T('independencia')) * 60;
   const tipo = ev.data && ev.data.tipo;
-  if (ev.type === 'desire_expired') {
-    const item = tipo === 'especifica' && game.items.get(ev.subject);
-    const frase = item ? `{n} parece ter desistido ${doItem(item)}.` : tipo === 'tag' ? `{n} parece ter desistido de ${TAGS_DESEJO[ev.subject].frase}.` : '{n} parou de farejar o ar.';
+  if (ev.type === 'desire_expired' && ev.kind !== 'quieto') {
+    const item = (tipo === 'especifica' || tipo === 'brinquedo') && game.items.get(ev.subject);
+    const frase = item ? `{n} parece ter desistido ${doItem(item)}.`
+      : tipo === 'tag' ? `{n} parece ter desistido de ${TAGS_DESEJO[ev.subject].frase}.`
+      : tipo === 'novidade' ? '{n} parou de farejar o ar.'
+      : ev.kind === 'brincar' ? '{n} desistiu de chamar você para brincar.'
+      : ev.kind === 'carinho' ? '{n} parou de se encostar em você.'
+      : '{n} parece ter se acostumado com o quarto assim.';
     observe(game, 'desejoPassou', frase, 0, 0);
     if (T('paciencia') < LOW) reveal('paciencia', 'baixo', 0.3); // desistiu rápido
     return;
   }
-  if (ev.type !== 'desire_fulfilled') return;
-  const item = game.items.get(String(ev.trigger && ev.trigger.item));
-  if (!item) return;
   const n = pet.needs;
   n.afeto = clamp(n.afeto + 8);
   n.diversao = clamp(n.diversao + 5);
@@ -409,21 +535,39 @@ function fimDoDesejo(game, self, ev) {
   ganhar(game, 2, 'desejo');
   emote(game, self, '♥', '#ff8fab');
   self.after(250, () => emote(game, self, '♥', '#ff8fab'));
-  mind = { act: 'happy', t: 1.6 };
-  if (tipo === 'especifica') {
-    observe(game, 'desejoAtendido', `{n} estava mesmo com vontade de ${comerOuTomar(item)} ${nomeDe(item)}! Parece muito feliz.`, 0, 2);
-    anotar(game, 'desejo', `Estava com vontade de ${comerOuTomar(item)} ${nomeDe(item)} e você deu.`, 'desejo:especifica', 0.6);
-    gostoVisto(game, item.id, me.prefs.item(item.id).level); // querer é uma pista forte
-  } else if (tipo === 'tag') {
-    const t = TAGS_DESEJO[ev.subject];
-    observe(game, 'desejoAtendido', `Era isso! {n} queria ${t.frase}, e ${oItem(item)} caiu muito bem.`, 0, 2);
-    anotar(game, 'desejo', `Queria ${t.frase} e você acertou com ${oItem(item)}.`, 'desejo:tag', 0.6);
-    gostoVisto(game, ev.subject, me.prefs.level(me.prefs.of(ev.subject)));
-  } else {
-    observe(game, 'desejoAtendido', `{n} parece contente por ter provado algo novo: ${nomeDe(item)}!`, 0, 2);
-    anotar(game, 'desejo', `Estava curioso por algo novo e você trouxe ${oItem(item)}.`, 'desejo:novidade', 0.6);
-    reveal('curiosidade', 'alto');
+  if (ev.kind === 'comida') {
+    const item = game.items.get(String(ev.trigger && ev.trigger.item));
+    if (!item) return;
+    mind = { act: 'happy', t: 1.6 };
+    if (tipo === 'especifica') {
+      observe(game, 'desejoAtendido', `{n} estava mesmo com vontade de ${comerOuTomar(item)} ${nomeDe(item)}! Parece muito feliz.`, 0, 2);
+      anotar(game, 'desejo', `Estava com vontade de ${comerOuTomar(item)} ${nomeDe(item)} e você deu.`, 'desejo:especifica', 0.6);
+      gostoVisto(game, item.id, me.prefs.item(item.id).level); // querer é uma pista forte
+    } else if (tipo === 'tag') {
+      const t = TAGS_DESEJO[ev.subject];
+      observe(game, 'desejoAtendido', `Era isso! {n} queria ${t.frase}, e ${oItem(item)} caiu muito bem.`, 0, 2);
+      anotar(game, 'desejo', `Queria ${t.frase} e você acertou com ${oItem(item)}.`, 'desejo:tag', 0.6);
+      gostoVisto(game, ev.subject, me.prefs.level(me.prefs.of(ev.subject)));
+    } else {
+      observe(game, 'desejoAtendido', `{n} parece contente por ter provado algo novo: ${nomeDe(item)}!`, 0, 2);
+      anotar(game, 'desejo', `Estava curioso por algo novo e você trouxe ${oItem(item)}.`, 'desejo:novidade', 0.6);
+      reveal('curiosidade', 'alto');
+    }
+    return;
   }
+  const chave = ev.kind === 'ambiente' ? ev.subject : ev.kind;
+  const item = ev.kind === 'brinquedo' && game.items.get(ev.subject);
+  const [obs, diario] = ATENDIDO[chave](item);
+  observe(game, 'desejoAtendido', obs, 0, 2);
+  anotar(game, 'desejo', diario, `desejo:${chave}`, 0.6);
+  // Cada desejo atendido é uma pista do jeito (ou do gosto) dele.
+  if (ev.kind === 'brinquedo') gostoVisto(game, item.id, me.prefs.item(item.id).level);
+  else if (ev.kind === 'brincar') reveal('brincadeira', 'alto');
+  else if (ev.kind === 'carinho') reveal('sociabilidade', 'alto');
+  else if (ev.kind === 'quieto') reveal('independencia', 'alto', 1);
+  else if (ev.subject === 'musica') gostoVisto(game, 'musica', me.prefs.item('caixinhaMusica').level);
+  else if (ev.data.jeito === 'escuro' || ev.data.jeito === 'luz') gostoVisto(game, 'escuro', feel('escuro').level, 0.5);
+  if (ev.kind === 'quieto' || ev.kind === 'ambiente') mind = { act: 'happy', t: 1.2 };
 }
 
 /** O balão de pensamento acima da cabeça (💭 com o ícone do desejo): aparece e some devagar, balança de leve. */
@@ -1077,6 +1221,15 @@ function decide(game, self) {
   sincronizarProps(game, self);
   const choice = self.ai.decide();
   const target = self.ai.target;
+  if (querQuieto() && !['dormir', 'comer', 'cochilar'].includes(choice)) {
+    mind = { act: 'idle', t: 3 };
+    return;
+  }
+  // Acabou de ser acordado por você: ainda com sono, mas não volta a dormir logo (dá tempo de comer).
+  if (realTime < acordadoAte && (choice === 'dormir' || choice === 'cochilar') && pet.needs.energia > 5) {
+    mind = { act: game.random() < 0.3 ? 'yawn' : 'idle', t: 2.5 };
+    return;
+  }
   if (choice) me.routine.record(choice);
   if (choice === 'dormir') {
     mind = { act: 'yawn', t: 1.6, then: () => go(game, xDeDormir(game), 'sleep') };
@@ -1415,6 +1568,7 @@ function voltouDoJogo(game, self, ev) {
   const j = JOGOS[r.jogo];
   if (!j) return;
   const animo = Math.max(0, Math.min(1, Number(r.animo) || 0));
+  game.emit('brincouComVoce', { entity: me.id, como: r.jogo });
   const n = pet.needs;
   n.diversao = clamp(n.diversao + 12 + animo * 18);
   n.afeto = clamp(n.afeto + 6);
@@ -1473,17 +1627,17 @@ function makeApi(game, self) {
       const n = pet.needs;
       const impaciente = T('paciencia') < LOW;
       if (pet.asleep) {
-        if (impaciente) {
-          naoGostou(game, self);
-          observe(game, 'acordado', '{n} acordou e não parece gostar disso.', 5);
-          lembrar('acordado', 'voce', -1, 0.7);
-          vinculo('acordado', -0.03);
-          anotar(game, 'lembranca', 'Ficou chateado quando você o acordou.', 'acordado', 0.5);
-          wake(game, self, true);
-          reveal('paciencia', 'baixo');
+        // O impaciente acorda na primeira; os outros, se você insistir.
+        cutucadas = cutucadas.filter((t) => realTime - t < CUTUCADAS_JANELA);
+        cutucadas.push(realTime);
+        if (impaciente || cutucadas.length >= CUTUCADAS_PARA_ACORDAR) acordadoPorVoce(game, self, impaciente);
+        else if (cutucadas.length > 1) {
+          emote(game, self, '~', '#b8c4a8');
+          observe(game, 'resmungou', '{n} resmungou e se encolheu, ainda dormindo.', 0);
         } else observe(game, 'carinhoDormindo', '{n} se mexeu um pouco, ainda dormindo.', 10);
         return;
       }
+      if (incomodou(game, self)) return;
       const recent = realTime - lastPetReal < 6;
       lastPetReal = realTime;
       // Ainda lembra de ter sido acordado por você há pouco: se afasta.
@@ -1523,6 +1677,7 @@ function makeApi(game, self) {
         anotar(game, 'lembranca', level === 'love' ? 'Recebeu o primeiro carinho e adorou.' : 'Recebeu o primeiro carinho e gostou.', 'carinho', 0.5);
         observe(game, 'carinho', level === 'love' ? '{n} parece adorar o carinho.' : '{n} parece gostar do carinho.', 2);
         mind = { act: 'happy', t: 1.2 };
+        game.emit('carinhoBom', { entity: me.id, level });
       } else if (level === 'neutral') {
         n.afeto = clamp(n.afeto + 8);
         lembrar('carinho', 'voce', 0.1, 0.3);
@@ -1571,6 +1726,7 @@ function makeApi(game, self) {
     },
     /** Um brinquedo apareceu no quarto: comprado ("novo") ou tirado da caixa ("voltou"). */
     brinquedoNovo(id, como) {
+      game.emit('brinquedoNoQuarto', { entity: me.id, item: id, como: como || 'novo' });
       const e = game.entity(id);
       const item = e && game.items.get(String(e.props.item));
       if (item && (item.category === 'ambiente' || item.category === 'cama')) verCoisa(game, self, id);
@@ -1628,6 +1784,7 @@ function makeApi(game, self) {
         observe(game, 'pedidoAtendido', 'Parece que era exatamente isso que {n} queria!', 5);
       } else if (jeitoCom(game, 'bola') === 'favorito') emote(game, self, '♥', '#ff8fab');
       mind = { act: 'chase' };
+      game.emit('brincouComVoce', { entity: me.id, como: 'bola' });
     },
     limpar(id) {
       const d = game.entity(id);
@@ -1658,9 +1815,15 @@ function makeApi(game, self) {
     salvar() {
       save(game);
     },
-    /** Começa um desejo agora (sem esperar a hora): {tipo: 'especifica', item} | {tipo: 'tag', tag} | {tipo: 'novidade'}; sem pedido, sorteia. */
+    /** Começa um desejo agora (sem esperar a hora; ver desejar()); sem pedido, sorteia. */
     desejar(pedido) {
       return desejar(game, self, pedido || null);
+    },
+    /** Quanto ele tende a querer cada tipo de coisa agora (soma dos pesos por tipo). */
+    vontades() {
+      const out = {};
+      for (const v of vontades(game)) out[v.kind] = (out[v.kind] || 0) + v.peso;
+      return out;
     },
     /** O desejo de agora ou null. */
     desejo: () => me.desires.get('*'),
@@ -1688,6 +1851,20 @@ function makeApi(game, self) {
       return true;
     },
   };
+}
+
+/** Acordado à força: fica chateado com você por um tempo (a lembrança passa), mas fica acordado para comer. */
+function acordadoPorVoce(game, self, impaciente) {
+  cutucadas = [];
+  naoGostou(game, self);
+  observe(game, 'acordado', '{n} acordou e não parece gostar disso.', 5);
+  lembrar('acordado', 'voce', -1, 0.7);
+  vinculo('acordado', -0.03);
+  pet.needs.afeto = clamp(pet.needs.afeto - 5);
+  anotar(game, 'lembranca', 'Ficou chateado quando você o acordou.', 'acordado', 0.5);
+  acordadoAte = realTime + ACORDADO_SEGS;
+  wake(game, self, true);
+  if (impaciente) reveal('paciencia', 'baixo');
 }
 
 function wake(game, self, rude) {
@@ -1971,6 +2148,7 @@ function onItem(self, item, game) {
     observe(game, 'ofertaDormindo', '{n} está dormindo.', 1);
     return { consumed: false, reason: 'dormindo' };
   }
+  if (incomodou(game, self)) return { consumed: false, reason: 'quieto' };
   const novo = !(pet.provou || {})[item.id];
   const desejada = serveProDesejo(me.desires.get('comida'), item, novo);
   // Satisfeito, recusa — menos o que ele estava com vontade de comer.

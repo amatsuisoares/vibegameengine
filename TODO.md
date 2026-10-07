@@ -376,7 +376,12 @@ que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
   10–25 min ele quer uma comida de que gosta (às vezes uma que você não tem), algo com um jeito (crocante, docinho,
   salgado, fresquinho, fruta, de leite) ou algo que nunca provou — balão de pensamento com o ícone e observação;
   atender rende ♥♥, vínculo, moedas, pista do gosto e página do diário; errar não conta, ignorar só passa (492 testes)
-- [ ] **Fase 4 — Outros desejos** (brinquedo, brincar com você, carinho, ficar quieto, ambiente)
+- [x] **Fase 4 — Outros desejos**: além de comida, ele quer um brinquedo de que gosta que não está no quarto (guardado ou
+  que você nem tem: atende ele aparecer), brincar com você (bola ou minigame), carinho (se gosta: atende um carinho
+  aceito), ficar quieto (o independente vai para um canto: atende NÃO mexer nele 3 min; carinho ou comida desfazem) e o
+  quarto (luz e cortina do jeito dele, ou a caixinha de música tocando). O tipo é sorteado pelo jeito (guloso → comida,
+  brincalhão → brinquedo, sociável → você, independente → quieto, sensível → quarto) e pelo momento; cada um tem o seu
+  balão, o seu jeito de mostrar (vai até a caixa, a bola, a janela, um canto) e a sua página do diário. Extra: 4 cliques seguidos acordam o pet (de mau humor, vínculo −0,03), que fica acordado ~2,5 min para comer (494 testes)
 - [ ] **Fase 5 — Eventos aleatórios** (`Happenings`; passarinho, borboleta, achado, amostra grátis, espirros)
 - [ ] **Fase 6 — Mais eventos e participação** (tempestade, pesadelo, bagunça, vendedor, presente)
 - [ ] **Fase 7 — Balanceamento a 1× e avaliação**

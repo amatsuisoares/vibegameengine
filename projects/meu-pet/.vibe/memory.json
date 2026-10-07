@@ -285,6 +285,22 @@
       "status": "verified",
       "evidence": "teste 'desires: soon after you arrive...' (primeiro desejo no 1º minuto, peixe comprado e atendido mesmo satisfeito, maçã não serve para crocante, biscoito sim, diário 'coisas crocantes', novidade expira); screenshots do balão no bebê e no adulto e da observação do desejo atendido",
       "updatedAt": "2026-10-04T15:42:32.044Z"
+    },
+    {
+      "id": "f26",
+      "kind": "feature",
+      "text": "Outros desejos: brinquedo fora do quarto (atende aparecer), brincar com você (bola/minigame), carinho, ficar quieto (atende não mexer 3 min), quarto (luz/cortina do jeito dele, música); tipo sorteado pelo jeito",
+      "status": "verified",
+      "evidence": "teste 'desires beyond food...' (vontades por personalidade, cada tipo atendido do seu jeito, quieto desfeito por carinho e atendido sem mexer, luz pela metade não basta); screenshots do balão 🌙 e 🔔 em desejos naturais",
+      "updatedAt": "2026-10-04T19:24:11.647Z"
+    },
+    {
+      "id": "f27",
+      "kind": "feature",
+      "text": "Acordar o pet: dormindo, 4 cliques em 8 s acordam qualquer um (impaciente no 1º), de mau humor (afeto −5, vínculo −0,03, lembrança acordado: rejeita carinho um tempo); fica acordado ~150 s reais para comer, depois volta a dormir se ainda tiver sono",
+      "status": "verified",
+      "evidence": "teste 'waking it up...' (1º clique só mexe, 2º/3º resmunga, 4º acorda, vínculo cai, carinho recusado, come, volta a dormir depois)",
+      "updatedAt": "2026-10-06T22:42:53.868Z"
     }
   ],
   "plans": []

@@ -97,7 +97,7 @@ O jogador nunca vê números: só comportamento, reações e observações.
 | independência | afeto cai mais devagar (×1,25–0,65); brincar sozinho com a bola diverte mais; pesa contra gostar de carinho |
 | sensibilidade | mais propenso a gostar de escuro; muito sensível se incomoda com a luz acesa ao dormir |
 | apetite | fome cai mais rápido (×0,75–1,3); vai comer mais cedo; mais propenso a gostar de doce |
-| paciência | baixa (< 0,35): emburra quando entediado, rejeita carinho cansado ou repetido, acorda irritado com carinho |
+| paciência | baixa (< 0,35): emburra quando entediado, rejeita carinho cansado ou repetido, acorda irritado com um só carinho (os outros, só com 4 seguidos) |
 | brincadeira | diversão cai mais rápido; procura a bola; aceita brincar mesmo satisfeito (> 0,65) |
 
 **Gostos** (afinidade −1..1 → adora / gosta / neutro / não gosta / odeia), inatos e puxados pelos traços:
@@ -287,7 +287,7 @@ se repete. Tudo aparece no 1× em poucos minutos:
 | `brinquedo` · brinquedo | 24 h | brincou sozinho (favorito +1, neutro +0,1) | boas lembranças aumentam até 30% a vontade de brincar com ele |
 | `brincouComVoce` · você | 8 h | brincou de bola com você | **pede de novo:** vai até a bola e fica olhando para você com "?" ("foi até a bola e está olhando para você. Parece querer brincar de novo."); jogar a bola nessa hora: ♥ e "parece que era exatamente isso que queria!". Pedido ignorado enfraquece a lembrança (pede cada vez menos: ~3 vezes em 10 min, caindo) |
 | `carinho` · você | 6 h | carinho bom (+), aceito sem empolgação, recusado (−) | carinhos bons fazem o pet sociável vir até você mais vezes (nota de "procurar") |
-| `acordado` · você | 2 h | você o acordou e ele é impaciente | fica chateado: um carinho logo depois o faz se afastar ("ainda parece chateado por ter sido acordado."); procura menos você |
+| `acordado` · você | 2 h | você o acordou (o impaciente com um carinho; qualquer um com 4 seguidos) | fica chateado: um carinho logo depois o faz se afastar ("ainda parece chateado por ter sido acordado."); procura menos você |
 
 Na Utility AI: `chamar` (nova; só com a bola no quarto, energia > 30; nota = lembrança de brincar com você × 3 × tédio ×
 sociabilidade; 60 s de intervalo) e `procurar` + `memory('voce', 'carinho')` × sociabilidade × 1,5 + `memory('voce',
@@ -298,7 +298,7 @@ com o indivíduo (`storage.petIndividuo`) e volta ao reabrir o jogo.
 
 | Ação | Como | Efeito e reação |
 |---|---|---|
-| Carinho | clicar no pet | afeto +15 (carinhoso +22), diversão +3, pulinho e ♥; repetido em < 6 s: "não parece querer mais carinho agora"; dormindo: "se mexeu um pouco" (irritável acorda incomodado) |
+| Carinho | clicar no pet | afeto +15 (carinhoso +22), diversão +3, pulinho e ♥; repetido em < 6 s: "não parece querer mais carinho agora"; dormindo: "se mexeu um pouco", de novo: "resmungou e se encolheu" (~); **4 cliques em 8 s acordam** qualquer um (o irritável já no primeiro) de mau humor: "acordou e não parece gostar disso.", 💢, afeto −5, vínculo −0,03, lembrança `acordado` (rejeita carinho por um tempo) e página do diário; fica acordado ~2,5 min reais (dá para alimentar) e depois, se ainda tiver sono, volta a dormir |
 | Encher a tigela | clicar na tigela | 3 porções (som); se o pet está acordado e com fome < 70, vai comer |
 | Loja | botão "Loja · N 🪙" (canto superior direito) → cartas com preço e quanto você tem → clicar compra 1 | sem moedas: "Faltam moedas para…" |
 | Comida | botão → bandeja com as comidas que você **tem** (com quantidade) → clicar numa; vazia: carta que leva à Loja | só sai do inventário se o pet comer | o pet cheira e reage pelo gosto (ver seção 7a); satisfeito (fome > 92; de pouco apetite, > 78): "não parece estar com fome agora" |
@@ -510,9 +510,27 @@ topo pede os desejos e eventos.
 ## 10c. Desejos (V0.8: componente `Desires`)
 
 De vez em quando ele **quer** alguma coisa: aparece um **balão de pensamento** acima da cabeça (nuvem com o ícone do que
-quer, que balança de leve) e uma observação. Ele estava esperando você: o primeiro vem entre 45 s e 1 min 45 s depois de
+quer, que balança de leve), ele vai até onde a coisa está e olha para você, e uma observação diz o que se vê. Ele estava esperando você: o primeiro vem entre 45 s e 1 min 45 s depois de
 abrir o jogo (mais cedo para os grudentos), os seguintes 10–25 min (reais) depois do fim do anterior. Um por vez, até 12
-por dia; nunca dormindo, doente, comendo ou de barriga cheia (fome > 80); pegar no sono desfaz a vontade.
+por dia; nunca dormindo, doente ou comendo; pegar no sono desfaz a vontade.
+
+**O que ele quer** é sorteado pelo jeito e pelo momento. Peso de cada tipo: comida 0,5 + apetite (não de barriga cheia,
+fome > 80); brinquedo 0,2 + 0,9 × brincadeira (precisa de energia); brincar com você 0,1 + a média de sociabilidade,
+brincadeira e atividade (com energia e sem estar cheio de diversão); carinho 1,2 × sociabilidade − 0,6 × independência
+(só se gosta de carinho e não ganhou um há 2 min); ficar quieto 2,5 × (independência − 0,55) (só os independentes que não
+adoram carinho); o quarto 0,2 + sensibilidade (só se a luz não está do jeito dele, ou se gosta de música e a caixinha
+está no quarto sem tocar).
+
+| Desejo | Balão | Mostra | Observação | Atende |
+|---|---|---|---|---|
+| um brinquedo de que gosta fora do quarto (guardado; ou que você nem tem) | o ícone dele | vai até a caixa de Coisas | "{n} está olhando para a caixa de coisas... parece querer a pelúcia." / "{n} parece sonhar com um chocalho." | o brinquedo aparecer no quarto (tirar da caixa ou comprar) |
+| brincar com você | ⚽ | vai até a bola e olha para você | "{n} foi buscar a bola e está olhando para você. Parece querer brincar." | jogar a bola (e ele ir atrás) ou um minigame |
+| carinho | 💗 | vem para perto de você | "{n} veio se encostar em você. Parece querer carinho." | um carinho que ele aceita |
+| ficar quieto | 🍃 | vai para um canto e fica | "{n} foi para um canto. Parece querer ficar sozinho um pouco." | **não** fazer carinho nem oferecer comida por 3 min; mexer desfaz ("queria ficar quieto um pouco e se afastou.", 💢) |
+| o quarto escuro / claro (o jeito dele com a luz) | 🌙 / 💡 | vai até a janela / a lâmpada | "{n} está apertando os olhos com a claridade e olhando para a cortina." | luz e cortina do jeito dele (às vezes as duas) |
+| música | ♪ | vai até a caixinha | "{n} está olhando para a caixinha de música." | a caixinha tocar |
+
+Comida:
 
 | Desejo | Quem quer mais | Balão | Observação | Atende |
 |---|---|---|---|---|
@@ -520,13 +538,15 @@ por dia; nunca dormindo, doente, comendo ou de barriga cheia (fome > 80); pegar 
 | algo com um jeito de que ele gosta: docinho 🍬, crocante 🥨, salgado 🧂, fresquinho 🌿, uma fruta 🍇, de leite 🧈 | — | o ícone do jeito | "{n} parece querer algo crocante." | qualquer comida com esse jeito (é um palpite) |
 | algo que nunca provou | curioso | ✨ | "{n} está farejando o ar, curioso. Parece querer provar algo novo." | qualquer comida nova para ele |
 
-- Dura 20–45 min de relógio pela paciência (e nunca menos de 2,5–5 min reais, mesmo acelerado). Ignorado, passa sem
+- Comida, brinquedo: 20–45 min de relógio pela paciência (nunca menos de 2,5–5 min reais, mesmo acelerado); brincar
+  10–25 min (2–4 reais); carinho 8–18 (1,5–3 reais); o quarto 15–30 (2,5–5 reais); ficar quieto 3 min. Ignorado, passa sem
   castigo: "{n} parece ter desistido do peixe." (o impaciente desiste antes, e isso conta como sinal do jeito).
 - Errar não conta e não pune: ele come o que você deu normalmente e continua querendo. Comer só um pouco (comida de que
   não gosta) também não atende.
 - Atender: ♥♥ e pulinhos, afeto +8, diversão +5, **vínculo** (+0,1, teto do dia 0,25), lembrança, +2 moedas, uma pista
-  forte do gosto (para o jeito: "Talvez adore coisas crocantes." na aba Gostos, em Comidas) e, na primeira vez de cada
-  tipo, uma página do diário ("Estava com vontade de comer peixe e você deu."). A observação é a do desejo ("{n} estava
+  (do gosto: "Talvez adore coisas crocantes." na aba Gostos, em Comidas; do brinquedo, da música ou do escuro; ou do
+  jeito: brincalhão, sociável, independente) e, na primeira vez de cada tipo, uma página do diário ("Estava com vontade
+  de comer peixe e você deu.", "Quis ficar sozinho um pouco e você respeitou."). A observação é a do desejo ("{n} estava
   mesmo com vontade de comer peixe! Parece muito feliz."), no lugar da de sempre da comida.
 - Com vontade de uma comida, ele aceita mesmo de barriga cheia.
 - O desejo fica salvo: fechar e abrir o jogo mantém o balão (se ainda não passou da hora).
