@@ -1494,7 +1494,7 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     start(g, 'vendedor');
     const rare = String(hap(g).current()!.data.item);
     expect(['ioio', 'bolhas']).toContain(rare);
-    expect(notes(g).at(-1)).toMatch(/^Um vendedor passou e deixou uma novidade na loja: /);
+    expect(notes(g).at(-1)).toMatch(/^Um vendedor passou e deixou (uma novidade|novidades) na loja: /);
     g.economy.wallet.add(40, 'moedas');
     g.perform([{ type: 'click', entity: 'vendedor' }, { type: 'wait', ms: 100 }]); // the ✨ opens the shop
     expect(shopItems()).toContain(rare);
@@ -1517,9 +1517,43 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     g.apply({ op: 'advanceClock', ms: 3 * 3_600_000 });
     g.perform([{ type: 'wait', ms: 3000 }]);
     expect(g.entity('vendedor')).toBeUndefined();
-    expect(notes(g)).toContain('A novidade do vendedor saiu da loja.');
+    expect(notes(g)).toContain('As novidades do vendedor saíram da loja.');
     g.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 100 }]);
     expect(shopItems()).not.toContain(offered);
+    expect(shopItems()).not.toContain('pocaoCarinho');
+
+    // Sometimes the peddler brings potions too (always, when you already have every rare toy): one brings it closer to
+    // you, the other makes it standoffish. They go through the food tray; it drinks at once and you see it.
+    g = make('2026-03-10T10:00:00Z');
+    g.economy.inventory().add('ioio', 1);
+    g.economy.inventory().add('bolhas', 1);
+    start(g, 'vendedor');
+    expect(notes(g).at(-1)).toBe('Um vendedor passou e deixou uma novidade na loja: 🧪 umas poções estranhas, só por algumas horas.');
+    g.economy.wallet.add(60, 'moedas');
+    g.perform([{ type: 'click', entity: 'vendedor' }, { type: 'wait', ms: 100 }]);
+    expect(shopItems()).toEqual(expect.arrayContaining(['pocaoCarinho', 'pocaoBirra']));
+    const buy = (id: string) => g.perform([{ type: 'click', entity: g.world.withTag('cartaLoja').find((c) => c.components.Script!.props.item === id)!.id }, { type: 'wait', ms: 300 }]);
+    buy('pocaoCarinho');
+    buy('pocaoBirra');
+    expect(ended(g)).toEqual(['vendedor:comprou']);
+    g.perform([{ type: 'click', x: 480, y: 370 }, { type: 'wait', ms: 100 }]);
+    const bondNow = () => g.entity('pet')!.components.Relationship!.values.voce?.value ?? 0.2;
+    const drink = (id: string) => {
+      g.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
+      g.perform([{ type: 'click', entity: g.world.withTag('cartaComida').find((c) => c.components.Script!.props.item === id)!.id }, { type: 'wait', ms: 2000 }]);
+    };
+    const b0 = bondNow();
+    drink('pocaoCarinho');
+    const b1 = bondNow();
+    expect(b1).toBeGreaterThan(b0 + 0.08);
+    expect(notes(g)).toContain('Mimi bebeu a poção, ficou todo brilhante e veio se aconchegar perto de você.');
+    expect(story(g)).toContain('Bebeu uma poção do carinho e ficou mais pertinho de você.');
+    expect(g.economy.inventory().has('pocaoCarinho')).toBe(false);
+    drink('pocaoBirra');
+    expect(bondNow()).toBeLessThan(b1 - 0.1);
+    expect(notes(g)).toContain('Mimi bebeu a poção, fez careta e se afastou um pouco de você.');
+    // The offer still lasts after you bought one of each (more can be bought), and leaves after 3 hours.
+    expect(g.entity('vendedor')).toBeTruthy();
 
     // A gift, when it trusts you: it fetches something and leaves it near you; clicking it accepts.
     expect(hap(make('2026-03-10T14:00:00Z')).candidates().map((c) => c.id)).not.toContain('presente');

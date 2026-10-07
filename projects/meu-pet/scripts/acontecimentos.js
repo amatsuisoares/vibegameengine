@@ -18,8 +18,9 @@
 //               cama e treme) — atende: duas de três coisas: fechar a cortina, acender a luz, um carinho
 //   pesadelo    de madrugada, dormindo: acorda assustado e treme — atende: um carinho (qualquer pet aceita)
 //   bagunça     entediado ou impaciente, derruba o vaso (terra no chão) — atende: limpar e depois brincar com ele
-//   vendedor    de dia: a loja ganha por 3 h um brinquedo raro (✨ ao lado da Loja) — comprar. O acontecimento
-//               em si é curto (o vendedor passando); a oferta fica guardada à parte (storage "vendedor")
+//   vendedor    de dia: a loja ganha por 3 h um brinquedo raro e, às vezes, duas poções (uma aproxima o pet de você,
+//               a outra o afasta) (✨ ao lado da Loja) — comprar. O acontecimento em si é curto (o vendedor
+//               passando); a oferta fica guardada à parte (storage "vendedor")
 //   presente    com vínculo alto: ele busca uma flor, uma folhinha ou uma pena e deixa perto de você — aceitar
 //               (clicar)
 
@@ -30,6 +31,8 @@ let montado = null; // id do acontecimento já montado na tela
 let extras = []; // efeitos que somem no fim (chuva, clarão)
 let brilho = null; // ✨ ao lado da Loja enquanto a oferta do vendedor vale
 const OFERTA_HORAS = 3;
+const POCOES = ['pocaoCarinho', 'pocaoBirra'];
+const CHANCE_POCOES = 0.5; // sem brinquedo raro para vender (você já tem todos), ele traz as poções
 
 const JANELA = { x: 250, y: 140 };
 const PEITORIL = { x: 318, y: 192 };
@@ -52,33 +55,37 @@ const api = (game) => {
 };
 const cortinaFechada = (game) => !!(game.storage.get('quarto') || {}).cortina;
 const perto = (game, x, d = 90) => Math.abs(game.entity('pet').x - x) < d;
-/** Brinquedo raro da loja agora (o do vendedor), ou null — a loja (loja.js) mostra só ele dos raros. */
+/** Os raros à venda agora (os do vendedor): o brinquedo, se ainda não é seu, e as poções — a loja (loja.js) mostra só eles. */
 const raroNaLoja = (game) => {
   const o = game.storage.get('vendedor');
-  return o && game.clock.now < o.ate && !game.inventory().has(o.item) ? o.item : null;
+  if (!o || game.clock.now >= o.ate) return [];
+  return [...(o.item && !game.inventory().has(o.item) ? [o.item] : []), ...(o.pocoes ? POCOES : [])];
 };
 
-/** O ✨ acompanha a oferta (que dura mais que o acontecimento); comprou: página do diário; venceu: um aviso discreto. */
+/** O ✨ acompanha a oferta (que dura mais que o acontecimento); comprou o brinquedo: página do diário; venceu: um aviso discreto. */
 function cuidarDaOferta(game, self, p) {
-  const item = raroNaLoja(game);
-  if (item && !brilho) {
+  const raros = raroNaLoja(game);
+  if (raros.length && !brilho) {
     brilho = mostrar(game, 'vendedor', '✨', 790, 82, 26, 61);
     brilho.tween('Text.fontSize', 32, 700, { yoyo: true, repeat: -1 });
-  } else if (!item && brilho) {
+  } else if (!raros.length && brilho) {
     sumir(brilho);
     brilho = null;
   }
   const o = game.storage.get('vendedor');
-  if (o && !item && p) {
-    game.storage.remove('vendedor');
-    const comprado = game.items.get(o.item);
-    if (!game.inventory().has(o.item)) p.notar('vendedorFim', 'A novidade do vendedor saiu da loja.', 0, 1);
-    else if (comprado) {
-      p.premio({ diario: ['evento:vendedor', `Ganhou ${comprado.props.artigo === 'a' ? 'uma' : 'um'} ${comprado.name.toLowerCase()} de um vendedor que passou.`] });
-      const cur = self.happenings.current();
-      if (cur && cur.kind === 'vendedor') self.happenings.end('comprou');
-    }
+  if (!o || !p) return;
+  const comprado = o.item && !o.anotado && game.inventory().has(o.item) && game.items.get(o.item);
+  if (comprado) {
+    game.storage.set('vendedor', { ...o, anotado: true });
+    p.premio({ diario: ['evento:vendedor', `Ganhou ${comprado.props.artigo === 'a' ? 'uma' : 'um'} ${comprado.name.toLowerCase()} de um vendedor que passou.`] });
+    const cur = self.happenings.current();
+    if (cur && cur.kind === 'vendedor') self.happenings.end('comprou');
   }
+  if (game.clock.now >= o.ate) {
+    game.storage.remove('vendedor');
+    const sobrou = (o.item && !game.inventory().has(o.item)) || o.pocoes;
+    if (sobrou) p.notar('vendedorFim', 'As novidades do vendedor saíram da loja.', 0, 1);
+  } else if (!raros.length) game.storage.remove('vendedor'); // comprou tudo
 }
 
 function onStart(self, game) {
@@ -91,7 +98,8 @@ function onStart(self, game) {
 
 function onEvent(self, ev, game) {
   const cur = self.happenings.current();
-  if (cur && ev.type === 'consolo') st.consolo = true; // carinho no pet assustado (pet.js)
+  if (cur && ev.type === 'consolo') st.consolo = true;
+  if (cur && cur.kind === 'vendedor' && ev.type === 'purchase' && POCOES.includes(ev.item)) self.happenings.end('comprou'); // carinho no pet assustado (pet.js)
   if (cur && cur.kind === 'bagunca' && ev.type === 'brincouComVoce' && cur.data.limpo) self.happenings.end('arrumado');
   if (ev.entity !== self.id) return;
   if (ev.type === 'happening_start') montar(game, self, ev, false);
@@ -199,17 +207,19 @@ function montar(game, self, ev, voltando) {
   } else if (ev.kind === 'bagunca') {
     if (ev.data.caido) derrubarVaso(game, true);
   } else if (ev.kind === 'vendedor') {
-    let item = ev.data.item && game.items.get(ev.data.item);
-    if (!item) {
+    let { item, pocoes } = ev.data;
+    if (!ev.data.oferta) {
       const raros = game.items.list({ category: 'brinquedo' }).filter((it) => it.props && it.props.raro && !game.inventory().has(it.id));
-      if (!raros.length) return self.happenings.end('nada'); // já tem todos
-      item = raros[Math.floor(game.random() * raros.length)];
-      self.happenings.update({ item: item.id });
-      game.storage.set('vendedor', { item: item.id, ate: game.clock.now + OFERTA_HORAS * 3_600_000 });
+      item = raros.length ? raros[Math.floor(game.random() * raros.length)].id : null;
+      pocoes = !item || game.random() < CHANCE_POCOES;
+      self.happenings.update({ oferta: true, item, pocoes });
+      game.storage.set('vendedor', { item, pocoes, ate: game.clock.now + OFERTA_HORAS * 3_600_000 });
     }
     if (!voltando) {
+      const brinquedo = item && game.items.get(item);
+      const coisas = [...(brinquedo ? [`${brinquedo.icon} ${brinquedo.name.toLowerCase()}`] : []), ...(pocoes ? ['🧪 umas poções estranhas'] : [])];
       game.playSound('sfx_guizo');
-      p.notar('vendedor', `Um vendedor passou e deixou uma novidade na loja: ${item.icon} ${item.name.toLowerCase()}, só por algumas horas.`, 0, 2);
+      p.notar('vendedor', `Um vendedor passou e deixou ${coisas.length > 1 ? 'novidades' : 'uma novidade'} na loja: ${coisas.join(' e ')}, só por algumas horas.`, 0, 2);
     }
   } else if (ev.kind === 'presente') {
     const g = PRESENTES.find((x) => x.icone === ev.data.icone) || PRESENTES[Math.floor(game.random() * PRESENTES.length)];

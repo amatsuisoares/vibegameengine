@@ -2222,6 +2222,7 @@ function sumir(food, s) {
  * Devolve {consumed, level} a quem ofereceu (a loja/inventário vão usar).
  */
 function onItem(self, item, game) {
+  if (item.category === 'pocao') return beberPocao(game, self, item);
   if (item.category !== 'comida') return { consumed: false, reason: 'naoComida' };
   if (pet.asleep) {
     observe(game, 'ofertaDormindo', '{n} está dormindo.', 1);
@@ -2270,6 +2271,39 @@ function onItem(self, item, game) {
   mind = { act: lembra >= 0.5 ? 'happy' : 'investigate', t: lembra >= 0.5 ? 0.5 : 0.9, refeicao: true, then: () => react(game, self) };
   game.emit('reacao', { item: item.id, level: agora.level, ...(agora.enjoado && { enjoado: true }) });
   return { consumed: r.level !== 'hate', level: agora.level };
+}
+
+/**
+ * Poção do vendedor (props.vinculo): bebe na hora (não tem gosto nem precisa de fome) e fica mais perto de você
+ * (vínculo +, no máximo props.vinculo por dia — Relationship.dailyCaps.pocao) ou mais arisco (vínculo −, sem limite).
+ * O nível que mudar aparece como sempre (mudouVinculo); o efeito também se vê na hora.
+ */
+function beberPocao(game, self, item) {
+  if (pet.asleep) {
+    observe(game, 'ofertaDormindo', '{n} está dormindo.', 1);
+    return { consumed: false, reason: 'dormindo' };
+  }
+  terminarRefeicao(game, self, false);
+  const v = item.props.vinculo || 0;
+  vinculo('pocao', v);
+  game.emit('bebeu', { entity: me.id, item: item.id, vinculo: v });
+  const primeira = !(pet.bebeu || {})[item.id];
+  pet.bebeu = { ...(pet.bebeu || {}), [item.id]: true };
+  if (v > 0) {
+    emote(game, self, '♥', '#ff8fab');
+    emote(game, self, '✨', '#ffd166');
+    mind = { act: 'happy', t: 1.5 };
+    observe(game, `pocao:${item.id}`, '{n} bebeu a poção, ficou todo brilhante e veio se aconchegar perto de você.', 0, 2);
+    if (primeira) anotar(game, 'pocao', 'Bebeu uma poção do carinho e ficou mais pertinho de você.', `pocao:${item.id}`, 0.6);
+  } else {
+    naoGostou(game, self);
+    mind = { act: 'sulk', t: 2 };
+    observe(game, `pocao:${item.id}`, '{n} bebeu a poção, fez careta e se afastou um pouco de você.', 0, 2);
+    if (primeira) anotar(game, 'pocao', 'Bebeu uma poção da birra e ficou meio arisco com você.', `pocao:${item.id}`, 0.6);
+    go(game, self.x < 480 ? MAX_X - 40 : MIN_X + 40, 'idle');
+  }
+  save(game);
+  return { consumed: true };
 }
 
 /** Depois de cheirar: recusa (odeia) ou come; o efeito vem no fim (terminarRefeicao). */

@@ -17,8 +17,8 @@ const jaTem = (game, item) => !item.consumable && game.inventory().count(item.id
 // Raros (props.raro) só aparecem quando um vendedor passou (acontecimentos.js) — ou se você já tem.
 function aVenda(game) {
   const ac = game.entity('acontecimentos');
-  const raro = ac && ac.state.raroNaLoja ? ac.state.raroNaLoja() : null;
-  return game.shop.list().filter((item) => !(item.props && item.props.raro) || item.id === raro || jaTem(game, item));
+  const raros = ac && ac.state.raroNaLoja ? ac.state.raroNaLoja() : [];
+  return game.shop.list().filter((item) => !(item.props && item.props.raro) || raros.includes(item.id) || jaTem(game, item));
 }
 const texto = (game, item) =>
   `${item.icon || '?'} ${item.name}\n${jaTem(game, item) ? 'já é seu' : `${item.price} 🪙 · tem ${game.inventory().count(item.id)}`}`;

@@ -403,6 +403,9 @@ que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
   lembrança) e vinham quase toda manhã (só com higiene bem baixa), o passarinho acabava em 6 s (agora ~20 s depois que
   ele o vê), a volta despejava 5–9 avisos em segundos (as necessidades esperam 20 s e a "saudade" não repete o resumo),
   o pet sociável chama você para brincar mais. Avaliação em `docs/V08_DESEJOS.md` §7 (504 testes)
+- [x] meu-pet: o vendedor às vezes traz duas poções (sempre, se você já tem todos os brinquedos raros): a do carinho
+  (🧪, 20) aproxima o pet de você (vínculo +, até 0,15 por dia) e a da birra (⚗️, 8) o deixa arisco (vínculo −); vão
+  pela bandeja de Comida, ele bebe na hora, com reação, aviso e página do diário na primeira vez
 
 ## V0.9 — App (planejada, depois da V0.8)
 Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` (Capacitor). Análise e fases em

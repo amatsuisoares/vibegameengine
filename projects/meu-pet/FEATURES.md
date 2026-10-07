@@ -572,9 +572,16 @@ guarda o acontecimento (ele volta ao abrir). Nada pune: ignorar só perde a chan
 | tempestade | 19h–6h, acordado ou dormindo; peso 0,5; 1 por dia | chuva escorrendo na janela, clarão de raio e trovão a cada 8–16 s | o sensível (≥ 0,6) se assusta no primeiro trovão (acorda se dormia), se esconde perto da cama e treme (💧); o calmo nem acorda ("nem acordou com a tempestade") ou, curioso, olha a chuva | acalmar o assustado com duas de três: cortina fechada, luz acesa, um carinho (cada uma dá um ♥) | afeto +10, vínculo +0,06, diário "Teve medo da tempestade e você ficou com ele."; depois volta a dormir; o calmo ganha só a página ("Dormiu a tempestade inteira, sem nem acordar.") |
 | pesadelo | 22h–5h, só dormindo; peso 0,2 + sensibilidade; 1 por dia | — | acorda assustado e treme: "{n} acordou assustado no meio da noite, tremendo." | um carinho (qualquer pet aceita: é consolo, não carinho) | afeto +8, vínculo +0,05, diário "Acordou assustado de noite e você o acalmou."; volta a dormir (sem consolo também volta, mais tarde) |
 | bagunça | acordado, diversão < 45; peso (1,6 − paciência); 1 por dia | ele vai até a planta e derruba o vaso: vaso tombado, planta no chão, 2 sujeiras | o impaciente acha graça (pula); os outros levam um susto | limpar a terra (o vaso volta para o lugar) e **depois** brincar com ele (bola ou minigame) | diversão +6, afeto +5, vínculo +0,04, ♥♥, diário; só limpar: vínculo +0,01 |
-| vendedor | 9h–19h; peso 0,35; 1 por dia; o acontecimento é só ele passando (10 min, mín. 90 s reais) — a oferta fica 3 h de relógio guardada à parte (storage `vendedor`), sem segurar a vez dos outros | ✨ ao lado do botão Loja enquanto a oferta vale (clicar abre a loja) e um brinquedo raro à venda (Ioiô 🪀 16, Bolhas de sabão 🫧 14), que só aparece assim; ao vencer: "A novidade do vendedor saiu da loja." | — | comprar o raro | o brinquedo novo (ele reage como a qualquer brinquedo novo) e uma página do diário; depois que é seu, ele fica na loja como "já é seu" |
+| vendedor | 9h–19h; peso 0,35; 1 por dia; o acontecimento é só ele passando (10 min, mín. 90 s reais) — a oferta fica 3 h de relógio guardada à parte (storage `vendedor`), sem segurar a vez dos outros | ✨ ao lado do botão Loja enquanto a oferta vale (clicar abre a loja) e um brinquedo raro à venda (Ioiô 🪀 16, Bolhas de sabão 🫧 14), que só aparece assim; com chance de 50% (100% se você já tem os dois brinquedos) também as **poções**: Poção do carinho 🧪 20 e Poção da birra ⚗️ 8; ao vencer: "As novidades do vendedor saíram da loja." | — | comprar o raro (ou as poções) | o brinquedo novo (ele reage como a qualquer brinquedo novo) e uma página do diário; depois que é seu, ele fica na loja como "já é seu" |
 | presente | acordado, vínculo ≥ 0,6; peso 0,4 + sociabilidade; 1 por dia | ele busca uma flor 🌼 ou uma folhinha 🍃 na planta, ou uma pena 🪶 na janela, traz na boca e deixa perto de você | ♥ | clicar no presente | afeto +8, vínculo +0,05, ♥♥, diário "Trouxe uma flor para você."; ignorado: "parece um pouco desapontado." |
 | espirros | saúde < 70 ou higiene < 25; peso 1,2; nunca doente | 💦 de vez em quando; texto só no 1º ("{n} espirrou."), no 2º ("espirrou de novo. Talvez esteja ficando resfriado.") e no 8º ("continua espirrando.") | — | dar remédio enquanto espirra | saúde +20, vínculo +0,04, diário; sem remédio, ao passar (30 min): saúde −15 ("parou de espirrar, mas não parece muito bem.") |
+
+**Poções do vendedor** (categoria `pocao`, consumíveis, `props.vinculo`): vão pela bandeja de **Comida**. Ele bebe na
+hora (sem gosto, sem precisar de fome; dormindo, não). Poção do carinho: vínculo +0,15 × (1 − vínculo), no máximo 0,15
+por dia (`Relationship.dailyCaps.pocao`), ♥ ✨ e "{n} bebeu a poção, ficou todo brilhante e veio se aconchegar perto de
+você."; Poção da birra: vínculo −0,15 (sem limite; nunca abaixo de zero), 💢, ele se afasta e "{n} bebeu a poção, fez
+careta e se afastou um pouco de você.". A primeira de cada vira página do diário; se o nível do vínculo mudar, aparece
+como sempre.
 
 ## 11. Coleção ("pokédex") e novo pet
 
@@ -613,7 +620,7 @@ Playbooks de regressão em `playbooks/` (rodar com `run_playbooks`): `limpar_suj
 - Cenário e objetos são formas simples; não há trilha sonora; os sons são efeitos sintetizados.
 - Balanceamento é um primeiro chute: ritmos das necessidades, 12 h / 36 h para evoluir, limites de doença.
 - O pet adulto não envelhece nem muda depois de adulto; não há morte (decisão de design).
-- Um único quarto; a loja tem 15 itens (mais 2 brinquedos raros, só com o vendedor) e há 2 minigames (prova de conceito da
+- Um único quarto; a loja tem 15 itens (mais 2 brinquedos raros e 2 poções, só com o vendedor) e há 2 minigames (prova de conceito da
   arquitetura).
 - Com os outros traços iguais, um pet ativo dorme ~40% do dia e um calmo ~45%: a diferença existe, mas é pequena.
 - Sem acessibilidade de teclado para as ações (só mouse, exceto digitar o nome).

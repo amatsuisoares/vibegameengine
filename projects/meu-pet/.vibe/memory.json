@@ -333,6 +333,14 @@
       "status": "verified",
       "evidence": "teste 'balance at 1×' (dois pets opostos, 90 min a 1× e a volta na manhã seguinte); simulação de 2 h; screenshots do ✨ e da loja com o raro depois do vendedor e do passarinho aos 12 s",
       "updatedAt": "2026-10-07T16:45:45.319Z"
+    },
+    {
+      "id": "f31",
+      "kind": "feature",
+      "text": "Poções do vendedor: às vezes (sempre, se já tem os brinquedos raros) ele traz a Poção do carinho (vínculo +, até 0,15/dia) e a Poção da birra (vínculo −); vão pela bandeja de Comida e ele bebe na hora",
+      "status": "verified",
+      "evidence": "teste 'more happenings...' (compra, bebe, vínculo sobe e desce, aviso e diário); screenshots da loja com as poções e da bandeja",
+      "updatedAt": "2026-10-07T21:56:37.318Z"
     }
   ],
   "plans": []

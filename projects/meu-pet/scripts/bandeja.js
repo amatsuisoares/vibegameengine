@@ -1,4 +1,4 @@
-// Bandeja de comida: o botão "Comida" abre uma carta por comida que você TEM no inventário (com a
+// Bandeja de comida: o botão "Comida" abre uma carta por comida (e poção) que você TEM no inventário (com a
 // quantidade); clicar numa carta oferece ao pet (game.useItem → onItem do pet), e só se ele comer
 // a unidade sai do inventário. Sem comida: uma carta leva à Loja. Clicar no painel fecha.
 // As cartas são achadas pela tag no mundo (não numa lista do script): um hot reload que recria a
@@ -19,7 +19,7 @@ function carta(game, self, i, text, item) {
 }
 
 function abrir(self, game) {
-  const owned = game.inventory().list({ category: 'comida' }).filter((e) => e.item.id !== 'racao');
+  const owned = [...game.inventory().list({ category: 'comida' }), ...game.inventory().list({ category: 'pocao' })].filter((e) => e.item.id !== 'racao');
   self.get('Sprite').visible = true;
   if (!owned.length) carta(game, self, 0, '🧺\nVazia: Loja', '');
   owned.forEach((e, i) => carta(game, self, i, `${e.item.icon || '?'} ×${e.count}\n${e.item.name}`, e.item.id));

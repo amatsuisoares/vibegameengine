@@ -1,0 +1,14 @@
+{
+  "name": "Poção do carinho",
+  "category": "pocao",
+  "icon": "🧪",
+  "tags": [],
+  "consumable": true,
+  "price": 20,
+  "description": "Cor-de-rosa e morninha: dizem que o pet fica mais pertinho de você. Só um vendedor de passagem traz.",
+  "props": {
+    "raro": true,
+    "artigo": "a",
+    "vinculo": 0.15
+  }
+}

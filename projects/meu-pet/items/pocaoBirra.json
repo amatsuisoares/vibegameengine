@@ -1,0 +1,14 @@
+{
+  "name": "Poção da birra",
+  "category": "pocao",
+  "icon": "⚗️",
+  "tags": [],
+  "consumable": true,
+  "price": 8,
+  "description": "Verde e borbulhante: dizem que o pet fica mais arisco com você. Só um vendedor de passagem traz.",
+  "props": {
+    "raro": true,
+    "artigo": "a",
+    "vinculo": -0.15
+  }
+}

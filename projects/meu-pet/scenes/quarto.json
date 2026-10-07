@@ -321,7 +321,8 @@
             "comida": 0.06,
             "cuidado": 0.06,
             "desejo": 0.25,
-            "evento": 0.2
+            "evento": 0.2,
+            "pocao": 0.15
           }
         },
         "Desires": { "max": 1, "minGapMinutes": 10, "minGapRealSeconds": 240, "maxPerDay": 12 }
