@@ -17,6 +17,7 @@ import { envAt } from './ambient';
 import { addEntry, hasEntry, journalEntries, removeEntry, type JournalAdd, type JournalEntry } from './journal';
 import { addBond, bondLevel, bondOf, listBonds, type BondChange, type BondView } from './relationship';
 import type { DesireBlock, DesireRunner, DesireSpec, DesireView } from './desires';
+import type { HappeningRunner, HappeningView } from './happenings';
 import type { BuyOptions, BuyResult, Economy, Inventory, Wallet } from './economy';
 import { affinityOf, evaluate, evaluateItem, learn, preferenceLevel, traitOf, type Evaluation, type IndividualRunner, type PreferenceLevel } from './individual';
 import { topmostAt, type InteractionRunner, type InteractResult, type InteractVia, type NearbyInteractable } from './interact';
@@ -73,6 +74,7 @@ export interface ScriptHost extends SlotHost, MinigameHost {
   readonly economy: Economy;
   readonly notifications: Notifier;
   readonly desires: DesireRunner;
+  readonly happenings: HappeningRunner;
   useItem(itemId: string, target: Entity, by?: Entity): { handled: boolean; result: unknown };
 }
 
@@ -179,6 +181,22 @@ export interface ScriptDesires {
   get(ref: string): DesireView | null;
   /** Desires now. */
   list(): DesireView[];
+}
+
+/** self.happenings: the random events this entity directs (Happenings). */
+export interface ScriptHappenings {
+  /** Starts a card of the deck now, skipping the draw rules (not the one-at-a-time): null if one is going on. */
+  start(kind: string, data?: Record<string, unknown>): HappeningView | null;
+  /** Ends the one going on with an outcome ("resolved", "missed"...; default "ended"): event happening_end {by: "script"}. */
+  end(outcome?: string, data?: Record<string, unknown>): HappeningView | null;
+  /** Merges data into the one going on. */
+  update(data: Record<string, unknown>): HappeningView | null;
+  /** The one going on, or null. */
+  current(): HappeningView | null;
+  /** Cards that could be drawn now, with their weights. */
+  candidates(): { id: string; weight: number }[];
+  /** Game-clock minutes until the next draw may happen (null while one goes on). */
+  nextIn(): number | null;
 }
 
 /** self.persist: where the individual data is kept (Persist). */
@@ -359,6 +377,8 @@ export interface ScriptEntity {
   readonly relationship: ScriptRelationship;
   /** What the entity wants now (Desires). */
   readonly desires: ScriptDesires;
+  /** The random events it directs (Happenings). */
+  readonly happenings: ScriptHappenings;
   /** The entity's Persist. */
   readonly persist: ScriptPersist;
   /** Runs fn once after ms of game time; returns the timer id (same id again = restart). Dropped if the entity is destroyed. */
@@ -881,7 +901,7 @@ class ScriptApi {
         return k;
       },
     };
-    const need = (c: 'Knowledge' | 'Journal' | 'Relationship' | 'Desires') => {
+    const need = (c: 'Knowledge' | 'Journal' | 'Relationship' | 'Desires' | 'Happenings') => {
       if (!e.components[c]) throw new Error(`entity "${e.id}" has no ${c}`);
       individuals.ensure(e);
     };
@@ -935,6 +955,14 @@ class ScriptApi {
       get: (ref) => (need('Desires'), host.desires.get(e, String(ref))),
       list: () => (need('Desires'), host.desires.list(e)),
     };
+    const happenings: ScriptHappenings = {
+      start: (kind, data) => (need('Happenings'), host.happenings.start(e, String(kind), data)),
+      end: (outcome, data) => (need('Happenings'), host.happenings.end(e, outcome === undefined ? 'ended' : String(outcome), data)),
+      update: (data) => (need('Happenings'), host.happenings.update(e, data)),
+      current: () => (need('Happenings'), host.happenings.current(e)),
+      candidates: () => (need('Happenings'), host.happenings.candidates(e)),
+      nextIn: () => (need('Happenings'), host.happenings.nextIn(e)),
+    };
     const persist: ScriptPersist = {
       get key() {
         return e.components.Persist?.key ?? null;
@@ -957,6 +985,7 @@ class ScriptApi {
       journal,
       relationship,
       desires,
+      happenings,
       persist,
       get x() {
         return e.x;

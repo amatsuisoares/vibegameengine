@@ -1,4 +1,4 @@
-import { DesireSchema, JournalEntrySchema, MemoryEntrySchema, type Components } from '@vibe/shared';
+import { DesireSchema, HappeningSchema, JournalEntrySchema, MemoryEntrySchema, type Components } from '@vibe/shared';
 import type { Entity } from './entity';
 import { itemTags } from './items';
 import { Rng } from './rng';
@@ -18,6 +18,7 @@ import type { World } from './world';
  *   Journal      its chronicle (see journal.ts)
  *   Relationship its bonds with others (see relationship.ts)
  *   Desires      what it wants now (see desires.ts)
+ *   Happenings   random events around it (see happenings.ts)
  *   Persist      keeps them in game.storage[key]: loaded before the entity's first onStart, drawn
  *                when missing, saved at the end of any frame in which they changed
  *
@@ -52,6 +53,7 @@ export interface PersistedIndividual {
   journal?: unknown[];
   relationship?: Record<string, unknown>;
   desires?: { active?: unknown[]; last?: number; today?: { day: number; count: number }; seq?: number };
+  happenings?: { current?: unknown; next?: number; history?: Record<string, unknown>; today?: { day: number; count: number }; seq?: number };
 }
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -180,6 +182,10 @@ export function persistedOf(c: Components): PersistedIndividual {
     const d = c.Desires;
     out.desires = { active: structuredClone(d.active), seq: d.seq, ...(d.last !== undefined && { last: d.last }), ...(d.today && { today: { ...d.today } }) };
   }
+  if (c.Happenings) {
+    const h = c.Happenings;
+    out.happenings = { seq: h.seq, history: structuredClone(h.history), ...(h.current && { current: structuredClone(h.current) }), ...(h.next !== undefined && { next: h.next }), ...(h.today && { today: { ...h.today } }) };
+  }
   return out;
 }
 
@@ -237,6 +243,18 @@ function applyPersisted(c: Components, saved: unknown): boolean {
     if (d.today && Number.isInteger(d.today.day) && Number.isInteger(d.today.count) && d.today.count >= 0) c.Desires.today = { day: d.today.day, count: d.today.count };
     if (Number.isInteger(d.seq) && (d.seq as number) >= 0) c.Desires.seq = d.seq as number;
   }
+  if (c.Happenings && s.happenings && typeof s.happenings === 'object') {
+    const h = s.happenings;
+    const cur = HappeningSchema.safeParse(h.current);
+    if (cur.success) c.Happenings.current = cur.data;
+    if (typeof h.next === 'number' && Number.isFinite(h.next)) c.Happenings.next = h.next;
+    if (h.today && Number.isInteger(h.today.day) && Number.isInteger(h.today.count) && h.today.count >= 0) c.Happenings.today = { day: h.today.day, count: h.today.count };
+    for (const [card, v] of Object.entries(h.history ?? {})) {
+      const r = v as { last?: unknown; day?: unknown; count?: unknown };
+      if (r && typeof r.last === 'number' && Number.isInteger(r.day) && Number.isInteger(r.count) && (r.count as number) >= 0) c.Happenings.history[card] = { last: r.last, day: r.day as number, count: r.count as number };
+    }
+    if (Number.isInteger(h.seq) && (h.seq as number) >= 0) c.Happenings.seq = h.seq as number;
+  }
   return true;
 }
 
@@ -252,7 +270,7 @@ export class IndividualRunner {
   private readonly dirty = new Set<Entity>();
   private resets = 0;
   /** Values the entity was authored with (before loading and drawing), for reset. */
-  private readonly authored = new WeakMap<Entity, { traits?: Record<string, number>; preferences?: PersistedIndividual['preferences']; routine?: Record<string, number[]>; memory?: unknown[]; knowledge?: unknown; journal?: unknown[]; relationship?: unknown; desires?: unknown }>();
+  private readonly authored = new WeakMap<Entity, { traits?: Record<string, number>; preferences?: PersistedIndividual['preferences']; routine?: Record<string, number[]>; memory?: unknown[]; knowledge?: unknown; journal?: unknown[]; relationship?: unknown; desires?: unknown; happenings?: unknown }>();
 
   constructor(
     private readonly world: World,
@@ -268,13 +286,14 @@ export class IndividualRunner {
   ensure(e: Entity) {
     if (this.ready.has(e)) return;
     const c = e.components;
-    if (!c.Traits && !c.Preferences && !c.Routine && !c.Memory && !c.Knowledge && !c.Journal && !c.Relationship && !c.Desires) return;
+    if (!c.Traits && !c.Preferences && !c.Routine && !c.Memory && !c.Knowledge && !c.Journal && !c.Relationship && !c.Desires && !c.Happenings) return;
     this.ready.add(e);
     this.authored.set(e, { traits: c.Traits && { ...c.Traits.values }, preferences: c.Preferences && structuredClone(c.Preferences.values), routine: c.Routine && structuredClone(c.Routine.values), memory: c.Memory && structuredClone(c.Memory.entries),
       knowledge: c.Knowledge && structuredClone(c.Knowledge.values),
       journal: c.Journal && structuredClone(c.Journal.entries),
       relationship: c.Relationship && structuredClone(c.Relationship.values),
       desires: c.Desires && structuredClone(c.Desires.active),
+      happenings: c.Happenings && structuredClone(c.Happenings.current),
     });
     const key = c.Persist?.key;
     const loaded = key !== undefined && applyPersisted(c, this.host.storage.get(key));
@@ -327,6 +346,14 @@ export class IndividualRunner {
       c.Desires.active = structuredClone((authored?.desires ?? []) as typeof c.Desires.active);
       delete c.Desires.last;
       delete c.Desires.today;
+    }
+    if (c.Happenings) {
+      const h = c.Happenings;
+      h.current = structuredClone(authored?.happenings as typeof h.current);
+      if (!h.current) delete h.current;
+      h.history = {};
+      delete h.next;
+      delete h.today;
     }
     const key = c.Persist?.key;
     if (key !== undefined) this.host.storage.remove(key);

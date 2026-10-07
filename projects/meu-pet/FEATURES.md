@@ -551,6 +551,21 @@ Comida:
 - Com vontade de uma comida, ele aceita mesmo de barriga cheia.
 - O desejo fica salvo: fechar e abrir o jogo mantém o balão (se ainda não passou da hora).
 
+## 10d. Acontecimentos (V0.8: componente `Happenings`)
+
+De vez em quando algo quebra a rotina do quarto. Quem decide é a entidade `acontecimentos` (o "diretor", com o baralho na
+cena e o script `scripts/acontecimentos.js`): um por vez, a cada 12–37 min de relógio (média 25), nunca com ele dormindo,
+nunca nos primeiros 4 min reais da visita nem a menos de 4 min reais do anterior, até 8 por dia. Fechar o jogo no meio
+guarda o acontecimento (ele volta ao abrir). Nada pune: ignorar só perde a chance.
+
+| Acontecimento | Quando / quem atrai | O que aparece | Como ele reage | Participar certo | Rende |
+|---|---|---|---|---|---|
+| passarinho | 7h–18h; peso 0,6 + curiosidade; 2 por dia | 🐦 pousa na janela, cantando (♪); atrás da cortina se ela estiver fechada | vai até a janela e olha (o ativo pula); o muito sensível (> 0,75) se assusta (❗) e olha de longe; com a cortina fechada, olha para a cortina: "parece ouvir alguma coisa lá fora" | abrir a cortina e deixar ele ver por uns segundos; clicar no passarinho o espanta | diversão +8, afeto +4, vínculo +0,04, ♥♥, diário "Viu um passarinho pousar na janela." |
+| borboleta | 9h–18h; peso 0,4 + atividade; 1 por dia | 🦋 entra pela janela e voa pelo quarto | o ativo (> 0,55) corre atrás e pula; o calmo para e olha (?) | clicar nela: ela volta para a janela e sai | diversão +5 (+10 se correu atrás), afeto +3, vínculo +0,04, diário; correr atrás já diverte mesmo sem você |
+| achado | peso 0,3 + curiosidade; 1 por dia | ele fuça debaixo da cama / atrás da planta / num canto; aparece 🪙 ou o ícone de um item que você não tem | vai até lá e fuça (❗ quando acha); se estiver ocupado, "Tem alguma coisa brilhando..." | clicar no achado: moedas ou o item para você | afeto +3, vínculo +0,03, ♥♥, diário "Achou umas moedas atrás da planta e você pegou." |
+| amostra grátis | peso 0,5; 1 por dia; só se há comida que ele nunca provou | 🎁 na porta (canto direito) | o curioso vai cheirar | clicar na caixinha (a comida vai para a sua comida) e oferecer: vale ele **provar**, gostando ou não | descoberta sem gastar; vínculo +0,03, diário |
+| espirros | saúde < 70 ou higiene < 40; nunca doente | 💦 de vez em quando: "{n} espirrou." / "espirrou de novo. Talvez esteja ficando resfriado." | — | dar remédio enquanto espirra | saúde +20, vínculo +0,04, diário; sem remédio, ao passar (30 min): saúde −15 ("parou de espirrar, mas não parece muito bem.") |
+
 ## 11. Coleção ("pokédex") e novo pet
 
 - Toda forma alcançada fica registrada (com o nome do pet que a revelou), mesmo depois de trocar de pet.

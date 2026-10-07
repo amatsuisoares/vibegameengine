@@ -292,6 +292,10 @@ Game ── API pública: step/advance/perform/waitUntil/getState/events/console
   `scriptRunner.events()`: casa os eventos novos do frame com os `fulfillOn` e depois expira pelo relógio, então o
   `onEvent` recebe o evento e o atendimento juntos. O tempo real de começo e o último fim por entidade ficam só em
   memória (uma sessão nova começa sem intervalo real).
+- **Acontecimentos** (V0.8, `engine/src/happenings.ts`): o `HappeningRunner` é um por `Game` e roda logo depois do
+  `DesireRunner`: termina o em curso pelos `endOn` (eventos novos do frame) ou pelo tempo e, uma vez por segundo real,
+  sorteia o próximo. O estado (em curso, `next`, histórico) fica no componente e é persistido pelo `IndividualRunner`; o
+  gerador aleatório é próprio por entidade; o intervalo real conta do carregamento da cena.
 - **`Text.maxWidth`** (V0.7): `buildDrawList` continua puro e só repassa `maxWidth` no `TextCmd`; a quebra
   (`wrapLines`, testável com uma medida falsa) acontece no `paint`, onde há `measureText`.
 - **Notifier** (V0.7, `engine/src/notifier.ts`): um por `Game` (sobrevive a trocas de cena). Cooldowns de relógio e

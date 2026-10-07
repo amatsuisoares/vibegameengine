@@ -382,7 +382,14 @@ que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
   quarto (luz e cortina do jeito dele, ou a caixinha de música tocando). O tipo é sorteado pelo jeito (guloso → comida,
   brincalhão → brinquedo, sociável → você, independente → quieto, sensível → quarto) e pelo momento; cada um tem o seu
   balão, o seu jeito de mostrar (vai até a caixa, a bola, a janela, um canto) e a sua página do diário. Extra: 4 cliques seguidos acordam o pet (de mau humor, vínculo −0,03), que fica acordado ~2,5 min para comer (494 testes)
-- [ ] **Fase 5 — Eventos aleatórios** (`Happenings`; passarinho, borboleta, achado, amostra grátis, espirros)
+- [x] **Fase 5 — Eventos aleatórios**: engine `Happenings` (um "diretor" com um baralho de cartas com peso por expressão,
+  `when`, duração, cooldown e limite por dia; sorteio pela semente a cada ~N min de relógio, um por vez, com intervalo
+  real; termina por evento `endOn` com um resultado, pelo script ou pelo tempo; `happening_start/end`; `happening()` nas
+  expressões; no estado; salvo pelo `Persist`). No meu-pet, a cada 12–37 min acordado (nunca nos 4 primeiros): um
+  passarinho na janela (abrir a cortina e deixar ele ver; o sensível se assusta), uma borboleta (o ativo corre atrás;
+  clicar a guia para fora), um achado (ele fuça e acha moedas ou um item que você não tem), uma amostra grátis na porta
+  (uma comida que ele nunca provou) e espirros (remédio cedo evita a doença). Participar rende vínculo, diversão e página
+  do diário; ignorar só perde a chance (501 testes)
 - [ ] **Fase 6 — Mais eventos e participação** (tempestade, pesadelo, bagunça, vendedor, presente)
 - [ ] **Fase 7 — Balanceamento a 1× e avaliação**
 

@@ -1712,13 +1712,54 @@ function makeApi(game, self) {
     },
     remedio() {
       if (!pet.sick) {
-        observe(game, 'remedioSemDoenca', '{n} não parece precisar de remédio.', 2);
+        // Espirrando (acontecimentos.js): o remédio cedo evita a doença.
+        const ac = game.entity('acontecimentos');
+        const agora = ac && ac.happenings.current();
+        if (agora && agora.kind === 'espirros') game.emit('remedio', { entity: me.id, cedo: true });
+        else observe(game, 'remedioSemDoenca', '{n} não parece precisar de remédio.', 2);
         return;
       }
       pet.sick = false;
       pet.needs.saude = clamp(pet.needs.saude + 25);
       vinculo('cuidado', 0.04);
       observe(game, 'remedio', '{n} parece estar se sentindo melhor.', 2);
+    },
+    // Acontecimentos (scripts/acontecimentos.js decide o que acontece no quarto; aqui, o corpo e o jeito dele).
+    traco: (axis) => T(axis),
+    /** Pode reagir a algo agora (acordado, bem, sem estar comendo ou crescendo, sem querer ficar quieto). */
+    livre: () => !pet.asleep && !pet.sick && !refeicao && !['evolve', 'eat', 'sleep', 'nap', 'yawn'].includes(mind.act) && !querQuieto(),
+    /** Vai até x e fica fazendo act ("investigate", "greet", "happy", "idle"...) por t segundos. */
+    irAte(x, act = 'investigate', t = 2.5) {
+      go(game, x, () => {
+        mind = { act, t };
+      });
+    },
+    /** Fica fazendo act ali mesmo, olhando para x (se dado). */
+    fazer(act, t = 2, x) {
+      mind = { act, t };
+      if (x !== undefined) self.get('Sprite').flipX = x < self.x;
+    },
+    reagir: (glyph, color) => emote(game, self, glyph, color),
+    susto() {
+      levouSusto(game, self);
+      mind = { act: 'sulk', t: 2 };
+    },
+    notar: (kind, text, cooldownMin = 0, priority = 1) => observe(game, kind, text, cooldownMin, priority),
+    revelar: (axis, dir, weight) => reveal(axis, dir, weight),
+    /** O que um acontecimento rendeu: necessidades, vínculo, moedas, lembrança, página do diário, festa. */
+    premio(p) {
+      const n = pet.needs;
+      for (const k of NEEDS) if (p[k]) n[k] = clamp(n[k] + p[k]);
+      if (p.vinculo) vinculo('evento', p.vinculo);
+      if (p.moedas) ganhar(game, p.moedas, 'evento');
+      if (p.lembrar) lembrar(p.lembrar, VOCE, 1, 0.5);
+      if (p.diario) anotar(game, 'evento', p.diario[1], p.diario[0], 0.6);
+      if (p.festa) {
+        emote(game, self, '♥', '#ff8fab');
+        self.after(250, () => emote(game, self, '♥', '#ff8fab'));
+        mind = { act: 'happy', t: 1.4 };
+      }
+      save(game);
     },
     /** Você mexeu num brinquedo: reage pelo jeito com ele (verBrinquedo). */
     brinquedoMostrado(id) {

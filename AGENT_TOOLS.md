@@ -472,6 +472,26 @@ peixe, algo crocante, brincar, ficar quieto...). O jogo decide o que ela quer e 
   sem desejo. Estado: `desires: [{id, kind, subject, minutesLeft}]`. Guardado pelo `Persist` (os ativos, o último
   horário e a contagem do dia).
 
+## Acontecimentos (`Happenings`)
+
+Implementado na V0.8 (`engine/src/happenings.ts`). Eventos aleatórios que quebram a rotina (um passarinho na janela, uma
+amostra na porta, uma tempestade). A entidade com o componente é o "diretor": tem um **baralho** e a engine sorteia uma
+carta a cada ~`everyMinutes` de relógio (cada espera 0,5–1,5×), **uma por vez**:
+
+- Carta: `{id, weight, when?, minutes, minRealSeconds?, cooldownMinutes, maxPerDay, endOn}`. `weight` é um número ou uma
+  expressão (`"0.6 + trait('pet', 'curiosidade')"`; ≤ 0 tira a carta); `when` é uma expressão (`"clock.hour >= 7"`).
+- Sorteio: quando o relógio passou de `next`, passaram `minGapRealSeconds` reais desde que a cena abriu ou o último
+  acabou (a 600× o relógio voa, o jogador não), o limite do dia (`maxPerDay`) deixa e o `when` do componente vale
+  (`"!vars.dormindo"`); entre as cartas com `when` verdadeiro, fora do `cooldownMinutes` e do limite delas, pelo peso.
+  O gerador é próprio (semente do jogo + id): um baralho novo não muda a sequência aleatória do resto do jogo.
+- Evento `happening_start {entity, id, kind, data}` (o jogo mostra). Acaba com um evento que case com um `endOn`
+  (`{event, match, outcome}`, mesmas regras do `fulfillOn` dos desejos), pelo script, ou pelo tempo (`"expired"`, nunca
+  antes de `minRealSeconds` reais): `happening_end {entity, id, kind, data, outcome, by, trigger?}`.
+- Pelo script: `self.happenings.start(kind, data?)` (pula as regras do sorteio, não o um por vez), `end(outcome?, data?)`,
+  `update(data)`, `current()`, `candidates()`, `nextIn()`. Expressão: `happening([id])` → a carta em curso ou `false`.
+  Estado: `happening {id, kind, minutesLeft}` e `nextHappeningIn`. Guardado pelo `Persist` (o em curso, o próximo, o
+  histórico por carta e o dia). Uma expressão inválida para só aquele baralho (`happening_error`).
+
 ## Texto com quebra de linha (`Text.maxWidth`)
 
 `Text.maxWidth` (px) quebra as linhas mais largas que isso, palavra por palavra (`
@@ -900,7 +920,7 @@ parser próprio (`packages/engine/src/expr.ts`), sem `eval`.
 - Funções: `entity(id)` (snapshot ou `null`; inclui `state`/`stateMs`/`prevState`, `ai`, `props` e `interactable` quando
   há), `exists(id)`, `count(tag)`, `events(type)`, `distance(a, b)` (entre centros; ids ou entidades; `null` se faltar
   uma), `pathDistance(a, b)` (comprimento do caminho de `a` até `b` desviando de obstáculos; `null` se não há),
-  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `bond([id,] alvo)`, `wants([id,] tipo)`, `knows([id,] chave)` (0..3), `env(prop, [id | x, y])`, `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
+  `abs`, `min`, `max`, `clamp(x, min, max)`, `trait([id,] eixo)`, `likes([id,] assunto)`, `habit([id,] atividade)` (sem id = `self`), `memory(assunto, tipo?)` / `memory(id, assunto, tipo)`, `bond([id,] alvo)`, `wants([id,] tipo)`, `happening([id])`, `knows([id,] chave)` (0..3), `env(prop, [id | x, y])`, `item(id)`, `itemCount(id, inventário?)`, `currency(moeda?)`
 - Booleanos viram 0/1 em contas: `(self.props.fome < 30) * 2`
 - Operadores: `.campo`, `['campo']`, `!`, `-`, `* /`, `+ -`, `< <= > >=`, `== !=`, `&&`, `||`
 - Campo de `null` dá `null`; comparação com `null` é falsa. `=` sozinho é erro ("use ==").

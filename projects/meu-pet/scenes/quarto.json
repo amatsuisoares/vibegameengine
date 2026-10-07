@@ -788,6 +788,67 @@
           "opacity": 0
         }
       }
+    },
+    {
+      "id": "acontecimentos",
+      "tags": ["sistema"],
+      "transform": { "x": 0, "y": 0 },
+      "components": {
+        "Happenings": {
+          "everyMinutes": 25,
+          "minGapRealSeconds": 240,
+          "maxPerDay": 8,
+          "when": "!vars.dormindo",
+          "deck": [
+            {
+              "id": "passarinho",
+              "weight": "0.6 + trait('pet', 'curiosidade')",
+              "when": "clock.hour >= 7 && clock.hour < 18",
+              "minutes": 5,
+              "minRealSeconds": 150,
+              "cooldownMinutes": 180,
+              "maxPerDay": 2
+            },
+            {
+              "id": "borboleta",
+              "weight": "0.4 + trait('pet', 'atividade')",
+              "when": "clock.hour >= 9 && clock.hour < 18",
+              "minutes": 4,
+              "minRealSeconds": 120,
+              "cooldownMinutes": 240,
+              "maxPerDay": 1
+            },
+            {
+              "id": "achado",
+              "weight": "0.3 + trait('pet', 'curiosidade')",
+              "minutes": 6,
+              "minRealSeconds": 180,
+              "cooldownMinutes": 300,
+              "maxPerDay": 1
+            },
+            {
+              "id": "amostra",
+              "weight": 0.5,
+              "minutes": 60,
+              "minRealSeconds": 300,
+              "cooldownMinutes": 720,
+              "maxPerDay": 1
+            },
+            {
+              "id": "espirros",
+              "weight": "(vars.saude < 70 || vars.higiene < 40) * 2",
+              "when": "!vars.doente",
+              "minutes": 30,
+              "minRealSeconds": 240,
+              "cooldownMinutes": 360,
+              "maxPerDay": 1,
+              "endOn": [{ "event": "remedio", "outcome": "remedio" }]
+            }
+          ]
+        },
+        "Persist": { "key": "acontecimentos" },
+        "Script": { "src": "scripts/acontecimentos.js" }
+      }
     }
   ]
 }

@@ -488,11 +488,59 @@ export const DesiresSchema = z.strictObject({
   seq: z.number().int().min(0).default(0).describe('Counter for desire ids.'),
 });
 
+export const HappeningEndSchema = DesireTriggerSchema.extend({
+  outcome: z.string().min(1).default('resolved').describe('How it ended when this event comes ("resolved", "scared"...).'),
+});
+
+export const HappeningCardSchema = z.strictObject({
+  id: z.string().min(1).describe('The happening ("bird", "storm"...): the game shows it on happening_start.'),
+  weight: z
+    .union([z.number().min(0), z.string().min(1)])
+    .default(1)
+    .describe('Chance in the draw: a number or an expression (self = the entity; trait(), vars, clock...); <= 0 leaves it out.'),
+  when: z.string().optional().describe('Expression: only drawn while true (e.g. "clock.hour >= 20").'),
+  minutes: z.number().positive().default(10).describe('Game-clock minutes it lasts if nothing ends it.'),
+  minRealSeconds: z.number().min(0).optional().describe('Does not end by time before this much real (simulated) time, however fast the clock runs.'),
+  cooldownMinutes: z.number().min(0).default(0).describe('Game-clock minutes after it ends before it can be drawn again.'),
+  maxPerDay: z.number().int().min(0).default(0).describe('Most times per game-clock day (0 = no limit).'),
+  endOn: z.array(HappeningEndSchema).default(() => []).describe('Events that end it (with an outcome) as soon as they happen.'),
+});
+
+export const HappeningSchema = z.strictObject({
+  id: z.string().min(1).describe('Instance id ("h1", "h2"...).'),
+  kind: z.string().min(1).describe('The card it came from.'),
+  data: z.record(z.string(), z.unknown()).default(() => ({})).describe('Anything the game keeps with it.'),
+  since: z.number(),
+  until: z.number(),
+  minRealSeconds: z.number().min(0).optional(),
+  endOn: z.array(HappeningEndSchema).default(() => []),
+});
+
+export const HappeningsSchema = z.strictObject({
+  deck: z.array(HappeningCardSchema).default(() => []).describe('The happenings that can be drawn.'),
+  everyMinutes: z.number().positive().default(60).describe('Average game-clock minutes between happenings (each wait is 0.5–1.5×).'),
+  minGapRealSeconds: z
+    .number()
+    .min(0)
+    .default(0)
+    .describe('Real (simulated) seconds since the session started or the last one ended before a new draw, so a fast clock does not rain events.'),
+  maxPerDay: z.number().int().min(0).default(0).describe('Most happenings per game-clock day, all cards (0 = no limit).'),
+  when: z.string().optional().describe('Expression: draws only while true (e.g. "!vars.sleeping"); the clock keeps running.'),
+  current: HappeningSchema.optional().describe('The happening going on now (one at a time).'),
+  next: z.number().optional().describe('Game clock (ms) from which the next draw may happen.'),
+  history: z
+    .record(z.string(), z.strictObject({ last: z.number(), day: z.number().int(), count: z.number().int().min(0) }))
+    .default(() => ({}))
+    .describe('Per card: when it last ended and how many today.'),
+  today: z.strictObject({ day: z.number().int(), count: z.number().int().min(0) }).optional(),
+  seq: z.number().int().min(0).default(0),
+});
+
 export const PersistSchema = z.strictObject({
   key: z
     .string()
     .min(1)
-    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship, Desires) across sessions and scenes.'),
+    .describe('game.storage key where the entity keeps its individual data (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship, Desires, Happenings) across sessions and scenes.'),
 });
 
 /** Registry of all built-in components. Add new component types here. */
@@ -527,6 +575,7 @@ export const ComponentSchemas = {
   Journal: JournalSchema,
   Relationship: RelationshipSchema,
   Desires: DesiresSchema,
+  Happenings: HappeningsSchema,
   Persist: PersistSchema,
   Script: ScriptSchema,
 } as const;
@@ -565,7 +614,8 @@ export const COMPONENT_DOCS: Record<ComponentType, string> = {
   Journal: 'A chronicle of the entity: entries with category, text, importance and a dedup key ("first time it..."), capped by dropping the least important; the base of a diary.',
   Relationship: 'Bonds with others ("player", an entity id...): 0..1, earned slowly (gains shrink near the top, daily caps per reason), fading without contact toward a floor that remembers the best it was; levels with event relationship_level; bond() in expressions.',
   Desires: 'What the entity wants now ({kind, subject, data}): started by its script with a game-clock duration, at most max at once, with gaps (clock and real) and a daily limit; fulfilled automatically by a matching event (fulfillOn) or by the script, or expires; events desire_start / desire_fulfilled / desire_expired / desire_cancelled; wants() in expressions.',
-  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship, Desires) in game.storage under a key: loaded before onStart, saved when it changes.',
+  Happenings: 'Random events (a director): a deck of cards {id, weight (number or expression), when, minutes, cooldownMinutes, maxPerDay, endOn} drawn by the seed every ~everyMinutes of game clock, one at a time, with a real-time gap and a daily limit; ended by a matching event (endOn, with an outcome), by the script or by time; events happening_start / happening_end; happening() in expressions.',
+  Persist: 'Keeps the individual data of the entity (Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship, Desires, Happenings) in game.storage under a key: loaded before onStart, saved when it changes.',
   Script: 'Custom behavior in JavaScript (scripts/*.js): onStart/onUpdate/onCollision hooks with a restricted game API.',
 };
 export const COMPONENT_TYPES = Object.keys(ComponentSchemas) as ComponentType[];
@@ -601,6 +651,7 @@ export const ComponentsSchema = z.strictObject({
   Journal: JournalSchema.optional(),
   Relationship: RelationshipSchema.optional(),
   Desires: DesiresSchema.optional(),
+  Happenings: HappeningsSchema.optional(),
   Persist: PersistSchema.optional(),
   Script: ScriptSchema.optional(),
 });

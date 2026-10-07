@@ -1281,7 +1281,131 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(g.events(0, 'script_error')).toEqual([]);
   });
 
-  it('minigames:Brincar opens Pega-pega or Caixinhas with who the pet is, and the room comes back with fun, clues about its tastes, coins and a diary page', () => {
+  it('happenings: a bird, a butterfly, a find, a free sample, sneezes — each shows up in the room, the pet reacts its way, and taking part the right way pays off', () => {
+    const iso = '2026-03-10T14:00:00Z';
+    const t = Date.parse(iso);
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const make = (needs: Record<string, number> = {}, traits: Record<string, number> = {}, inventory: Record<string, number> = { bola: 1 }) => {
+      const g = new Game(load(), {
+        seed: 4, scene: 'quarto', clock: { start: iso },
+        storage: {
+          pet: {
+            version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 70, energia: 95, diversao: 50, higiene: 95, saude: 100, afeto: 60, ...needs }, sick: false,
+            asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+            wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t, provou: { maca: true },
+          },
+          petIndividuo: { version: 1, traits: { atividade: 0.5, sociabilidade: 0.5, curiosidade: 0.8, independencia: 0.3, sensibilidade: 0.3, apetite: 0.6, paciencia: 0.6, brincadeira: 0.5, ...traits }, preferences: { carinho: p(0.5) } },
+          'vibe.inventory': { default: inventory }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+        },
+      });
+      g.perform([{ type: 'wait', ms: 300 }]);
+      return g;
+    };
+    type Hap = { start(kind: string): unknown; current(): { kind: string; data: Record<string, unknown> } | null; candidates(): { id: string }[] };
+    const hap = (g: Game) => (g as unknown as { scriptRunner: { api: { entity(e: unknown): { happenings: Hap } } } }).scriptRunner.api.entity(g.entity('acontecimentos')).happenings;
+    const notes = (g: Game) => g.events(0, 'notification').map((e) => e.text as string);
+    const ended = (g: Game) => g.events(0, 'happening_end').map((e) => `${e.kind}:${e.outcome}`);
+    const story = (g: Game) => g.getState({ ids: ['pet'] }).entities[0].journal!.last.join(' | ');
+    const bond = (g: Game) => g.entity('pet')!.components.Relationship!.values.voce?.value ?? 0.2;
+
+    // What can come depends on the hour and on how it is: sneezes only when health or cleanliness are low.
+    expect(hap(make()).candidates().map((c) => c.id)).toEqual(['passarinho', 'borboleta', 'achado', 'amostra']);
+    expect(hap(make({ saude: 55 })).candidates().map((c) => c.id)).toContain('espirros');
+
+    // A bird at the window: with the curtain open the curious pet goes to see it.
+    let g = make();
+    hap(g).start('passarinho');
+    g.perform([{ type: 'wait', ms: 50 }]);
+    expect(notes(g).at(-1)).toBe('Um passarinho pousou na janela.');
+    expect(g.entity('passarinho')).toBeTruthy();
+    g.perform([{ type: 'wait', ms: 15_000 }]);
+    expect(ended(g)).toEqual(['passarinho:visto']);
+    expect(notes(g)).toContain('Mimi ficou olhando o passarinho até ele voar. Parece encantado.');
+    expect(story(g)).toContain('Viu um passarinho pousar na janela.');
+    expect(bond(g)).toBeGreaterThan(0.2);
+    // With the curtain closed it is only heard: the pet looks at the curtain; opening it lets it see.
+    g = make();
+    g.perform([{ type: 'click', entity: 'cortinaE' }, { type: 'wait', ms: 3000 }]);
+    hap(g).start('passarinho');
+    g.perform([{ type: 'wait', ms: 6000 }]);
+    expect(notes(g)).toContain('Tem um passarinho cantando lá fora.');
+    expect(notes(g)).toContain('Mimi está olhando para a cortina... parece ouvir alguma coisa lá fora.');
+    expect(ended(g)).toEqual([]);
+    g.perform([{ type: 'click', entity: 'cortinaE' }, { type: 'wait', ms: 15_000 }]);
+    expect(ended(g)).toEqual(['passarinho:visto']);
+
+    // A butterfly: clicking it guides it back out of the window.
+    g = make();
+    hap(g).start('borboleta');
+    g.perform([{ type: 'wait', ms: 50 }]);
+    expect(notes(g).at(-1)).toBe('Uma borboleta entrou pela janela!');
+    g.perform([{ type: 'wait', ms: 2000 }, { type: 'click', entity: 'borboleta' }, { type: 'wait', ms: 8000 }]);
+    expect(ended(g)).toEqual(['borboleta:solta']);
+    expect(notes(g)).toContain('A borboleta voltou lá para fora. Mimi ficou olhando ela ir.');
+
+    // A find: it digs somewhere and something shows up; clicking it is yours.
+    g = make();
+    hap(g).start('achado');
+    g.perform([{ type: 'wait', ms: 50 }]);
+    g.perform([{ type: 'wait', ms: 25_000 }]);
+    const found = hap(g).current()!.data;
+    expect(found.coisa).toBeTruthy();
+    const coinsBefore = g.economy.wallet.get('moedas');
+    g.perform([{ type: 'click', entity: 'achado' }, { type: 'wait', ms: 300 }]);
+    expect(ended(g)).toEqual(['achado:pego']);
+    if (found.coisa === 'moedas') expect(g.economy.wallet.get('moedas')).toBeGreaterThan(coinsBefore);
+    else expect(g.economy.inventory().has(String(found.coisa))).toBe(true);
+
+    // A free sample at the door: a food it never tried; opening it puts it with your food, eating it ends it well.
+    g = make({ fome: 40 });
+    hap(g).start('amostra');
+    g.perform([{ type: 'wait', ms: 50 }]);
+    const sample = String(hap(g).current()!.data.item);
+    expect(sample).not.toBe('maca'); // it already tried apples
+    expect(notes(g).at(-1)).toBe('Deixaram uma caixinha de amostra grátis na porta!');
+    g.perform([{ type: 'click', entity: 'amostra' }, { type: 'wait', ms: 300 }]);
+    expect(g.economy.inventory().has(sample)).toBe(true);
+    g.perform([{ type: 'click', entity: 'botaoPetisco' }, { type: 'wait', ms: 50 }]);
+    g.perform([{ type: 'click', entity: g.world.withTag('cartaComida').find((c) => c.components.Script!.props.item === sample)!.id }, { type: 'wait', ms: 6000 }]);
+    expect(ended(g)).toEqual(['amostra:provou']);
+
+    // Sneezes: medicine early keeps it from getting sick.
+    g = make({ saude: 55 });
+    hap(g).start('espirros');
+    g.perform([{ type: 'wait', ms: 50 }]);
+    g.perform([{ type: 'wait', ms: 500 }]);
+    expect(notes(g)).toContain('Mimi espirrou.');
+    g.perform([{ type: 'click', entity: 'botaoRemedio' }, { type: 'wait', ms: 300 }]);
+    expect(ended(g)).toEqual(['espirros:remedio']);
+    expect(notes(g)).toContain('Mimi parou de espirrar. Parece bem melhor.');
+    expect(g.world.vars.saude as number).toBeGreaterThanOrEqual(70);
+    expect(g.console.read(0, 'error')).toEqual([]);
+    expect(g.events(0, 'script_error')).toEqual([]);
+  });
+
+  it('happenings come by themselves at 1×: none in the first minutes, then now and then while it is awake', () => {
+    const iso = '2026-03-10T10:00:00Z';
+    const t = Date.parse(iso);
+    const g = new Game(load(), {
+      seed: 8, scene: 'quarto', clock: { start: iso },
+      storage: {
+        pet: {
+          version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 90, energia: 100, diversao: 80, higiene: 95, saude: 100, afeto: 80 }, sick: false,
+          asleep: false, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+          wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+        },
+        economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+      },
+    });
+    for (let i = 0; i < 4; i++) g.perform([{ type: 'wait', ms: 59_000 }]);
+    expect(g.events(0, 'happening_start')).toEqual([]); // the first 4 minutes belong to the pet
+    for (let i = 0; i < 40; i++) g.perform([{ type: 'wait', ms: 59_000 }]);
+    expect(g.events(0, 'happening_start').length).toBeGreaterThanOrEqual(1);
+    expect(g.events(0, 'happening_start').length).toBeLessThanOrEqual(4);
+    expect(g.events(0, 'script_error')).toEqual([]);
+  });
+
+  it('minigames: Brincar opens Pega-pega or Caixinhas with who the pet is, and the room comes back with fun, clues about its tastes, coins and a diary page', () => {
     const t = Date.parse('2026-03-10T14:00:00Z');
     const pet = {
       version: 2, name: 'Mimi', born: t - 5 * 3_600_000, stage: 'bebe', needs: { fome: 80, energia: 90, diversao: 40, higiene: 95, saude: 100, afeto: 60 }, sick: false,

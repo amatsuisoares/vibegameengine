@@ -301,6 +301,14 @@
       "status": "verified",
       "evidence": "teste 'waking it up...' (1º clique só mexe, 2º/3º resmunga, 4º acorda, vínculo cai, carinho recusado, come, volta a dormir depois)",
       "updatedAt": "2026-10-06T22:42:53.868Z"
+    },
+    {
+      "id": "f28",
+      "kind": "feature",
+      "text": "Acontecimentos (Happenings, entidade acontecimentos + scripts/acontecimentos.js): passarinho na janela (cortina aberta), borboleta (clicar guia para fora), achado (moedas ou item), amostra grátis (comida nunca provada), espirros (remédio cedo evita doença); a cada 12–37 min acordado, nunca nos 4 primeiros min",
+      "status": "verified",
+      "evidence": "testes 'happenings: a bird...' (cada um participado do jeito certo, cortina fechada só ouve) e 'happenings come by themselves at 1×'; playtest a 1×: borboleta natural aos 13 min com o pet ativo correndo atrás; screenshots do passarinho, achado, amostra e espirros",
+      "updatedAt": "2026-10-07T02:19:58.298Z"
     }
   ],
   "plans": []

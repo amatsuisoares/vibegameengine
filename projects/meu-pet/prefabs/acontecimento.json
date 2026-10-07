@@ -1,0 +1,9 @@
+{
+  "tags": ["acontecimento"],
+  "components": {
+    "Sprite": { "shape": "rect", "color": "#000000", "width": 44, "height": 40, "layer": 30, "opacity": 0 },
+    "Text": { "text": "", "fontSize": 28, "align": "center", "screenSpace": false, "layer": 30 },
+    "Interactable": { "action": "mexer", "via": ["click"] },
+    "Script": { "src": "scripts/acontecimentoCoisa.js" }
+  }
+}

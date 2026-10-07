@@ -125,8 +125,8 @@ export function individualErrors(c: Components, at: string): string[] {
   }
   if (c.Preferences && Object.keys(c.Preferences.learnFrom).length && !c.Memory)
     errors.push(`${at}.components.Preferences.learnFrom: learning from memories needs a Memory component`);
-  if (c.Persist && !c.Traits && !c.Preferences && !c.Routine && !c.Memory && !c.Knowledge && !c.Journal && !c.Relationship && !c.Desires)
-    errors.push(`${at}.components.Persist: nothing to keep (add Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship or Desires)`);
+  if (c.Persist && !c.Traits && !c.Preferences && !c.Routine && !c.Memory && !c.Knowledge && !c.Journal && !c.Relationship && !c.Desires && !c.Happenings)
+    errors.push(`${at}.components.Persist: nothing to keep (add Traits, Preferences, Routine, Memory, Knowledge, Journal, Relationship, Desires or Happenings)`);
   return errors;
 }
 
