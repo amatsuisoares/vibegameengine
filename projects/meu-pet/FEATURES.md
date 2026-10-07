@@ -252,11 +252,14 @@ Cada coisa do quarto põe algo no ambiente (`Ambient`, com alcance), e o pet sen
 - **Onde dorme**: na cama em uso; se ele **não gosta nada** dela (afinidade ≤ −0,45), dorme **no chão**, longe dela
   ("{n} preferiu dormir no chão, longe da cama fresquinha.", pista do gosto e página do diário). Primeira vez numa cama
   nova: "Dormiu pela primeira vez na cama quentinha." no diário.
-- **Qualidade do sono** (0..1) = 0,45 + conforto × 0,45 − luz × (0,12 + gosto por escuro × 0,45 + sensibilidade acima de 0,5
-  × 0,4) (+ um pouco para quem gosta de claridade) − ruído × (0,2 + sensibilidade × 0,7) + música × gosto por música ×
+- **Qualidade do sono** (0..1) = 0,45 + conforto × 0,45 − o peso da luz − ruído × (0,2 + sensibilidade × 0,7) + música × gosto por música ×
   0,25 + gosto pela cama × 0,2 (se gosta) − desgosto pela cama × 0,35 (se não gosta: "incomodado com a cama"). A energia recuperada por hora vai de ×0,55 a ×1,35. **Dá para ver:** bem (≥ 0,7) = "z" devagar e "{n} está
   dormindo tranquilo na cestinha fofa."; mal (< 0,4) = "~", balança e vira de lado, "{n} está dormindo mal: parece
   incomodado com a luz / o barulho." (vira evidência de gosto por escuro e de sensibilidade no diário).
+  O peso da luz segue o **jeito dele com a claridade** (seção 6e, o mesmo das reações e do diário): gosta de escuro = luz ×
+  (0,25 + gosto por escuro × 0,45 + sensibilidade acima de 0,5 × 0,4); normal (claro acordado, escuro para dormir) = luz ×
+  (0,12 + sensibilidade acima de 0,5 × 0,4); indiferente = 0; gosta de luz = a luz **ajuda** (+ luz × 0,12) — quem gosta de
+  luz nunca "dorme mal por causa da luz", mesmo sendo sensível.
 - **Cochilo** (UtilityAI `cochilar`, alvo um lugar de dormir, de dia, energia < 80, 90 s de intervalo): nota =
   (1,3 − atividade) × cansaço × (0,4 + conforto do lugar) × (1 − ruído × sensibilidade). Cochila 20–60 s reais (o
   calmo mais), recupera energia como dormindo e "{n} tirou um cochilo na cestinha fofa.".
@@ -554,8 +557,9 @@ Comida:
 ## 10d. Acontecimentos (V0.8: componente `Happenings`)
 
 De vez em quando algo quebra a rotina do quarto. Quem decide é a entidade `acontecimentos` (o "diretor", com o baralho na
-cena e o script `scripts/acontecimentos.js`): um por vez, a cada 12–37 min de relógio (média 25), nunca com ele dormindo,
-nunca nos primeiros 4 min reais da visita nem a menos de 4 min reais do anterior, até 8 por dia. Fechar o jogo no meio
+cena e o script `scripts/acontecimentos.js`): um por vez, a cada 12–37 min de relógio (média 25), nunca nos primeiros 4
+min reais da visita nem a menos de 4 min reais do anterior, até 8 por dia. Cada carta diz quando pode vir: quase todas só
+com ele acordado; a tempestade também dormindo; o pesadelo só dormindo. Fechar o jogo no meio
 guarda o acontecimento (ele volta ao abrir). Nada pune: ignorar só perde a chance.
 
 | Acontecimento | Quando / quem atrai | O que aparece | Como ele reage | Participar certo | Rende |
@@ -564,6 +568,11 @@ guarda o acontecimento (ele volta ao abrir). Nada pune: ignorar só perde a chan
 | borboleta | 9h–18h; peso 0,4 + atividade; 1 por dia | 🦋 entra pela janela e voa pelo quarto | o ativo (> 0,55) corre atrás e pula; o calmo para e olha (?) | clicar nela: ela volta para a janela e sai | diversão +5 (+10 se correu atrás), afeto +3, vínculo +0,04, diário; correr atrás já diverte mesmo sem você |
 | achado | peso 0,3 + curiosidade; 1 por dia | ele fuça debaixo da cama / atrás da planta / num canto; aparece 🪙 ou o ícone de um item que você não tem | vai até lá e fuça (❗ quando acha); se estiver ocupado, "Tem alguma coisa brilhando..." | clicar no achado: moedas ou o item para você | afeto +3, vínculo +0,03, ♥♥, diário "Achou umas moedas atrás da planta e você pegou." |
 | amostra grátis | peso 0,5; 1 por dia; só se há comida que ele nunca provou | 🎁 na porta (canto direito) | o curioso vai cheirar | clicar na caixinha (a comida vai para a sua comida) e oferecer: vale ele **provar**, gostando ou não | descoberta sem gastar; vínculo +0,03, diário |
+| tempestade | 19h–6h, acordado ou dormindo; peso 0,5; 1 por dia | chuva escorrendo na janela, clarão de raio e trovão a cada 8–16 s | o sensível (≥ 0,6) se assusta no primeiro trovão (acorda se dormia), se esconde perto da cama e treme (💧); o calmo nem acorda ("nem acordou com a tempestade") ou, curioso, olha a chuva | acalmar o assustado com duas de três: cortina fechada, luz acesa, um carinho (cada uma dá um ♥) | afeto +10, vínculo +0,06, diário "Teve medo da tempestade e você ficou com ele."; depois volta a dormir; o calmo ganha só a página ("Dormiu a tempestade inteira, sem nem acordar.") |
+| pesadelo | 22h–5h, só dormindo; peso 0,2 + sensibilidade; 1 por dia | — | acorda assustado e treme: "{n} acordou assustado no meio da noite, tremendo." | um carinho (qualquer pet aceita: é consolo, não carinho) | afeto +8, vínculo +0,05, diário "Acordou assustado de noite e você o acalmou."; volta a dormir (sem consolo também volta, mais tarde) |
+| bagunça | acordado, diversão < 45; peso (1,6 − paciência); 1 por dia | ele vai até a planta e derruba o vaso: vaso tombado, planta no chão, 2 sujeiras | o impaciente acha graça (pula); os outros levam um susto | limpar a terra (o vaso volta para o lugar) e **depois** brincar com ele (bola ou minigame) | diversão +6, afeto +5, vínculo +0,04, ♥♥, diário; só limpar: vínculo +0,01 |
+| vendedor | 9h–19h; peso 0,35; 1 por dia; dura 3 h de relógio (mín. 10 min reais) | ✨ ao lado do botão Loja (clicar abre a loja) e um brinquedo raro à venda (Ioiô 🪀 16, Bolhas de sabão 🫧 14), que só aparece assim | — | comprar o raro | o brinquedo novo (ele reage como a qualquer brinquedo novo) e uma página do diário; depois que é seu, ele fica na loja como "já é seu" |
+| presente | acordado, vínculo ≥ 0,6; peso 0,4 + sociabilidade; 1 por dia | ele busca uma flor 🌼 ou uma folhinha 🍃 na planta, ou uma pena 🪶 na janela, traz na boca e deixa perto de você | ♥ | clicar no presente | afeto +8, vínculo +0,05, ♥♥, diário "Trouxe uma flor para você."; ignorado: "parece um pouco desapontado." |
 | espirros | saúde < 70 ou higiene < 40; nunca doente | 💦 de vez em quando: "{n} espirrou." / "espirrou de novo. Talvez esteja ficando resfriado." | — | dar remédio enquanto espirra | saúde +20, vínculo +0,04, diário; sem remédio, ao passar (30 min): saúde −15 ("parou de espirrar, mas não parece muito bem.") |
 
 ## 11. Coleção ("pokédex") e novo pet
@@ -603,6 +612,7 @@ Playbooks de regressão em `playbooks/` (rodar com `run_playbooks`): `limpar_suj
 - Cenário e objetos são formas simples; não há trilha sonora; os sons são efeitos sintetizados.
 - Balanceamento é um primeiro chute: ritmos das necessidades, 12 h / 36 h para evoluir, limites de doença.
 - O pet adulto não envelhece nem muda depois de adulto; não há morte (decisão de design).
-- Um único quarto; a loja tem 15 itens e há 2 minigames (prova de conceito da arquitetura).
+- Um único quarto; a loja tem 15 itens (mais 2 brinquedos raros, só com o vendedor) e há 2 minigames (prova de conceito da
+  arquitetura).
 - Com os outros traços iguais, um pet ativo dorme ~40% do dia e um calmo ~45%: a diferença existe, mas é pequena.
 - Sem acessibilidade de teclado para as ações (só mouse, exceto digitar o nome).

@@ -1,6 +1,7 @@
 // Acontecimentos do quarto (componente Happenings da engine): de vez em quando algo quebra a rotina —
-// um passarinho na janela, uma borboleta, um achado, uma amostra grátis, espirros. A engine sorteia
-// (o baralho está na cena: um por vez, no relógio, nunca com ele dormindo, com intervalo real); aqui
+// um passarinho na janela, uma borboleta, um achado, uma amostra grátis, espirros, uma tempestade, um
+// pesadelo, uma bagunça, um vendedor, um presente. A engine sorteia (o baralho está na cena: um por vez,
+// no relógio, com intervalo real; cada carta diz quando pode vir — a maioria só com ele acordado); aqui
 // fica o que aparece, como cada jeito reage e o que é participar do jeito certo. Nada pune: ignorar só
 // perde a chance (e os espirros, se ninguém der remédio, deixam a saúde mais fraca).
 //
@@ -13,14 +14,29 @@
 //   amostra     uma caixinha na porta com uma comida que ele nunca provou — atende: abrir e oferecer
 //   espirros    ele espirra de vez em quando (a saúde ou a limpeza andam baixas) — atende: remédio cedo,
 //               que evita a doença (sem remédio, a saúde cai)
+//   tempestade  à noite: chuva na janela, raios, trovões; o sensível se assusta (acorda, se esconde perto da
+//               cama e treme) — atende: duas de três coisas: fechar a cortina, acender a luz, um carinho
+//   pesadelo    de madrugada, dormindo: acorda assustado e treme — atende: um carinho (qualquer pet aceita)
+//   bagunça     entediado ou impaciente, derruba o vaso (terra no chão) — atende: limpar e depois brincar com ele
+//   vendedor    de dia: a loja ganha por algumas horas um brinquedo raro (✨ ao lado da Loja) — comprar
+//   presente    com vínculo alto: ele busca uma flor, uma folhinha ou uma pena e deixa perto de você — aceitar
+//               (clicar)
 
 let coisa = null; // o que está na tela (passarinho, borboleta, achado, amostra)
 let st = {}; // estado do acontecimento atual nesta sessão
 let t = 0; // segundos reais desde que ele começou (ou desde que o jogo abriu com ele em curso)
 let montado = null; // id do acontecimento já montado na tela
+let extras = []; // efeitos que somem no fim (chuva, clarão)
 
 const JANELA = { x: 250, y: 140 };
 const PEITORIL = { x: 318, y: 192 };
+const VASO = { x: 905, y: 380 };
+const PLANTA = { x: 905, y: 330 };
+const PRESENTES = [
+  { icone: '🌼', frase: 'uma flor', x: 860 },
+  { icone: '🍃', frase: 'uma folhinha', x: 860 },
+  { icone: '🪶', frase: 'uma pena', x: 300 },
+];
 const LUGARES = [
   { x: 150, onde: 'debaixo da cama' },
   { x: 860, onde: 'atrás da planta' },
@@ -33,15 +49,25 @@ const api = (game) => {
 };
 const cortinaFechada = (game) => !!(game.storage.get('quarto') || {}).cortina;
 const perto = (game, x, d = 90) => Math.abs(game.entity('pet').x - x) < d;
+/** Brinquedo raro da loja agora (o do vendedor), ou null — a loja (loja.js) mostra só ele dos raros. */
+const raroNaLoja = (self) => {
+  const cur = self.happenings.current();
+  return cur && cur.kind === 'vendedor' ? cur.data.item || null : null;
+};
 
 function onStart(self, game) {
   self.state.clicou = (id) => clicou(game, self, id);
+  self.state.raroNaLoja = () => raroNaLoja(self);
   // Voltou com um acontecimento em curso (fechou o jogo no meio): monta de novo.
   const cur = self.happenings.current();
   if (cur) montar(game, self, cur, true);
 }
 
 function onEvent(self, ev, game) {
+  const cur = self.happenings.current();
+  if (cur && ev.type === 'consolo') st.consolo = true; // carinho no pet assustado (pet.js)
+  if (cur && cur.kind === 'bagunca' && ev.type === 'brincouComVoce' && cur.data.limpo) self.happenings.end('arrumado');
+  if (cur && cur.kind === 'vendedor' && ev.type === 'purchase' && ev.item === cur.data.item) self.happenings.end('comprou');
   if (ev.entity !== self.id) return;
   if (ev.type === 'happening_start') montar(game, self, ev, false);
   else if (ev.type === 'happening_end') terminar(game, self, ev);
@@ -58,6 +84,10 @@ function onUpdate(self, game, dt) {
   else if (cur.kind === 'borboleta') borboleta(game, self, p, dt, cur);
   else if (cur.kind === 'achado') achado(game, self, p, cur, dt);
   else if (cur.kind === 'espirros') espirros(game, self, p);
+  else if (cur.kind === 'tempestade') tempestade(game, self, p, dt);
+  else if (cur.kind === 'pesadelo') pesadelo(game, self, p, dt);
+  else if (cur.kind === 'bagunca') bagunca(game, self, p, cur);
+  else if (cur.kind === 'presente') presente(game, self, p, cur);
   else if (cur.kind === 'amostra' && cur.data.aberta && (p.pet.provou || {})[cur.data.item]) self.happenings.end('provou'); // provou (gostando ou não)
 }
 
@@ -123,6 +153,74 @@ function montar(game, self, ev, voltando) {
     }
   } else if (ev.kind === 'espirros') {
     st.prox = voltando ? 8 : 0;
+  } else if (ev.kind === 'tempestade') {
+    st.dormia = p.pet.asleep;
+    st.medo = p.traco('sensibilidade') >= 0.6;
+    for (let i = 0; i < 8; i++) {
+      const g = mostrar(game, `chuva${i}`, '╱', 172 + i * 22, 80 + ((i * 47) % 120), 18, -12);
+      g.get('Text').color = '#c9d6ff';
+      g.get('Interactable').enabled = false;
+      extras.push(g);
+    }
+    st.raio = voltando ? 5 : 1.5;
+    if (!voltando) p.notar('tempestade', 'Começou uma tempestade lá fora.', 0, 2);
+  } else if (ev.kind === 'pesadelo') {
+    if (!ev.data.medo && !p.pet.asleep) return self.happenings.end('nada'); // acordou antes (outra sessão)
+    if (!ev.data.medo) self.happenings.update({ medo: true });
+    p.assustar();
+    st.tremer = 3;
+    if (!voltando) p.notar('pesadelo', '{n} acordou assustado no meio da noite, tremendo.', 0, 2);
+  } else if (ev.kind === 'bagunca') {
+    if (ev.data.caido) derrubarVaso(game, true);
+  } else if (ev.kind === 'vendedor') {
+    let item = ev.data.item && game.items.get(ev.data.item);
+    if (!item) {
+      const raros = game.items.list({ category: 'brinquedo' }).filter((it) => it.props && it.props.raro && !game.inventory().has(it.id));
+      if (!raros.length) return self.happenings.end('nada'); // já tem todos
+      item = raros[Math.floor(game.random() * raros.length)];
+      self.happenings.update({ item: item.id });
+    }
+    coisa = mostrar(game, 'vendedor', '✨', 790, 82, 26, 61);
+    coisa.tween('Text.fontSize', 32, 700, { yoyo: true, repeat: -1 });
+    if (!voltando) {
+      game.playSound('sfx_guizo');
+      p.notar('vendedor', `Um vendedor passou e deixou uma novidade na loja: ${item.icon} ${item.name.toLowerCase()}, só por algumas horas.`, 0, 2);
+    }
+  } else if (ev.kind === 'presente') {
+    const g = PRESENTES.find((x) => x.icone === ev.data.icone) || PRESENTES[Math.floor(game.random() * PRESENTES.length)];
+    if (!ev.data.icone) self.happenings.update({ icone: g.icone, frase: g.frase });
+    st.presente = g;
+    if (ev.data.entregue) {
+      coisa = mostrar(game, 'presente', g.icone, ev.data.x, 462, 38, 12);
+      st.fase = 'entregue';
+    } else st.fase = 'buscar';
+  }
+}
+
+function derrubarVaso(game, ja) {
+  const vaso = game.entity('vaso');
+  const planta = game.entity('planta');
+  const ms = ja ? 1 : 450;
+  if (vaso) {
+    vaso.tween('rotation', 1.35, ms, { ease: 'easeIn' });
+    vaso.tween('y', 436, ms, { ease: 'easeIn' });
+  }
+  if (planta) {
+    planta.tween('x', PLANTA.x - 60, ms, { ease: 'easeIn' });
+    planta.tween('y', 446, ms, { ease: 'easeIn' });
+  }
+}
+
+function levantarVaso(game) {
+  const vaso = game.entity('vaso');
+  const planta = game.entity('planta');
+  if (vaso) {
+    vaso.tween('rotation', 0, 500, { ease: 'easeOut' });
+    vaso.tween('y', VASO.y, 500, { ease: 'easeOut' });
+  }
+  if (planta) {
+    planta.tween('x', PLANTA.x, 500, { ease: 'easeOut' });
+    planta.tween('y', PLANTA.y, 500, { ease: 'easeOut' });
   }
 }
 
@@ -140,6 +238,8 @@ function terminar(game, self, ev) {
   coisa = null;
   if (!p) return c && c.destroy();
   const n = ev.outcome;
+  for (const e of extras) e.destroy();
+  extras = [];
   if (ev.kind === 'passarinho') {
     sumir(c, PEITORIL.x + 120, PEITORIL.y - 80);
     if (n === 'visto') {
@@ -184,6 +284,50 @@ function terminar(game, self, ev) {
     } else if (n === 'expired' && !p.pet.sick) {
       p.premio({ saude: -15 });
       p.notar('espirrosFim', '{n} parou de espirrar, mas não parece muito bem.', 0, 1);
+    }
+  } else if (ev.kind === 'tempestade') {
+    const medo = st.medo || ev.data.medo;
+    if (n === 'acalmou') {
+      p.notar('tempestadeFim', '{n} parou de tremer. Parece mais tranquilo com você por perto.', 0, 2);
+      p.premio({ afeto: 10, vinculo: 0.06, lembrar: 'eventoBom', diario: ['evento:tempestade', 'Teve medo da tempestade e você ficou com ele.'] });
+    } else if (medo) p.notar('tempestadeFim', 'A tempestade passou. {n} demorou para parar de tremer.', 0, 1);
+    else {
+      p.notar('tempestadeFim', 'A tempestade passou.', 0, 0);
+      p.premio({ diario: ['evento:tempestade', st.dormia ? 'Dormiu a tempestade inteira, sem nem acordar.' : 'Viu a primeira tempestade e nem ligou.'] });
+    }
+    p.revelar('sensibilidade', medo ? 'alto' : 'baixo', 0.4);
+    if (medo && st.dormia) self.after(3000, () => p.voltarADormir());
+  } else if (ev.kind === 'pesadelo') {
+    if (n === 'consolado') {
+      p.notar('pesadeloFim', '{n} se acalmou com você e voltou a dormir.', 0, 2);
+      p.premio({ afeto: 8, vinculo: 0.05, lembrar: 'eventoBom', diario: ['evento:pesadelo', 'Acordou assustado de noite e você o acalmou.'] });
+      self.after(1500, () => p.voltarADormir());
+    } else if (n === 'expired') {
+      p.notar('pesadeloFim', '{n} demorou, mas voltou a dormir.', 0, 1);
+      p.voltarADormir();
+    }
+  } else if (ev.kind === 'bagunca') {
+    if (ev.data.caido) levantarVaso(game);
+    if (n === 'arrumado') {
+      p.notar('baguncaFim', '{n} parece feliz: você arrumou a bagunça e ainda brincou com ele.', 0, 2);
+      p.premio({ diversao: 6, afeto: 5, vinculo: 0.04, lembrar: 'eventoBom', festa: true, diario: ['evento:bagunca', 'Derrubou o vaso; você arrumou e ainda brincou com ele.'] });
+    } else if (ev.data.limpo) p.premio({ vinculo: 0.01 });
+  } else if (ev.kind === 'vendedor') {
+    sumir(c);
+    const item = game.items.get(String(ev.data.item));
+    if (n === 'comprou' && item) p.premio({ diario: ['evento:vendedor', `Ganhou ${item.props.artigo === 'a' ? 'uma' : 'um'} ${item.name.toLowerCase()} de um vendedor que passou.`] });
+    else if (n === 'expired') p.notar('vendedorFim', 'O vendedor foi embora; a novidade saiu da loja.', 0, 0);
+  } else if (ev.kind === 'presente') {
+    if (n === 'aceito') {
+      if (c) c.destroy();
+      p.notar('presenteFim', '{n} parece muito contente por você ter aceitado o presente.', 0, 2);
+      p.premio({ afeto: 8, vinculo: 0.05, lembrar: 'eventoBom', festa: true, diario: ['evento:presente', `Trouxe ${ev.data.frase} para você.`] });
+    } else {
+      sumir(c);
+      if (ev.data.entregue) {
+        p.notar('presenteFim', '{n} parece um pouco desapontado.', 0, 1);
+        p.reagir('?', '#ffd166');
+      }
     }
   }
   st = {};
@@ -304,6 +448,123 @@ function espirros(game, self, p) {
   else p.notar('espirro', '{n} espirrou de novo. Talvez esteja ficando resfriado.', 0, 1);
 }
 
+function tempestade(game, self, p, dt) {
+  for (const g of extras) {
+    g.y += 240 * dt;
+    g.x -= 60 * dt;
+    if (g.y > 204) {
+      g.y = 78;
+      g.x += 30;
+    }
+  }
+  st.raio -= dt;
+  if (st.raio <= 0) {
+    st.raio = 8 + game.random() * 8;
+    const flash = mostrar(game, 'clarao', '', JANELA.x, JANELA.y, 10, -12);
+    const sp = flash.get('Sprite');
+    sp.width = 176;
+    sp.height = 136;
+    sp.color = '#ffffff';
+    sp.opacity = 0.75;
+    flash.get('Interactable').enabled = false;
+    self.after(140, () => flash.destroy());
+    game.playSound('sfx_trovao');
+    if (st.medo && !st.assustou) {
+      st.assustou = true;
+      p.assustar();
+      self.after(900, () => p.irAte(120, 'sulk', 6)); // se esconde perto da cama
+      p.notar('tempestadeSusto', '{n} se assustou com o trovão e está tremendo.', 0, 2);
+    } else if (st.medo && !st.calmo) p.reagir('❗', '#e5534b');
+  }
+  if (!st.medo) {
+    if (!st.avisou && t > 5) {
+      st.avisou = true;
+      if (p.pet.asleep) p.notar('tempestadePet', '{n} nem acordou com a tempestade.', 0, 1);
+      else if (!cortinaFechada(game) && p.livre() && p.traco('curiosidade') > 0.5) {
+        p.irAte(JANELA.x + 40, 'investigate', 5);
+        p.notar('tempestadePet', '{n} está olhando a chuva pela janela.', 0, 1);
+      }
+    }
+    return;
+  }
+  if (!st.assustou) return;
+  // Tremendo até se acalmar: duas de três coisas (cortina fechada, luz acesa, um carinho).
+  st.tremer = (st.tremer || 4) - dt;
+  if (st.tremer <= 0) {
+    st.tremer = 5;
+    p.tremer();
+  }
+  const conforto = (cortinaFechada(game) ? 1 : 0) + (p.pet.lightOn ? 1 : 0) + (st.consolo ? 1 : 0);
+  if (conforto > (st.conforto || 0) && t > 3) p.reagir('♥', '#ff8fab');
+  st.conforto = Math.max(st.conforto || 0, conforto);
+  if (conforto >= 2 && t > 6) self.happenings.end('acalmou');
+}
+
+function pesadelo(game, self, p, dt) {
+  if (p.pet.asleep) return self.happenings.end('dormiu'); // voltou a dormir sozinho
+  st.tremer = (st.tremer || 0) - dt;
+  if (st.tremer <= 0) {
+    st.tremer = 5;
+    p.tremer();
+  }
+}
+
+function bagunca(game, self, p, cur) {
+  const d = cur.data;
+  if (!d.caido) {
+    if (!st.foi && p.livre()) {
+      st.foi = true;
+      p.irAte(VASO.x - 45, 'investigate', 1.5);
+    }
+    if (!(st.foi && perto(game, VASO.x - 45, 50)) && t < 40) return;
+    derrubarVaso(game, false);
+    game.playSound('sfx_limpar');
+    const sujeiras = [p.sujar(830), p.sujar(880)].filter(Boolean);
+    self.happenings.update({ caido: true, sujeiras });
+    p.notar('bagunca', '{n} derrubou o vaso da planta! Tem terra no chão.', 0, 2);
+    if (p.traco('paciencia') < 0.35) {
+      p.fazer('happy', 1.2);
+      p.revelar('paciencia', 'baixo', 0.4);
+    } else p.susto();
+    return;
+  }
+  if (!d.limpo && (d.sujeiras || []).every((id) => !game.entity(id))) {
+    self.happenings.update({ limpo: true });
+    levantarVaso(game);
+    p.notar('baguncaLimpa', 'Você arrumou o vaso. {n} está olhando para você.', 0, 1);
+  }
+}
+
+function presente(game, self, p, cur) {
+  const g = st.presente;
+  const pet = game.entity('pet');
+  if (st.fase === 'buscar') {
+    if (!st.foi && p.livre()) {
+      st.foi = true;
+      p.irAte(g.x, 'investigate', 1.2);
+    }
+    if (!st.foi && t > 60) return self.happenings.end('nada');
+    if (st.foi && perto(game, g.x, 50)) {
+      st.fase = 'trazer';
+      coisa = mostrar(game, 'presente', g.icone, pet.x, pet.y + 20, 34, 12);
+      coisa.get('Interactable').enabled = false;
+      p.irAte(470, 'greet', 8);
+    }
+  } else if (st.fase === 'trazer') {
+    coisa.x = pet.x + 45;
+    coisa.y = pet.y + 25;
+    if (perto(game, 470, 25) || t > 40) {
+      st.fase = 'entregue';
+      coisa.x = pet.x + 75;
+      coisa.y = 462;
+      coisa.get('Interactable').enabled = true;
+      self.happenings.update({ entregue: true, x: Math.round(coisa.x) });
+      p.reagir('♥', '#ff8fab');
+      p.notar('presente', `{n} trouxe ${g.frase} e deixou perto de você.`, 0, 2);
+    }
+  }
+}
+
 // ---------------------------------------------------------------- cliques
 
 function clicou(game, self, id) {
@@ -333,5 +594,11 @@ function clicou(game, self, id) {
     if (coisa) coisa.destroy();
     coisa = null;
     p.notar('amostraAberta', `Era uma amostra de ${item.name.toLowerCase()}. Está na sua comida — ${p.pet.name} nunca provou.`, 0, 2);
+  } else if (id === 'vendedor') {
+    const loja = game.entity('loja');
+    if (loja && loja.state.toggle) loja.state.toggle();
+  } else if (id === 'presente' && cur.data.entregue) {
+    game.playSound('sfx_guizo');
+    self.happenings.end('aceito');
   }
 }

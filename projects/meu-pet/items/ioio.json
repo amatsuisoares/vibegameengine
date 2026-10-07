@@ -1,0 +1,18 @@
+{
+  "name": "Ioiô",
+  "category": "brinquedo",
+  "icon": "🪀",
+  "tags": [
+    "ativo",
+    "rola"
+  ],
+  "consumable": false,
+  "price": 16,
+  "description": "Sobe e desce sem parar: só um vendedor de passagem traz.",
+  "props": {
+    "raro": true,
+    "artigo": "o",
+    "diversao": 14,
+    "lugar": 620
+  }
+}

@@ -2,7 +2,7 @@
 // compra uma unidade com moedas (game.shop.buy) e ela vai para o inventário. Clicar no painel fecha.
 // Como a bandeja, acha as cartas pela tag no mundo: ao começar (também depois de um hot reload), fecha.
 const MOEDA = 'moedas';
-const COLS = 6;
+const COLS = 7; // 3 fileiras de 7: até 21 itens no painel
 const TAG = 'cartaLoja';
 
 function onStart(self, game) {
@@ -14,6 +14,12 @@ function onStart(self, game) {
 
 // Brinquedos (não consumíveis) só se compra uma vez: depois a carta diz que já é seu (no quarto ou na caixa).
 const jaTem = (game, item) => !item.consumable && game.inventory().count(item.id) > 0;
+// Raros (props.raro) só aparecem quando um vendedor passou (acontecimentos.js) — ou se você já tem.
+function aVenda(game) {
+  const ac = game.entity('acontecimentos');
+  const raro = ac && ac.state.raroNaLoja ? ac.state.raroNaLoja() : null;
+  return game.shop.list().filter((item) => !(item.props && item.props.raro) || item.id === raro || jaTem(game, item));
+}
 const texto = (game, item) =>
   `${item.icon || '?'} ${item.name}\n${jaTem(game, item) ? 'já é seu' : `${item.price} 🪙 · tem ${game.inventory().count(item.id)}`}`;
 
@@ -24,8 +30,8 @@ function info(game, msg) {
 
 function abrir(self, game) {
   self.get('Sprite').visible = true;
-  game.shop.list().forEach((item, i) => {
-    const c = game.spawn('cartaLoja', self.x - 262 + (i % COLS) * 105, self.y - 65 + Math.floor(i / COLS) * 90);
+  aVenda(game).forEach((item, i) => {
+    const c = game.spawn('cartaLoja', self.x - 315 + (i % COLS) * 105, self.y - 110 + Math.floor(i / COLS) * 90);
     c.get('Text').text = texto(game, item);
     c.props.item = item.id;
   });

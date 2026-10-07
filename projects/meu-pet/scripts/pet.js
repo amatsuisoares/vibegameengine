@@ -355,6 +355,7 @@ function vontades(game) {
     for (const it of game.items.list({ category: 'brinquedo' })) {
       const jeito = jeitoCom(game, it.id);
       if (game.entity(it.id) || (jeito !== 'favorito' && jeito !== 'gosta')) continue;
+      if (it.props.raro && !game.inventory().has(it.id)) continue; // só aparece com o vendedor
       porTipo.brinquedo[1].push({ item: it, peso: (jeito === 'favorito' ? 2 : 1) * (game.inventory().has(it.id) ? 1 : 0.7) });
     }
   }
@@ -705,8 +706,9 @@ function luzDaLampada(game) {
 const likesTag = (tag) => me.prefs.of(tag);
 
 /**
- * Qualidade do sono (0..1) onde ele está: conforto ajuda; a luz atrapalha quem gosta de escuro (e quem é
- * sensível) e agrada um pouco quem gosta de claridade; ruído atrapalha os sensíveis; música embala quem gosta.
+ * Qualidade do sono (0..1) onde ele está: conforto ajuda; a luz segue o jeito dele com a claridade (jeitoComLuz, o
+ * mesmo das reações e do diário): atrapalha muito quem gosta de escuro, um pouco quem quer o quarto escuro para dormir,
+ * nada quem é indiferente, e embala um pouco quem gosta de luz; ruído atrapalha os sensíveis; música embala quem gosta.
  * Também diz o que mais atrapalhou, para a observação ("dormindo mal: parece incomodado com a luz").
  */
 function sono(game, at) {
@@ -714,14 +716,18 @@ function sono(game, at) {
   const escuro = me.prefs.of('escuro');
   const sens = T('sensibilidade');
   const luz = luzEm(game, at);
-  const pesoLuz = luz * (0.12 + Math.max(0, escuro) * 0.45 + Math.max(0, sens - 0.5) * 0.4) - luz * Math.max(0, -escuro) * 0.12;
+  const jeito = jeitoComLuz();
+  const pesoLuz = jeito === 'escuro' ? luz * (0.25 + Math.max(0, escuro) * 0.45 + Math.max(0, sens - 0.5) * 0.4)
+    : jeito === 'normal' ? luz * (0.12 + Math.max(0, sens - 0.5) * 0.4)
+    : 0;
+  const luzBoa = jeito === 'luz' ? luz * 0.12 : 0;
   const pesoRuido = (env.noise || 0) * (0.2 + sens * 0.7);
   const musica = (env.music || 0) * likesTag('musica') * 0.25;
   // A cama: a que ele adora embala; a que ele não gosta atrapalha.
   const onde = ondeDorme(game);
   const gostoCama = onde.id && game.items.get(onde.id) ? me.prefs.item(onde.id).score : 0;
   const pesoCama = Math.max(0, -gostoCama) * 0.35;
-  const q = 0.45 + (env.comfort || 0) * 0.45 - pesoLuz - pesoRuido + musica + Math.max(0, gostoCama) * 0.2 - pesoCama;
+  const q = 0.45 + (env.comfort || 0) * 0.45 - pesoLuz + luzBoa - pesoRuido + musica + Math.max(0, gostoCama) * 0.2 - pesoCama;
   const pior = Math.max(pesoLuz, pesoRuido, pesoCama);
   const causa = pior <= 0.15 ? null : pior === pesoLuz ? 'a luz' : pior === pesoRuido ? 'o barulho' : 'a cama';
   return { q: Math.max(0, Math.min(1, q)), causa };
@@ -730,11 +736,6 @@ function sono(game, at) {
 /** Energia recuperada por hora de sono: dorme melhor, recupera mais. Pets ativos recuperam mais rápido. */
 function sleepRate(game, at) {
   return 22 * lerp(0.55, 1.35, sono(game, at).q) * lerp(0.85, 1.25, T('atividade'));
-}
-
-/** Luz acesa à noite só incomoda quem gosta de escuro (ou é muito sensível). */
-function lightBothers() {
-  return me.prefs.of('escuro') > 0.2 || T('sensibilidade') > 0.8;
 }
 
 /** Onde ele está dormindo, para as frases (" na cama", " na cestinha fofa", " na cama quentinha"). */
@@ -1626,6 +1627,13 @@ function makeApi(game, self) {
     carinho() {
       const n = pet.needs;
       const impaciente = T('paciencia') < LOW;
+      const ac = game.entity('acontecimentos');
+      const agora = ac && ac.happenings.current();
+      if (agora && agora.data.medo && !pet.asleep) {
+        emote(game, self, '♥', '#ff8fab');
+        game.emit('consolo', { entity: me.id, de: agora.kind });
+        return;
+      }
       if (pet.asleep) {
         // O impaciente acorda na primeira; os outros, se você insistir.
         cutucadas = cutucadas.filter((t) => realTime - t < CUTUCADAS_JANELA);
@@ -1740,6 +1748,32 @@ function makeApi(game, self) {
       if (x !== undefined) self.get('Sprite').flipX = x < self.x;
     },
     reagir: (glyph, color) => emote(game, self, glyph, color),
+    /** Leva um susto (acorda, se estiver dormindo, sem o mau humor de ser acordado por você). */
+    assustar() {
+      pet.asleep = false;
+      pet.cochilando = false;
+      levouSusto(game, self);
+      mind = { act: 'sulk', t: 6 };
+    },
+    /** Assustado: treme no lugar. */
+    tremer() {
+      if (pet.asleep || mind.act === 'walk') return;
+      emote(game, self, '💧', '#9ad1ff');
+      mind = { act: 'sulk', t: 6 };
+    },
+    voltarADormir() {
+      if (!pet.asleep) go(game, xDeDormir(game), 'sleep');
+    },
+    /** Suja o chão em x (bagunça): id da sujeira, ou null se já está no máximo. */
+    sujar(x) {
+      if (pet.dirt >= 3) return null;
+      let k = 1;
+      while (game.entity(`sujeira${k}`)) k++;
+      game.spawn('sujeira', x, 452 + game.random() * 30, `sujeira${k}`);
+      pet.dirt++;
+      pet.needs.higiene = clamp(Math.min(pet.needs.higiene, [100, 69, 44, 24][pet.dirt]));
+      return `sujeira${k}`;
+    },
     susto() {
       levouSusto(game, self);
       mind = { act: 'sulk', t: 2 };

@@ -1233,6 +1233,30 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(g.events(0, 'script_error')).toEqual([]);
   });
 
+  it('sleeping with the light on follows its way with light: one that likes light (even a sensitive one) is not bothered by it; one that likes the dark sleeps badly', () => {
+    const iso = '2026-03-10T23:30:00Z';
+    const t = Date.parse(iso);
+    const sleeper = (escuro: number) => {
+      const g = new Game(load(), {
+        seed: 3, scene: 'quarto', clock: { start: iso },
+        storage: {
+          pet: {
+            version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 80, energia: 40, diversao: 60, higiene: 95, saude: 100, afeto: 60 }, sick: false,
+            asleep: true, lightOn: true, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+            wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+          },
+          petIndividuo: { version: 1, traits: { atividade: 0.5, sociabilidade: 0.5, curiosidade: 0.5, independencia: 0.5, sensibilidade: 0.9, apetite: 0.5, paciencia: 0.6, brincadeira: 0.5 }, preferences: { escuro: { innate: escuro, learned: 0, n: 0 } } },
+          economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+        },
+      });
+      g.perform([{ type: 'wait', ms: 30_000 }]);
+      return g.events(0, 'notification').map((e) => e.text as string);
+    };
+    const likesLight = sleeper(-0.8);
+    expect(likesLight.some((n) => /incomodado com a luz|claridade/.test(n))).toBe(false);
+    expect(sleeper(0.8)).toContain('Mimi está dormindo mal: parece incomodado com a luz.');
+  });
+
   it('waking it up: one poke while it sleeps only stirs it; poking again and again wakes it, grumpy for a while, and it stays awake long enough to eat', () => {
     const iso = '2026-03-10T23:30:00Z';
     const t = Date.parse(iso);
@@ -1309,7 +1333,7 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     const bond = (g: Game) => g.entity('pet')!.components.Relationship!.values.voce?.value ?? 0.2;
 
     // What can come depends on the hour and on how it is: sneezes only when health or cleanliness are low.
-    expect(hap(make()).candidates().map((c) => c.id)).toEqual(['passarinho', 'borboleta', 'achado', 'amostra']);
+    expect(hap(make()).candidates().map((c) => c.id)).toEqual(['passarinho', 'borboleta', 'achado', 'amostra', 'vendedor']);
     expect(hap(make({ saude: 55 })).candidates().map((c) => c.id)).toContain('espirros');
 
     // A bird at the window: with the curtain open the curious pet goes to see it.
@@ -1379,6 +1403,113 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(ended(g)).toEqual(['espirros:remedio']);
     expect(notes(g)).toContain('Mimi parou de espirrar. Parece bem melhor.');
     expect(g.world.vars.saude as number).toBeGreaterThanOrEqual(70);
+    expect(g.console.read(0, 'error')).toEqual([]);
+    expect(g.events(0, 'script_error')).toEqual([]);
+  });
+
+  it('more happenings: a storm and a nightmare (comfort the scared one), a mess (clean up, then play), a peddler (a rare toy for a few hours), a gift (accept it)', () => {
+    const p = (v: number) => ({ innate: v, learned: 0, n: 0 });
+    const make = (iso: string, o: { needs?: Record<string, number>; traits?: Record<string, number>; asleep?: boolean; bond?: number } = {}) => {
+      const t = Date.parse(iso);
+      const g = new Game(load(), {
+        seed: 4, scene: 'quarto', clock: { start: iso },
+        storage: {
+          pet: {
+            version: 2, name: 'Mimi', born: t - 3_600_000, stage: 'bebe', needs: { fome: 80, energia: o.asleep ? 50 : 95, diversao: 60, higiene: 95, saude: 100, afeto: 60, ...o.needs }, sick: false,
+            asleep: !!o.asleep, lightOn: !o.asleep, bowl: 3, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+            wellbeing: 80, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t,
+          },
+          petIndividuo: {
+            version: 1, traits: { atividade: 0.5, sociabilidade: 0.6, curiosidade: 0.5, independencia: 0.3, sensibilidade: 0.3, apetite: 0.5, paciencia: 0.6, brincadeira: 0.5, ...o.traits }, preferences: { carinho: p(-0.5), bola: p(0.6) },
+            ...(o.bond !== undefined && { relationship: { voce: { value: o.bond, peak: o.bond, t } } }),
+          },
+          'vibe.inventory': { default: { bola: 1 } }, quarto: { bolaDada: true, brinquedos: {} }, economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+        },
+      });
+      g.perform([{ type: 'wait', ms: 300 }]);
+      return g;
+    };
+    type Hap = { start(kind: string): unknown; current(): { kind: string; data: Record<string, unknown> } | null; candidates(): { id: string }[] };
+    const hap = (g: Game) => (g as unknown as { scriptRunner: { api: { entity(e: unknown): { happenings: Hap } } } }).scriptRunner.api.entity(g.entity('acontecimentos')).happenings;
+    const start = (g: Game, kind: string) => (hap(g).start(kind), g.perform([{ type: 'wait', ms: 50 }]));
+    const notes = (g: Game) => g.events(0, 'notification').map((e) => e.text as string);
+    const ended = (g: Game) => g.events(0, 'happening_end').map((e) => `${e.kind}:${e.outcome}`);
+    const story = (g: Game) => g.getState({ ids: ['pet'] }).entities[0].journal!.last.join(' | ');
+
+    // Night: the storm can come even while it sleeps; the nightmare only then.
+    expect(hap(make('2026-03-10T23:30:00Z', { asleep: true })).candidates().map((c) => c.id)).toEqual(['tempestade', 'pesadelo']);
+
+    // A storm and a sensitive pet: the thunder wakes it, it hides and trembles; two comforts (curtain + light) calm it.
+    let g = make('2026-03-10T23:30:00Z', { asleep: true, traits: { sensibilidade: 0.85 } });
+    start(g, 'tempestade');
+    g.perform([{ type: 'wait', ms: 3000 }]);
+    expect(g.world.vars.dormindo).toBe(false);
+    expect(notes(g)).toContain('Mimi se assustou com o trovão e está tremendo.');
+    g.perform([{ type: 'click', entity: 'cortinaE' }, { type: 'wait', ms: 500 }, { type: 'click', entity: 'lampada' }, { type: 'wait', ms: 6000 }]);
+    expect(ended(g)).toEqual(['tempestade:acalmou']);
+    expect(story(g)).toContain('Teve medo da tempestade e você ficou com ele.');
+    g.perform([{ type: 'wait', ms: 15_000 }]);
+    expect(g.world.vars.dormindo).toBe(true); // back to bed
+    // A calm one sleeps through it.
+    g = make('2026-03-10T23:30:00Z', { asleep: true, traits: { sensibilidade: 0.2 } });
+    start(g, 'tempestade');
+    g.perform([{ type: 'wait', ms: 7000 }]);
+    expect(g.world.vars.dormindo).toBe(true);
+    expect(notes(g)).toContain('Mimi nem acordou com a tempestade.');
+
+    // A nightmare: it wakes up scared; a pet calms it (even one that does not like petting) and it goes back to sleep.
+    g = make('2026-03-11T02:00:00Z', { asleep: true, traits: { sensibilidade: 0.7 } });
+    start(g, 'pesadelo');
+    expect(notes(g)).toContain('Mimi acordou assustado no meio da noite, tremendo.');
+    expect(g.world.vars.dormindo).toBe(false);
+    g.perform([{ type: 'wait', ms: 1500 }, { type: 'click', entity: 'pet' }, { type: 'wait', ms: 300 }]);
+    expect(ended(g)).toEqual(['pesadelo:consolado']);
+    g.perform([{ type: 'wait', ms: 12_000 }]);
+    expect(g.world.vars.dormindo).toBe(true);
+
+    // A mess: bored and impatient, it knocks the vase over; clean the dirt, then play with it.
+    g = make('2026-03-10T14:00:00Z', { needs: { diversao: 30 }, traits: { paciencia: 0.2 } });
+    expect(hap(g).candidates().map((c) => c.id)).toContain('bagunca');
+    start(g, 'bagunca');
+    for (let i = 0; i < 9 && !hap(g).current()!.data.caido; i++) g.perform([{ type: 'wait', ms: 5000 }]);
+    expect(notes(g)).toContain('Mimi derrubou o vaso da planta! Tem terra no chão.');
+    const dirt = hap(g).current()!.data.sujeiras as string[];
+    expect(dirt.length).toBe(2);
+    for (const id of dirt) g.perform([{ type: 'click', entity: id }, { type: 'wait', ms: 300 }]);
+    g.perform([{ type: 'wait', ms: 1000 }]);
+    expect(hap(g).current()!.data.limpo).toBe(true);
+    g.perform([{ type: 'click', entity: 'bola' }, { type: 'wait', ms: 500 }]);
+    expect(ended(g)).toEqual(['bagunca:arrumado']);
+    expect(g.entity('vaso')!.rotation).toBeCloseTo(0, 1);
+
+    // A peddler: a rare toy shows in the shop only while it is here; buying it ends it well.
+    g = make('2026-03-10T14:00:00Z');
+    const shopItems = () => g.world.withTag('cartaLoja').map((c) => String(c.components.Script!.props.item));
+    g.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 100 }]);
+    expect(shopItems()).not.toContain('ioio');
+    expect(shopItems()).not.toContain('bolhas');
+    g.perform([{ type: 'click', x: 480, y: 370 }, { type: 'wait', ms: 100 }]); // an empty spot of the panel closes it
+    start(g, 'vendedor');
+    const rare = String(hap(g).current()!.data.item);
+    expect(['ioio', 'bolhas']).toContain(rare);
+    expect(notes(g).at(-1)).toMatch(/^Um vendedor passou e deixou uma novidade na loja: /);
+    g.economy.wallet.add(40, 'moedas');
+    g.perform([{ type: 'click', entity: 'vendedor' }, { type: 'wait', ms: 100 }]); // the ✨ opens the shop
+    expect(shopItems()).toContain(rare);
+    g.perform([{ type: 'click', entity: g.world.withTag('cartaLoja').find((c) => c.components.Script!.props.item === rare)!.id }, { type: 'wait', ms: 300 }]);
+    expect(ended(g)).toEqual(['vendedor:comprou']);
+    expect(g.economy.inventory().has(rare)).toBe(true);
+
+    // A gift, when it trusts you: it fetches something and leaves it near you; clicking it accepts.
+    expect(hap(make('2026-03-10T14:00:00Z')).candidates().map((c) => c.id)).not.toContain('presente');
+    g = make('2026-03-10T14:00:00Z', { bond: 0.7 });
+    expect(hap(g).candidates().map((c) => c.id)).toContain('presente');
+    start(g, 'presente');
+    for (let i = 0; i < 10 && !hap(g).current()!.data.entregue; i++) g.perform([{ type: 'wait', ms: 3000 }]);
+    expect(notes(g).some((n) => /^Mimi trouxe (uma flor|uma folhinha|uma pena) e deixou perto de você\.$/.test(n))).toBe(true);
+    g.perform([{ type: 'click', entity: 'presente' }, { type: 'wait', ms: 300 }]);
+    expect(ended(g)).toEqual(['presente:aceito']);
+    expect(notes(g)).toContain('Mimi parece muito contente por você ter aceitado o presente.');
     expect(g.console.read(0, 'error')).toEqual([]);
     expect(g.events(0, 'script_error')).toEqual([]);
   });

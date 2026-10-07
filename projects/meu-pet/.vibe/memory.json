@@ -309,6 +309,22 @@
       "status": "verified",
       "evidence": "testes 'happenings: a bird...' (cada um participado do jeito certo, cortina fechada só ouve) e 'happenings come by themselves at 1×'; playtest a 1×: borboleta natural aos 13 min com o pet ativo correndo atrás; screenshots do passarinho, achado, amostra e espirros",
       "updatedAt": "2026-10-07T02:19:58.298Z"
+    },
+    {
+      "id": "f29",
+      "kind": "feature",
+      "text": "Mais acontecimentos: tempestade à noite (o sensível acorda e treme; acalma com 2 de 3: cortina fechada, luz acesa, carinho), pesadelo de madrugada (carinho consola), bagunça (vaso derrubado: limpar e brincar), vendedor (brinquedo raro Ioiô/Bolhas na loja por 3 h), presente com vínculo ≥ 0,6 (flor/folhinha/pena: clicar aceita)",
+      "status": "verified",
+      "evidence": "teste 'more happenings...' (cada um participado do jeito certo; o calmo dorme a tempestade; raro fora da loja sem o vendedor); screenshots da chuva na janela, do vaso caído com terra, do ✨ com o Ioiô na loja e da pena entregue",
+      "updatedAt": "2026-10-07T03:13:24.590Z"
+    },
+    {
+      "id": "i2",
+      "kind": "issue",
+      "text": "Pet que gosta de luz (sensível) aparecia dormindo mal \"incomodado com a luz\": sono() tinha regra própria de luz; agora segue jeitoComLuz",
+      "status": "verified",
+      "evidence": "teste 'sleeping with the light on follows its way with light'",
+      "updatedAt": "2026-10-07T03:21:10.150Z"
     }
   ],
   "plans": []

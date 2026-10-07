@@ -26,7 +26,8 @@
     { "id": "sfx_guizo", "type": "audio", "path": "sfx/sfx_guizo.wav" },
     { "id": "sfx_nota1", "type": "audio", "path": "sfx/sfx_nota1.wav" },
     { "id": "sfx_nota2", "type": "audio", "path": "sfx/sfx_nota2.wav" },
-    { "id": "sfx_nota3", "type": "audio", "path": "sfx/sfx_nota3.wav" }
+    { "id": "sfx_nota3", "type": "audio", "path": "sfx/sfx_nota3.wav" },
+    { "id": "sfx_trovao", "type": "audio", "path": "sfx/sfx_trovao.wav" }
   ],
   "gravity": 0,
   "pixelArt": false,

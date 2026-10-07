@@ -390,7 +390,13 @@ que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
   clicar a guia para fora), um achado (ele fuça e acha moedas ou um item que você não tem), uma amostra grátis na porta
   (uma comida que ele nunca provou) e espirros (remédio cedo evita a doença). Participar rende vínculo, diversão e página
   do diário; ignorar só perde a chance (501 testes)
-- [ ] **Fase 6 — Mais eventos e participação** (tempestade, pesadelo, bagunça, vendedor, presente)
+- [x] **Fase 6 — Mais eventos e participação**: à noite uma tempestade (chuva e raios na janela, trovão; o sensível acorda,
+  se esconde perto da cama e treme — acalma com duas de três: cortina fechada, luz acesa, carinho) e, de madrugada, um
+  pesadelo (acorda assustado; um carinho acalma, mesmo de quem não gosta de carinho, e ele volta a dormir); entediado ou
+  impaciente, ele derruba o vaso (terra no chão: limpar e depois brincar); um vendedor deixa por algumas horas um brinquedo
+  raro na loja (✨ ao lado da Loja; Ioiô e Bolhas de sabão só aparecem assim); com vínculo alto, ele traz um presente
+  (flor, folhinha ou pena) e deixa perto de você. Cada carta diz se vem com ele dormindo. A loja passou para 7 colunas
+  (as cartas vazavam do painel) (502 testes)
 - [ ] **Fase 7 — Balanceamento a 1× e avaliação**
 
 ## V0.9 — App (planejada, depois da V0.8)
