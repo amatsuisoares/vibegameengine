@@ -325,6 +325,14 @@
       "status": "verified",
       "evidence": "teste 'sleeping with the light on follows its way with light'",
       "updatedAt": "2026-10-07T03:21:10.150Z"
+    },
+    {
+      "id": "f30",
+      "kind": "feature",
+      "text": "Balanceamento a 1× (V0.8 fase 7): numa visita, um desejo antes de 2 min, depois um a cada 20–30 min; um acontecimento a cada ~25–30 min (nunca nos 4 primeiros); no máximo 9 avisos em 10 min; a volta mostra o resumo e as necessidades só depois de 20 s; o vendedor só passa (a oferta do raro fica 3 h à parte); espirros com 2–3 textos; passarinho ~20 s",
+      "status": "verified",
+      "evidence": "teste 'balance at 1×' (dois pets opostos, 90 min a 1× e a volta na manhã seguinte); simulação de 2 h; screenshots do ✨ e da loja com o raro depois do vendedor e do passarinho aos 12 s",
+      "updatedAt": "2026-10-07T16:45:45.319Z"
     }
   ],
   "plans": []

@@ -840,7 +840,7 @@
             },
             {
               "id": "espirros",
-              "weight": "(vars.saude < 70 || vars.higiene < 40) * 2",
+              "weight": "(vars.saude < 70 || vars.higiene < 25) * 1.2",
               "when": "!vars.dormindo && !vars.doente",
               "minutes": 30,
               "minRealSeconds": 240,
@@ -880,8 +880,8 @@
               "id": "vendedor",
               "weight": 0.35,
               "when": "!vars.dormindo && clock.hour >= 9 && clock.hour < 19",
-              "minutes": 180,
-              "minRealSeconds": 600,
+              "minutes": 10,
+              "minRealSeconds": 90,
               "cooldownMinutes": 1440,
               "maxPerDay": 1
             },

@@ -1343,6 +1343,8 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(notes(g).at(-1)).toBe('Um passarinho pousou na janela.');
     expect(g.entity('passarinho')).toBeTruthy();
     g.perform([{ type: 'wait', ms: 15_000 }]);
+    expect(ended(g)).toEqual([]); // it stays a while: at 1× you get to see it too
+    g.perform([{ type: 'wait', ms: 15_000 }]);
     expect(ended(g)).toEqual(['passarinho:visto']);
     expect(notes(g)).toContain('Mimi ficou olhando o passarinho até ele voar. Parece encantado.');
     expect(story(g)).toContain('Viu um passarinho pousar na janela.');
@@ -1355,7 +1357,7 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(notes(g)).toContain('Tem um passarinho cantando lá fora.');
     expect(notes(g)).toContain('Mimi está olhando para a cortina... parece ouvir alguma coisa lá fora.');
     expect(ended(g)).toEqual([]);
-    g.perform([{ type: 'click', entity: 'cortinaE' }, { type: 'wait', ms: 15_000 }]);
+    g.perform([{ type: 'click', entity: 'cortinaE' }, { type: 'wait', ms: 30_000 }]);
     expect(ended(g)).toEqual(['passarinho:visto']);
 
     // A butterfly: clicking it guides it back out of the window.
@@ -1499,6 +1501,25 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     g.perform([{ type: 'click', entity: g.world.withTag('cartaLoja').find((c) => c.components.Script!.props.item === rare)!.id }, { type: 'wait', ms: 300 }]);
     expect(ended(g)).toEqual(['vendedor:comprou']);
     expect(g.economy.inventory().has(rare)).toBe(true);
+    expect(story(g)).toMatch(/de um vendedor que passou\./);
+    // The peddler only passes by (it does not hold the turn of the others); the offer stays for 3 hours, then leaves.
+    g = make('2026-03-10T10:00:00Z');
+    start(g, 'vendedor');
+    const offered = String(hap(g).current()!.data.item);
+    g.apply({ op: 'advanceClock', ms: 15 * 60_000 });
+    g.perform([{ type: 'wait', ms: 95_000 }]);
+    expect(hap(g).current()).toBeNull();
+    expect(ended(g)).toEqual(['vendedor:expired']);
+    expect(g.entity('vendedor')).toBeTruthy(); // the ✨ is still there
+    g.perform([{ type: 'click', entity: 'vendedor' }, { type: 'wait', ms: 100 }]);
+    expect(shopItems()).toContain(offered);
+    g.perform([{ type: 'click', x: 480, y: 370 }, { type: 'wait', ms: 100 }]);
+    g.apply({ op: 'advanceClock', ms: 3 * 3_600_000 });
+    g.perform([{ type: 'wait', ms: 3000 }]);
+    expect(g.entity('vendedor')).toBeUndefined();
+    expect(notes(g)).toContain('A novidade do vendedor saiu da loja.');
+    g.perform([{ type: 'click', entity: 'botaoLoja' }, { type: 'wait', ms: 100 }]);
+    expect(shopItems()).not.toContain(offered);
 
     // A gift, when it trusts you: it fetches something and leaves it near you; clicking it accepts.
     expect(hap(make('2026-03-10T14:00:00Z')).candidates().map((c) => c.id)).not.toContain('presente');
@@ -1534,6 +1555,81 @@ describe('meu-pet (regression)', { timeout: 20_000 }, () => {
     expect(g.events(0, 'happening_start').length).toBeGreaterThanOrEqual(1);
     expect(g.events(0, 'happening_start').length).toBeLessThanOrEqual(4);
     expect(g.events(0, 'script_error')).toEqual([]);
+  });
+
+  it('balance at 1×: two opposite pets over an hour and a half (a desire soon after you arrive, a few happenings, few words), sneezes say little, and coming back does not pour notes', { timeout: 180_000 }, () => {
+    const fresh = (traits: Record<string, number>, iso: string) => {
+      const t = Date.parse(iso);
+      return {
+        pet: {
+          version: 2, name: 'Mimi', born: t - 4 * 3_600_000, stage: 'bebe', needs: { fome: 70, energia: 80, diversao: 60, higiene: 90, saude: 100, afeto: 60 }, sick: false,
+          asleep: false, lightOn: true, bowl: 1, dirt: 0, care: { brincadeiras: 0, carinhos: 0, petiscos: 0, refeicoes: 0, sonecas: 0, limpezas: 0 },
+          wellbeing: 70, treats: { day: -1, n: 0 }, revealed: {}, cooldowns: {}, lastSeen: t - 6 * 3_600_000,
+        },
+        petIndividuo: { version: 1, traits },
+        economia: { cesta: true, dia: Math.floor(t / 86_400_000) },
+      } as Record<string, unknown>;
+    };
+    // Plays at 1× in 10 s steps, keeping every event of interest (the game keeps only the latest ones).
+    const visit = (storage: Record<string, unknown>, iso: string, minutes: number, care = false) => {
+      const g = new Game(load(), { seed: 11, scene: 'quarto', clock: { start: iso }, storage });
+      const seen: GameEvent[] = [];
+      let from = 0;
+      for (let i = 0; i < minutes * 6; i++) {
+        g.perform([{ type: 'wait', ms: 10_000 }]);
+        if (care && (g.world.vars.tigela as number) < 2) g.perform([{ type: 'click', entity: 'tigela' }, { type: 'wait', ms: 50 }]);
+        if (care) for (const d of g.world.withTag('sujeira')) g.perform([{ type: 'click', entity: d.id }, { type: 'wait', ms: 50 }]);
+        seen.push(...g.events(from).filter((e) => ['notification', 'desire_start', 'happening_start', 'script_error'].includes(e.type)));
+        from = g.frame;
+      }
+      return { g, seen: [...new Map(seen.map((e) => [`${e.frame}/${e.type}/${e.kind}/${e.text}`, e])).values()] };
+    };
+    const secs = (e: GameEvent) => e.frame / 60;
+    const social = { sociabilidade: 0.9, atividade: 0.85, curiosidade: 0.9, sensibilidade: 0.8, paciencia: 0.15, independencia: 0.1, brincadeira: 0.85, apetite: 0.7 };
+    const loner = { sociabilidade: 0.1, atividade: 0.15, curiosidade: 0.15, sensibilidade: 0.1, paciencia: 0.9, independencia: 0.9, brincadeira: 0.15, apetite: 0.3 };
+    const asks: Record<string, string[]> = {};
+    for (const [who, traits] of Object.entries({ social, loner })) {
+      const { seen } = visit(fresh(traits, '2026-03-10T09:00:00Z'), '2026-03-10T09:00:00Z', 90);
+      expect(seen.filter((e) => e.type === 'script_error')).toEqual([]);
+      const desires = seen.filter((e) => e.type === 'desire_start');
+      expect(secs(desires[0])).toBeLessThan(120); // it was waiting for you
+      expect(desires.length).toBeGreaterThanOrEqual(3);
+      asks[who] = desires.map((e) => String(e.kind));
+      const happenings = seen.filter((e) => e.type === 'happening_start');
+      expect(happenings.length).toBeGreaterThanOrEqual(3); // the peddler does not hold the turn for hours
+      expect(happenings.length).toBeLessThanOrEqual(6);
+      expect(secs(happenings[0])).toBeGreaterThanOrEqual(240);
+      const notes = seen.filter((e) => e.type === 'notification');
+      expect(notes.length).toBeLessThanOrEqual(45); // ~one every two minutes on average
+      for (let m = 0; m < 90; m += 10) expect(notes.filter((e) => secs(e) >= m * 60 && secs(e) < (m + 10) * 60).length).toBeLessThanOrEqual(9);
+    }
+    // Opposite pets want opposite things: the loner asks to be left alone, the social one never does.
+    expect(asks.loner).toContain('quieto');
+    expect(asks.social).not.toContain('quieto');
+
+    // Coming back the next morning: the summary first, the needs wait a little, and it does not repeat that it missed you.
+    const evening = visit(fresh(social, '2026-03-10T18:00:00Z'), '2026-03-10T18:00:00Z', 15, true);
+    const morning = visit(evening.g.storage.snapshot(), '2026-03-11T08:00:00Z', 10);
+    const back = morning.seen.filter((e) => e.type === 'notification');
+    expect(back[0].text).toMatch(/^Você ficou fora por 14 h\. .*sentir sua falta|^Você ficou fora por 14 h\. .*sentido sua falta/);
+    const needs = ['fome', 'cansaco', 'tedio', 'saudade', 'sujo', 'tigelaVazia'];
+    expect(back.filter((e) => secs(e) < 20 && needs.includes(String(e.kind)))).toEqual([]);
+    expect(back.some((e) => secs(e) >= 20 && e.kind === 'sujo')).toBe(true); // then it does say it
+    expect(back.filter((e) => e.kind === 'saudade')).toEqual([]);
+
+    // Sneezes: the first two say so, then it is only the 💦 (and one reminder).
+    const g = new Game(load(), { seed: 5, scene: 'quarto', clock: { start: '2026-03-10T10:00:00Z' }, storage: fresh(social, '2026-03-10T10:00:00Z') });
+    g.perform([{ type: 'wait', ms: 300 }]);
+    (g as unknown as { scriptRunner: { api: { entity(e: unknown): { happenings: { start(k: string): unknown } } } } }).scriptRunner.api.entity(g.entity('acontecimentos')).happenings.start('espirros');
+    let from = 0;
+    const sneezes: string[] = [];
+    for (let i = 0; i < 60; i++) {
+      g.perform([{ type: 'wait', ms: 10_000 }]);
+      sneezes.push(...g.events(from, 'notification').filter((e) => e.kind === 'espirro').map((e) => String(e.text)));
+      from = g.frame;
+    }
+    expect(sneezes.length).toBeGreaterThanOrEqual(2);
+    expect(sneezes.length).toBeLessThanOrEqual(3);
   });
 
   it('minigames: Brincar opens Pega-pega or Caixinhas with who the pet is, and the room comes back with fun, clues about its tastes, coins and a diary page', () => {

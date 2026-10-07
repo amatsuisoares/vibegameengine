@@ -98,6 +98,8 @@ let acordadoAte = -1;
 let pedindoBola = -99; // tempo real em que foi até a bola pedir para brincar
 let lastLookBowl = -99;
 let realTime = 0;
+let calmaAte = 0; // depois do resumo da volta, as observações de necessidade esperam um pouco (sem despejar tudo junto)
+let falouDaFalta = -Infinity; // o resumo já disse que ele sentiu sua falta (tempo real)
 let proximoDesejo = 0; // tempo real a partir do qual ele pode querer algo (ver desejos)
 let balaoAlpha = 0;
 
@@ -345,7 +347,7 @@ function vontades(game) {
   const porTipo = {
     comida: [0.5 + T('apetite'), vontadesDeComida(game)],
     brinquedo: [0.2 + T('brincadeira') * 0.9, []],
-    brincar: [0.1 + (T('sociabilidade') + T('brincadeira') + T('atividade')) / 3, []],
+    brincar: [0.1 + ((T('sociabilidade') + T('brincadeira') + T('atividade')) / 3) * 1.5, []], // o sociável chama você mais
     carinho: [Math.max(0, T('sociabilidade') * 1.2 - T('independencia') * 0.6), []],
     quieto: [Math.max(0, T('independencia') - 0.55) * 2.5, []],
     ambiente: [0.2 + T('sensibilidade'), []],
@@ -1022,6 +1024,8 @@ function awaySummary(game, hours, s) {
   if (s.comeu) parts.push('comeu da tigela');
   if (pet.needs.afeto < 30) parts.push('parece ter sentido sua falta');
   const what = parts.length ? `. ${pet.name} ${parts.join(', ').replace(/, ([^,]*)$/, ' e $1')}` : '';
+  calmaAte = realTime + 20;
+  if (pet.needs.afeto < 30) falouDaFalta = realTime;
   observe(game, 'fora', `Você ficou fora por ${duration(hours)}${what}.`);
 }
 
@@ -1338,7 +1342,7 @@ function arrive(game, self, then) {
     mind = { act: 'greet', t: 3 };
     reveal('sociabilidade', 'alto');
     reveal('independencia', 'baixo');
-    if (n.afeto < 40) observe(game, 'saudade', '{n} parece estar com saudade de você.', 90);
+    if (n.afeto < 40 && realTime - falouDaFalta > 600) observe(game, 'saudade', '{n} parece estar com saudade de você.', 90);
   } else if (then === 'toy') {
     comecarBrincar(game, self, mind.what);
   } else if (then === 'chase') {
@@ -2615,10 +2619,11 @@ function checkObservations(game, self) {
   const awake = !pet.asleep;
   if (pet.sick && observe(game, 'doente', '{n} não parece estar se sentindo bem.', 90, 0)) return emote(game, self, '~', '#9fd8a4');
   // Observações só contam o que se vê; decidir o que fazer é da UtilityAI (decide).
+  if (realTime < calmaAte) return;
   if (awake && n.fome < 30 && observe(game, 'fome', '{n} parece estar com fome.', 90, 0)) return;
   if (awake && n.energia < 20 && observe(game, 'cansaco', n.energia < 10 ? '{n} parece estar muito cansado.' : '{n} está ficando cansado.', 90, 0)) return;
   if (awake && n.diversao < 30 && observe(game, 'tedio', '{n} parece entediado.', 120, 0)) return;
-  if (awake && n.afeto < 30 && observe(game, 'saudade', '{n} parece estar com saudade de você.', 120, 0)) return;
+  if (awake && n.afeto < 30 && realTime - falouDaFalta > 600 && observe(game, 'saudade', '{n} parece estar com saudade de você.', 120, 0)) return;
   if (n.higiene < 30 && observe(game, 'sujo', '{n} parece incomodado com a sujeira.', 120, 0)) return;
   if (awake && Math.min(n.fome, n.energia, n.diversao, n.higiene, n.afeto) > 80 && observe(game, 'feliz', '{n} parece muito feliz!', 180, 0)) {
     ganhar(game, 2, 'feliz');

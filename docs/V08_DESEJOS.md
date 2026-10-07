@@ -120,4 +120,41 @@ ficou com ele."). Mal resolvidos ou ignorados: só a chance perdida (sem puniç�
 | 4 ✅ | — | desejos de brinquedo, brincar com você, carinho, ficar quieto, ambiente; quem deseja o quê pela personalidade |
 | 5 ✅ | `Happenings` (baralho, sorteio no relógio, um por vez) | passarinho, borboleta, achado, amostra grátis, espirros |
 | 6 ✅ | — | tempestade, pesadelo, bagunça, vendedor, presente; participação certa por jeito e prêmios |
-| 7 | — | balanceamento a 1× (o que acontece numa visita de 5 min, numa de 30 min, voltando no dia seguinte), avaliação com dois pets opostos |
+| 7 ✅ | — | balanceamento a 1× (o que acontece numa visita de 5 min, numa de 30 min, voltando no dia seguinte), avaliação com dois pets opostos |
+
+## 7. Avaliação (fase 7)
+
+Simulação a 1× (o jogo rodando em passos de 10 s, o jogador só olhando) com dois pets opostos: **Sociável** (sociável,
+ativo, curioso, sensível, impaciente) e **Solitário** (independente, calmo, pouco curioso, paciente). O teste
+"balance at 1×" (`packages/server/test/meu-pet.test.ts`) guarda os números abaixo como limites.
+
+**Visita de 5 min.** O resumo da volta, um desejo antes dos 2 min (o Sociável aos 51 s, chamando para brincar; o
+Solitário aos 1:39, pedindo para ficar quieto) e algumas observações do jeito dele. Nenhum acontecimento nos 4
+primeiros minutos; às vezes um logo depois. Os dois pets já parecem diferentes nesse tempo.
+
+**Visita de 30 min.** Dois desejos e um acontecimento em média. O Sociável fala mais (claridade, saudade, tigela) e
+pede coisas diferentes (brincar, maçã, pelúcia); o Solitário quase só se mostra pelo "ficar quieto" e pelo jeito
+diante dos acontecimentos (olha a borboleta em vez de correr atrás).
+
+**Visita de 2 h.** 4–6 desejos (um a cada 20–30 min, cada um esperando 10–45 min) e 4 acontecimentos (vendedor,
+passarinho, achado, borboleta). ~45 avisos no Sociável e ~25 no Solitário, nunca mais que 9 em 10 min.
+
+**Voltar na manhã seguinte** (tigela cheia e quarto limpo na véspera): o resumo ("Você ficou fora por 14 h…"), a
+moeda do dia e, se for o caso, a evolução; as necessidades aparecem depois de 20 s, uma por vez; um desejo no
+primeiro minuto e meio; um acontecimento perto dos 4 min (uma amostra grátis).
+
+**O que estava errado e foi corrigido**
+
+| Problema (visto na simulação) | Correção |
+|---|---|
+| O vendedor ocupava a vez dos acontecimentos por 3 h: numa visita de 2 h, só ele | o acontecimento é só ele passando (10 min); a oferta do raro fica 3 h guardada à parte (storage `vendedor`), com o ✨ ao lado da Loja; a compra dá a página do diário |
+| Espirros: um aviso a cada ~35 s por 10 min | texto no 1º e no 2º espirro e uma lembrança no 8º; o resto é só o 💦 |
+| Espirros quase toda manhã (higiene < 40 depois de uma noite) | só com higiene < 25 (ou saúde < 70), peso 1,2 |
+| O passarinho acabava 6 s depois que ele chegava na janela (a 1× nem dava para ver) | fica ~20 s depois que ele o vê |
+| A volta despejava 5–9 avisos em 20 s (resumo, moedas, evolução, saudade, tédio, sujeira, fome…) | as observações de necessidade esperam 20 s depois do resumo; "saudade" não repete o resumo por 10 min |
+| O Sociável chamava para brincar tanto quanto o Solitário | o peso de "brincar" pela sociabilidade/atividade/brincadeira subiu (×1,5) |
+
+**O que fica como está:** o "incomodado com a claridade" volta a cada 30 min enquanto o quarto continua errado (é a
+pista do que fazer); um jogador que só olha vê o afeto do Sociável cair (ele pede e desiste) e o do Solitário ficar
+bem — é o jeito de cada um. Longe por quase um dia sem encher a tigela, ele volta com fome, sujo e às vezes doente
+(sem morte, como antes).

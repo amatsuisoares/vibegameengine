@@ -357,7 +357,7 @@ Análise e arquitetura em `docs/V07_INDIVIDUOS.md`. Sistemas genéricos na engin
   em 36 h para 4 em ~2 min; história inteira no diário em páginas; "sociável"; observações que dizem do quê; contração
   nos gostos que mudam; preferido já sabido não repete; resumo das Caixinhas conta quando o pet não esperou (480 testes)
 
-## V0.8 — Desejos, eventos e vínculo (em andamento)
+## V0.8 — Desejos, eventos e vínculo (concluída)
 O pet passa a querer coisas e acontecimentos quebram a rotina; atender e participar do jeito certo aumenta o vínculo,
 que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
 
@@ -397,7 +397,12 @@ que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
   raro na loja (✨ ao lado da Loja; Ioiô e Bolhas de sabão só aparecem assim); com vínculo alto, ele traz um presente
   (flor, folhinha ou pena) e deixa perto de você. Cada carta diz se vem com ele dormindo. A loja passou para 7 colunas
   (as cartas vazavam do painel) (502 testes)
-- [ ] **Fase 7 — Balanceamento a 1× e avaliação**
+- [x] **Fase 7 — Balanceamento a 1× e avaliação**: visitas simuladas a 1× (5 min, 30 min, 2 h, voltar na manhã
+  seguinte) com dois pets opostos; corrigido: o vendedor ocupava a vez dos outros acontecimentos por 3 h (agora só passa;
+  a oferta do raro fica 3 h guardada à parte, com o ✨), os espirros davam um aviso a cada ~35 s (agora dois e uma
+  lembrança) e vinham quase toda manhã (só com higiene bem baixa), o passarinho acabava em 6 s (agora ~20 s depois que
+  ele o vê), a volta despejava 5–9 avisos em segundos (as necessidades esperam 20 s e a "saudade" não repete o resumo),
+  o pet sociável chama você para brincar mais. Avaliação em `docs/V08_DESEJOS.md` §7 (504 testes)
 
 ## V0.9 — App (planejada, depois da V0.8)
 Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` (Capacitor). Análise e fases em

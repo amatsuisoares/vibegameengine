@@ -18,7 +18,8 @@
 //               cama e treme) — atende: duas de três coisas: fechar a cortina, acender a luz, um carinho
 //   pesadelo    de madrugada, dormindo: acorda assustado e treme — atende: um carinho (qualquer pet aceita)
 //   bagunça     entediado ou impaciente, derruba o vaso (terra no chão) — atende: limpar e depois brincar com ele
-//   vendedor    de dia: a loja ganha por algumas horas um brinquedo raro (✨ ao lado da Loja) — comprar
+//   vendedor    de dia: a loja ganha por 3 h um brinquedo raro (✨ ao lado da Loja) — comprar. O acontecimento
+//               em si é curto (o vendedor passando); a oferta fica guardada à parte (storage "vendedor")
 //   presente    com vínculo alto: ele busca uma flor, uma folhinha ou uma pena e deixa perto de você — aceitar
 //               (clicar)
 
@@ -27,6 +28,8 @@ let st = {}; // estado do acontecimento atual nesta sessão
 let t = 0; // segundos reais desde que ele começou (ou desde que o jogo abriu com ele em curso)
 let montado = null; // id do acontecimento já montado na tela
 let extras = []; // efeitos que somem no fim (chuva, clarão)
+let brilho = null; // ✨ ao lado da Loja enquanto a oferta do vendedor vale
+const OFERTA_HORAS = 3;
 
 const JANELA = { x: 250, y: 140 };
 const PEITORIL = { x: 318, y: 192 };
@@ -50,14 +53,37 @@ const api = (game) => {
 const cortinaFechada = (game) => !!(game.storage.get('quarto') || {}).cortina;
 const perto = (game, x, d = 90) => Math.abs(game.entity('pet').x - x) < d;
 /** Brinquedo raro da loja agora (o do vendedor), ou null — a loja (loja.js) mostra só ele dos raros. */
-const raroNaLoja = (self) => {
-  const cur = self.happenings.current();
-  return cur && cur.kind === 'vendedor' ? cur.data.item || null : null;
+const raroNaLoja = (game) => {
+  const o = game.storage.get('vendedor');
+  return o && game.clock.now < o.ate && !game.inventory().has(o.item) ? o.item : null;
 };
+
+/** O ✨ acompanha a oferta (que dura mais que o acontecimento); comprou: página do diário; venceu: um aviso discreto. */
+function cuidarDaOferta(game, self, p) {
+  const item = raroNaLoja(game);
+  if (item && !brilho) {
+    brilho = mostrar(game, 'vendedor', '✨', 790, 82, 26, 61);
+    brilho.tween('Text.fontSize', 32, 700, { yoyo: true, repeat: -1 });
+  } else if (!item && brilho) {
+    sumir(brilho);
+    brilho = null;
+  }
+  const o = game.storage.get('vendedor');
+  if (o && !item && p) {
+    game.storage.remove('vendedor');
+    const comprado = game.items.get(o.item);
+    if (!game.inventory().has(o.item)) p.notar('vendedorFim', 'A novidade do vendedor saiu da loja.', 0, 1);
+    else if (comprado) {
+      p.premio({ diario: ['evento:vendedor', `Ganhou ${comprado.props.artigo === 'a' ? 'uma' : 'um'} ${comprado.name.toLowerCase()} de um vendedor que passou.`] });
+      const cur = self.happenings.current();
+      if (cur && cur.kind === 'vendedor') self.happenings.end('comprou');
+    }
+  }
+}
 
 function onStart(self, game) {
   self.state.clicou = (id) => clicou(game, self, id);
-  self.state.raroNaLoja = () => raroNaLoja(self);
+  self.state.raroNaLoja = () => raroNaLoja(game);
   // Voltou com um acontecimento em curso (fechou o jogo no meio): monta de novo.
   const cur = self.happenings.current();
   if (cur) montar(game, self, cur, true);
@@ -67,7 +93,6 @@ function onEvent(self, ev, game) {
   const cur = self.happenings.current();
   if (cur && ev.type === 'consolo') st.consolo = true; // carinho no pet assustado (pet.js)
   if (cur && cur.kind === 'bagunca' && ev.type === 'brincouComVoce' && cur.data.limpo) self.happenings.end('arrumado');
-  if (cur && cur.kind === 'vendedor' && ev.type === 'purchase' && ev.item === cur.data.item) self.happenings.end('comprou');
   if (ev.entity !== self.id) return;
   if (ev.type === 'happening_start') montar(game, self, ev, false);
   else if (ev.type === 'happening_end') terminar(game, self, ev);
@@ -76,6 +101,7 @@ function onEvent(self, ev, game) {
 function onUpdate(self, game, dt) {
   const cur = self.happenings.current();
   const p = api(game);
+  cuidarDaOferta(game, self, p);
   if (!cur || !p) return;
   if (montado !== cur.id) montar(game, self, cur, false); // começou neste frame (o evento chega depois)
   if (!self.happenings.current()) return;
@@ -179,9 +205,8 @@ function montar(game, self, ev, voltando) {
       if (!raros.length) return self.happenings.end('nada'); // já tem todos
       item = raros[Math.floor(game.random() * raros.length)];
       self.happenings.update({ item: item.id });
+      game.storage.set('vendedor', { item: item.id, ate: game.clock.now + OFERTA_HORAS * 3_600_000 });
     }
-    coisa = mostrar(game, 'vendedor', '✨', 790, 82, 26, 61);
-    coisa.tween('Text.fontSize', 32, 700, { yoyo: true, repeat: -1 });
     if (!voltando) {
       game.playSound('sfx_guizo');
       p.notar('vendedor', `Um vendedor passou e deixou uma novidade na loja: ${item.icon} ${item.name.toLowerCase()}, só por algumas horas.`, 0, 2);
@@ -313,10 +338,7 @@ function terminar(game, self, ev) {
       p.premio({ diversao: 6, afeto: 5, vinculo: 0.04, lembrar: 'eventoBom', festa: true, diario: ['evento:bagunca', 'Derrubou o vaso; você arrumou e ainda brincou com ele.'] });
     } else if (ev.data.limpo) p.premio({ vinculo: 0.01 });
   } else if (ev.kind === 'vendedor') {
-    sumir(c);
-    const item = game.items.get(String(ev.data.item));
-    if (n === 'comprou' && item) p.premio({ diario: ['evento:vendedor', `Ganhou ${item.props.artigo === 'a' ? 'uma' : 'um'} ${item.name.toLowerCase()} de um vendedor que passou.`] });
-    else if (n === 'expired') p.notar('vendedorFim', 'O vendedor foi embora; a novidade saiu da loja.', 0, 0);
+    // A oferta continua (cuidarDaOferta); a página do diário vem na compra (onEvent).
   } else if (ev.kind === 'presente') {
     if (n === 'aceito') {
       if (c) c.destroy();
@@ -360,14 +382,16 @@ function passarinho(game, self, p, dt) {
       p.notar('passarinhoSusto', '{n} se assustou com o passarinho na janela.', 0, 2);
       self.after(1500, () => p.irAte(720, 'idle', 3)); // e se afasta da janela
     } else {
-      p.irAte(PEITORIL.x - 30, p.traco('atividade') > 0.65 ? 'happy' : 'investigate', 6);
+      p.irAte(PEITORIL.x - 30, p.traco('atividade') > 0.65 ? 'happy' : 'investigate', 12);
       if (p.traco('curiosidade') > 0.6) p.reagir('❗', '#ffd166');
     }
   }
-  // Ver: perto da janela (o assustado, de longe) com a cortina aberta.
-  if (st.viu && (st.medo || perto(game, PEITORIL.x, 120))) {
+  // Ver: chegou perto da janela (o assustado, de longe) com a cortina aberta; o passarinho ainda fica um
+  // pouco (tempo de você ver também, a 1×).
+  if (st.viu && (st.medo || perto(game, PEITORIL.x, 120))) st.olhou = true;
+  if (st.olhou) {
     st.visto = (st.visto || 0) + dt;
-    if (st.visto >= 6) self.happenings.end('visto');
+    if (st.visto >= 20) self.happenings.end('visto');
   }
 }
 
@@ -445,7 +469,8 @@ function espirros(game, self, p) {
   if (p.livre()) p.fazer('sulk', 0.8);
   st.vezes = (st.vezes || 0) + 1;
   if (st.vezes === 1) p.notar('espirro', '{n} espirrou.', 0, 2);
-  else p.notar('espirro', '{n} espirrou de novo. Talvez esteja ficando resfriado.', 0, 1);
+  else if (st.vezes === 2) p.notar('espirro', '{n} espirrou de novo. Talvez esteja ficando resfriado.', 0, 1);
+  else if (st.vezes === 8) p.notar('espirro', '{n} continua espirrando.', 0, 0);
 }
 
 function tempestade(game, self, p, dt) {
@@ -568,6 +593,12 @@ function presente(game, self, p, cur) {
 // ---------------------------------------------------------------- cliques
 
 function clicou(game, self, id) {
+  if (id === 'vendedor') {
+    // O ✨ vale enquanto a oferta vale (mais que o acontecimento): abre a loja.
+    const loja = game.entity('loja');
+    if (loja && loja.state.toggle) loja.state.toggle();
+    return;
+  }
   const cur = self.happenings.current();
   const p = api(game);
   if (!cur || !p) return;
@@ -594,9 +625,6 @@ function clicou(game, self, id) {
     if (coisa) coisa.destroy();
     coisa = null;
     p.notar('amostraAberta', `Era uma amostra de ${item.name.toLowerCase()}. Está na sua comida — ${p.pet.name} nunca provou.`, 0, 2);
-  } else if (id === 'vendedor') {
-    const loja = game.entity('loja');
-    if (loja && loja.state.toggle) loja.state.toggle();
   } else if (id === 'presente' && cur.data.entregue) {
     game.playSound('sfx_guizo');
     self.happenings.end('aceito');
