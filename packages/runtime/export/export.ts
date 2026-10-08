@@ -18,6 +18,8 @@ export interface ExportResult {
   /** Files written (relative to outDir). */
   files: string[];
   assets: number;
+  /** Project folder name, window title and viewport size (for the app shells). */
+  game: { name: string; title: string; width: number; height: number };
 }
 
 export function defaultExportDir(projectDir: string) {
@@ -72,5 +74,6 @@ export async function exportWeb(projectDir: string, outDir = defaultExportDir(pr
     copyFileSync(from, to);
     assets++;
   }
-  return { outDir, files: listFiles(outDir), assets };
+  const { width, height } = status.project.config;
+  return { outDir, files: listFiles(outDir), assets, game: { name, title: game.title, width, height } };
 }

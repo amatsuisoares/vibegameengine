@@ -17,6 +17,7 @@ const USAGE = `Usage: npm run vibe -- <command>
   undo <project> | redo <project>
   export <project> [outDir]               static web build that plays the game with no dev server
                                           (default: build/<project>/web)
+  package desktop <project> [outDir]      Windows app (Electron): installer + portable .exe in build/<project>/desktop/dist
 
 <project> is a folder name under projects/ or a path.
 Examples:
@@ -121,6 +122,17 @@ async function main(argv: string[]): Promise<number> {
       const { exportWeb } = await import('../../runtime/export/export');
       const r = await exportWeb(store.dir, rest[1]);
       print(`Exported to ${r.outDir}: ${r.files.length} files (${r.assets} assets)`);
+      return 0;
+    }
+    case 'package': {
+      if (rest[0] !== 'desktop') {
+        console.log(USAGE);
+        return 1;
+      }
+      const store = openStore(rest[1]);
+      const { packageDesktop } = await import('../../runtime/export/desktop');
+      const r = await packageDesktop(store.dir, { outDir: rest[2] });
+      print([`Desktop app in ${r.appDir}`, ...r.executables.map((f) => `  ${f}`)].join('\n'));
       return 0;
     }
     case 'undo':

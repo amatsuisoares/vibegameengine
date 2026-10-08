@@ -425,7 +425,13 @@ Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` 
   também em `touchend`/`click` (iOS) e suspenso com o app no fundo; página sem zoom, rolagem, seleção nem
   puxar-para-recarregar (`touch-action: none`); celular em pé com jogo deitado mostra “gire o aparelho”. E2e com
   toque emulado: tocar, digitar o nome no teclado virtual, Enter, teclado fecha (515 testes + 28 e2e)
-- [ ] **Fase 4 — Desktop (Electron)**: `vibe package desktop` → `.exe`
+- [x] **Fase 4 — Desktop (Electron)**: `npm run vibe -- package desktop <projeto>` → `build/<projeto>/desktop/dist`
+  com o instalador (`<Nome> Setup 1.0.0.exe`) e o portátil (`<Nome> 1.0.0.exe`), ~115 MB cada (electron-builder,
+  reaproveitando o Electron do `node_modules`). Casca `runtime/desktop/main.cjs`: jogo servido por `app://game/`
+  (origem própria, CSP só do app), janela do tamanho do jogo, sem menu, F11 tela cheia, uma instância só; save em
+  arquivos JSON em `%APPDATA%/<Nome>/save` (gravação atômica, IPC síncrono para o último save ao fechar), entregue
+  ao player pelo `preload.cjs` como `window.__vibeSaveBackend`. E2e abre o Electron de verdade (Playwright
+  `_electron`): nomeia o pet, fecha, confere o arquivo, abre de novo e o pet continua (516 testes + 29 e2e)
 - [ ] **Fase 5 — Android (Capacitor)**: `vibe package android` → `.apk` (requer Android Studio)
 - [ ] **Fase 6 — Polimento**: ícone e nome do app pelo projeto, tela de carregamento, guia de como gerar, playtest
 

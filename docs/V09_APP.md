@@ -70,6 +70,6 @@ o `Runtime` e os módulos de `packages/runtime/src`. Nada no app fala com o dev 
 | 1 ✅ | análise e arquitetura (este documento) | — |
 | 2 ✅ | player standalone + `vibe export` + `SaveStore` (localStorage) + escala/letterbox | e2e: abre a pasta exportada num servidor estático qualquer, joga, recarrega e o save continua; nenhuma chamada a `/api` |
 | 3 ✅ | celular no navegador: teclado virtual para texto, som no primeiro toque, paisagem, gestos desligados, salvar ao ir para o fundo | e2e com emulação de toque (Playwright mobile) digitando o nome; screenshot em tela de celular |
-| 4 | desktop: Electron + electron-builder, `vibe package desktop` | `.exe` gerado, abre o jogo, save sobrevive a fechar e abrir |
+| 4 ✅ | desktop: Electron + electron-builder, `vibe package desktop` | `.exe` gerado, abre o jogo, save sobrevive a fechar e abrir |
 | 5 | Android: Capacitor + Preferences + Gradle, `vibe package android` (precisa do Android Studio instalado) | `.apk` instalado no celular (ou emulador), nome, jogar, fechar, voltar outro dia |
 | 6 | polimento: ícones e nome do app a partir do projeto, tela de carregamento, docs (README de como gerar), playtest nos dois aparelhos | — |

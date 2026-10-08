@@ -411,6 +411,13 @@ app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶
   (`src/text-field.ts`) focar um `<input>` invisível ao fim de um toque — só assim o teclado virtual abre —, e o que
   é digitado nele entra como texto digitado normal; a página desliga os gestos do navegador e pede para girar o
   aparelho quando o jogo é deitado e a tela está em pé.
+- **App desktop** (V0.9, `runtime/desktop/` + `runtime/export/desktop.ts`): `npm run vibe -- package desktop <projeto>`
+  exporta para `build/<projeto>/desktop/app/web`, junta a casca Electron (`main.cjs` + `preload.cjs` +
+  `game.json` com nome, título e tamanho) e roda o electron-builder (`nsis` + `portable`, Electron do
+  `node_modules`). O `main.cjs` serve `web/` pelo protocolo `app://game/` (origem real para módulos e `fetch`, CSP
+  restrita), abre uma janela do tamanho do jogo sem menu (F11 = tela cheia) e grava o save em arquivos de
+  `<userData>/save` por IPC síncrono; o `preload.cjs` expõe isso como `window.__vibeSaveBackend`, que o player usa
+  no lugar do `localStorage`. `VIBE_USER_DATA` troca a pasta de dados (testes).
 
 ## ProjectStore e tools (`packages/server`)
 
