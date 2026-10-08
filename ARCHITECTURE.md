@@ -418,6 +418,12 @@ app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶
   restrita), abre uma janela do tamanho do jogo sem menu (F11 = tela cheia) e grava o save em arquivos de
   `<userData>/save` por IPC síncrono; o `preload.cjs` expõe isso como `window.__vibeSaveBackend`, que o player usa
   no lugar do `localStorage`. `VIBE_USER_DATA` troca a pasta de dados (testes).
+- **App Android** (V0.9, `runtime/export/android.ts`): `npm run vibe -- package android <projeto>` exporta para
+  `build/<projeto>/android/web`, escreve `package.json` (Capacitor core/android/preferences, resolvidos no
+  `node_modules` da raiz) e `capacitor.config.json`, roda `cap add android`, adapta o projeto Gradle (Gradle 9.1 para
+  o Java 25 do Android Studio, `screenOrientation` pela proporção do jogo, `MainActivity` em tela cheia) e roda
+  `gradlew assembleDebug` (JDK e SDK achados em `JAVA_HOME`/`ANDROID_HOME` ou nos lugares padrão do Android Studio).
+  No aparelho, o player usa `capacitorPreferencesBackend` (`src/save-store.ts`) direto na ponte nativa.
 
 ## ProjectStore e tools (`packages/server`)
 

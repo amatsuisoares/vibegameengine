@@ -6,6 +6,7 @@
 import { audioVoices, type ClockOptions } from '@vibe/engine';
 import {
   AssetStore,
+  capacitorPreferencesBackend,
   attachDomInput,
   attachTextField,
   createVibeApi,
@@ -16,6 +17,7 @@ import {
   SaveStore,
   SoundPlayer,
   webStorageBackend,
+  type CapacitorBridge,
   type KeyValueBackend,
   type VibeApi,
 } from '@vibe/runtime';
@@ -28,6 +30,8 @@ declare global {
     __vibeError?: string[];
     /** A host (the Android app) can set where the save goes before the page loads; default: localStorage. */
     __vibeSaveBackend?: KeyValueBackend;
+    /** Injected by the Android app (Capacitor native bridge). */
+    Capacitor?: CapacitorBridge;
   }
 }
 
@@ -54,7 +58,9 @@ async function main() {
   const assets = new AssetStore(project.config.assets, ASSETS, loadHtmlImage);
   const report = await assets.loadAll();
 
-  const store = new SaveStore(window.__vibeSaveBackend ?? webStorageBackend(localStorage), `vibe:${game.name}`, { onError: (m) => console.warn(m) });
+  // Where the save lives: the desktop app's files, the Android app's Preferences, else localStorage.
+  const backend = window.__vibeSaveBackend ?? capacitorPreferencesBackend(window.Capacitor) ?? webStorageBackend(localStorage);
+  const store = new SaveStore(backend, `vibe:${game.name}`, { onError: (m) => console.warn(m) });
   const saved = await store.load();
   let storage = saved.storage;
   let slots = saved.slots;
@@ -120,6 +126,7 @@ async function main() {
     if (document.visibilityState === 'hidden') void store.flush();
   });
   addEventListener('pagehide', () => void store.flush());
+  document.addEventListener('pause', () => void store.flush()); // Capacitor: the Android app went to the background
 
   window.__vibe = createVibeApi(runtime, game.name);
   runtime.start();

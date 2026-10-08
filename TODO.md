@@ -432,7 +432,14 @@ Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` 
   arquivos JSON em `%APPDATA%/<Nome>/save` (gravação atômica, IPC síncrono para o último save ao fechar), entregue
   ao player pelo `preload.cjs` como `window.__vibeSaveBackend`. E2e abre o Electron de verdade (Playwright
   `_electron`): nomeia o pet, fecha, confere o arquivo, abre de novo e o pet continua (516 testes + 29 e2e)
-- [ ] **Fase 5 — Android (Capacitor)**: `vibe package android` → `.apk` (requer Android Studio)
+- [x] **Fase 5 — Android (Capacitor)**: `npm run vibe -- package android <projeto>` → `build/<projeto>/android/<slug>.apk`
+  (APK de debug, ~9 MB; 1º build ~1,5 min baixando o Gradle, depois ~20 s). Gera o projeto Capacitor 8 (`cap add
+  android`), troca o Gradle do template por 9.1 (roda no Java 25 do Android Studio), trava em paisagem
+  (`sensorLandscape`), esconde as barras do sistema (`MainActivity` gerada) e inclui o plugin Preferences. O player
+  acha o plugin pela ponte nativa (`Capacitor.PluginHeaders` + `nativePromise`, sem o JS do Capacitor) e grava o save
+  nele (`capacitorPreferencesBackend`), também no evento `pause` do Android. E2e simula a ponte no Chromium
+  (517 testes + 30 e2e). **Pendente:** jogar o `.apk` num aparelho — o emulador desta máquina não sobe sem a
+  aceleração de hardware do Windows
 - [ ] **Fase 6 — Polimento**: ícone e nome do app pelo projeto, tela de carregamento, guia de como gerar, playtest
 
 ## ~~Etapa 9 — Teste final~~ — descartada

@@ -9,7 +9,8 @@ Plataforma de jogos 2D guiada por agente de IA. Leia ARCHITECTURE.md antes de mu
 - `npm run vibe -- <cmd>` — CLI das tools (`tools`, `call <projeto> <tool> <json|@arquivo>`, `script <projeto> @passos.json`,
   `history`, `undo`, `export`). Tools de runtime precisam de `script` (a run vive só durante o processo).
   `export <projeto>` gera o jogo como site estático em `build/<projeto>/web` (player sem editor; ver V0.9);
-  `package desktop <projeto>` gera os `.exe` (Electron) em `build/<projeto>/desktop/dist`.
+  `package desktop <projeto>` gera os `.exe` (Electron) em `build/<projeto>/desktop/dist`;
+  `package android <projeto>` gera o `.apk` (Capacitor + Gradle) em `build/<projeto>/android`.
   O terminal do VS Code define `ELECTRON_RUN_AS_NODE=1`: para abrir o Electron à mão, remova essa variável.
 - `npm run test:e2e` — Chromium headless via Playwright (`packages/*/e2e/**/*.e2e.test.ts`); screenshots em
   `test-results/screenshots/` (fixture dos testes: `test-fixtures/demo-platformer`)

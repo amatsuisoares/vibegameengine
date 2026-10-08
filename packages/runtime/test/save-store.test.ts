@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fitViewport, SaveStore, webStorageBackend, type KeyValueBackend } from '../src';
+import { capacitorPreferencesBackend, fitViewport, SaveStore, webStorageBackend, type CapacitorBridge, type KeyValueBackend } from '../src';
 
 function memory(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -67,6 +67,37 @@ describe('SaveStore (save of an exported game on the device)', () => {
     store.writeStorage({ x: 1 });
     await store.flush();
     expect(ls.get('vibe:pet:save')).toBe('{"x":1}');
+  });
+});
+
+describe('capacitorPreferencesBackend (save inside the Android app)', () => {
+  it('goes through the native bridge to the Preferences plugin; null in a browser or without the plugin', async () => {
+    const prefs = new Map<string, string>();
+    const calls: string[] = [];
+    const cap = (native: boolean, plugins: string[]): CapacitorBridge => ({
+      isNativePlatform: () => native,
+      PluginHeaders: plugins.map((name) => ({ name })),
+      nativePromise: async (plugin, method, o) => {
+        calls.push(`${plugin}.${method}`);
+        const key = o.key as string;
+        if (method === 'get') return { value: prefs.get(key) ?? null };
+        if (method === 'set') prefs.set(key, o.value as string);
+        if (method === 'remove') prefs.delete(key);
+        return undefined;
+      },
+    });
+    expect(capacitorPreferencesBackend(undefined)).toBeNull();
+    expect(capacitorPreferencesBackend(cap(false, ['Preferences']))).toBeNull(); // Capacitor's web build
+    expect(capacitorPreferencesBackend(cap(true, []))).toBeNull();
+
+    const store = new SaveStore(capacitorPreferencesBackend(cap(true, ['Preferences']))!, 'vibe:pet');
+    store.writeStorage({ pet: { name: 'Pipoca' } });
+    await store.flush();
+    expect(prefs.get('vibe:pet:save')).toBe('{"pet":{"name":"Pipoca"}}');
+    expect((await new SaveStore(capacitorPreferencesBackend(cap(true, ['Preferences']))!, 'vibe:pet').load()).storage).toEqual({ pet: { name: 'Pipoca' } });
+    await store.clear();
+    expect(prefs.size).toBe(0);
+    expect(calls).toContain('Preferences.remove');
   });
 });
 

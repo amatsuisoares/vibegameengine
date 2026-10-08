@@ -144,4 +144,40 @@ describe('exported game (static folder, Chromium)', () => {
     expect(errors).toEqual([]);
     await context.close();
   });
+
+  it('inside the Android app (Capacitor bridge): the save goes to the Preferences plugin, written when the app is paused', async () => {
+    const context = await browser.newContext({ viewport: { width: 800, height: 360 } });
+    // What the Capacitor native bridge injects: the app's plugins and nativePromise (here backed by a Map).
+    await context.addInitScript(() => {
+      const prefs = new Map<string, string>();
+      const calls: string[] = [];
+      Object.assign(window, {
+        __prefs: prefs,
+        __prefCalls: calls,
+        Capacitor: {
+          isNativePlatform: () => true,
+          PluginHeaders: [{ name: 'Preferences' }],
+          nativePromise: async (plugin: string, method: string, o: { key: string; value?: string }) => {
+            calls.push(`${plugin}.${method}`);
+            if (method === 'get') return { value: prefs.get(o.key) ?? null };
+            if (method === 'set') prefs.set(o.key, o.value!);
+            return undefined;
+          },
+        },
+      });
+    });
+    const page = await context.newPage();
+    await open(page);
+    await page.locator('canvas').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.type('Nina');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => window.__vibe!.getState().vars.petName === 'Nina', undefined, { timeout: 10_000 });
+    // Capacitor fires "pause" on the document when the app goes to the background: the save is written at once.
+    await page.evaluate(() => document.dispatchEvent(new Event('pause')));
+    const saved = await page.evaluate(() => (window as unknown as { __prefs: Map<string, string> }).__prefs.get('vibe:meu-pet:save'));
+    expect(JSON.parse(saved!).pet?.name).toBe('Nina');
+    expect(await page.evaluate(() => localStorage.getItem('vibe:meu-pet:save'))).toBeNull();
+    expect(await page.evaluate(() => (window as unknown as { __prefCalls: string[] }).__prefCalls[0])).toBe('Preferences.get');
+    await context.close();
+  });
 });

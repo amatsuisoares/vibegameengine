@@ -36,6 +36,28 @@ export function webStorageBackend(storage: Pick<Storage, 'getItem' | 'setItem' |
   };
 }
 
+/** The part of the Capacitor native bridge (window.Capacitor inside the Android app) the save uses. */
+export interface CapacitorBridge {
+  isNativePlatform(): boolean;
+  /** Native plugins the app carries (set by the bridge; Capacitor.Plugins only exists with Capacitor's JS). */
+  PluginHeaders?: { name: string }[];
+  nativePromise(plugin: string, method: string, options: Record<string, unknown>): Promise<unknown>;
+}
+
+/**
+ * Inside the Android app (Capacitor): the save goes to the Preferences plugin (SharedPreferences),
+ * which Android does not clear like the WebView's localStorage. Talks to the native bridge directly,
+ * so the player does not need Capacitor's JS. Null outside the app (or without the plugin).
+ */
+export function capacitorPreferencesBackend(cap: CapacitorBridge | undefined): KeyValueBackend | null {
+  if (!cap?.isNativePlatform?.() || !cap.PluginHeaders?.some((p) => p.name === 'Preferences')) return null;
+  return {
+    get: async (key) => ((await cap.nativePromise('Preferences', 'get', { key })) as { value?: string | null })?.value ?? null,
+    set: async (key, value) => void (await cap.nativePromise('Preferences', 'set', { key, value })),
+    remove: async (key) => void (await cap.nativePromise('Preferences', 'remove', { key })),
+  };
+}
+
 export class SaveStore {
   private pending: Partial<SaveData> = {};
   private timer: ReturnType<typeof setTimeout> | undefined;

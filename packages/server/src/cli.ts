@@ -18,6 +18,7 @@ const USAGE = `Usage: npm run vibe -- <command>
   export <project> [outDir]               static web build that plays the game with no dev server
                                           (default: build/<project>/web)
   package desktop <project> [outDir]      Windows app (Electron): installer + portable .exe in build/<project>/desktop/dist
+  package android <project> [outDir]      Android app (Capacitor): debug .apk in build/<project>/android
 
 <project> is a folder name under projects/ or a path.
 Examples:
@@ -125,6 +126,14 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case 'package': {
+      if (rest[0] === 'android') {
+        const store = openStore(rest[1]);
+        const { packageAndroid } = await import('../../runtime/export/android');
+        console.log('Building the Android app (the first build downloads Gradle and dependencies: a few minutes)...');
+        const r = await packageAndroid(store.dir, { outDir: rest[2] });
+        print(`Android app (${r.appId}): ${r.apk}`);
+        return 0;
+      }
       if (rest[0] !== 'desktop') {
         console.log(USAGE);
         return 1;
