@@ -18,3 +18,5 @@ projects/*/.vibe/save.json
 test-results/
 # entity selected in the hierarchy panel (editor state)
 projects/*/.vibe/selection.json
+# exported / packaged games (vibe export, vibe package)
+build/

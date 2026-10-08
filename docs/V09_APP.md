@@ -20,7 +20,8 @@ ordem.
 | Texto digitado (`game.input.text`, ex.: nome do pet) | `engine/input.ts` | sim no PC; **no Android o teclado virtual não abre** sobre um canvas |
 | Scripts do jogo (`new Function`) | `engine/scripts.ts` | sim: Chromium (Electron) e WebView do Android permitem (sem CSP restritiva) |
 
-Ferramentas na máquina: Node 24 e npm. **Não há** Java nem Android SDK (necessários para o APK).
+Ferramentas na máquina: Node 24 e npm; Android Studio com o SDK (platform 37, build-tools 36) e o Java 25 dele
+(`C:\Program Files\Android\Android Studio\jbr`) — o `java` do PATH é um Java 8 de 32 bits, que não serve.
 
 ## 2. Divisão plataforma × jogo
 
@@ -67,7 +68,7 @@ o `Runtime` e os módulos de `packages/runtime/src`. Nada no app fala com o dev 
 | Fase | Plataforma | Verificação |
 |---|---|---|
 | 1 ✅ | análise e arquitetura (este documento) | — |
-| 2 | player standalone + `vibe export` + `SaveStore` (localStorage) + escala/letterbox | e2e: abre a pasta exportada num servidor estático qualquer, joga, recarrega e o save continua; nenhuma chamada a `/api` |
+| 2 ✅ | player standalone + `vibe export` + `SaveStore` (localStorage) + escala/letterbox | e2e: abre a pasta exportada num servidor estático qualquer, joga, recarrega e o save continua; nenhuma chamada a `/api` |
 | 3 | celular no navegador: teclado virtual para texto, som no primeiro toque, paisagem, gestos desligados, salvar ao ir para o fundo | e2e com emulação de toque (Playwright mobile) digitando o nome; screenshot em tela de celular |
 | 4 | desktop: Electron + electron-builder, `vibe package desktop` | `.exe` gerado, abre o jogo, save sobrevive a fechar e abrir |
 | 5 | Android: Capacitor + Preferences + Gradle, `vibe package android` (precisa do Android Studio instalado) | `.apk` instalado no celular (ou emulador), nome, jogar, fechar, voltar outro dia |

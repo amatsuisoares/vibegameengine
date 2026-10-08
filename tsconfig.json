@@ -26,6 +26,8 @@
     "packages/*/test/**/*.ts",
     "packages/*/e2e/**/*.ts",
     "packages/*/app/**/*.ts",
+    "packages/*/player/**/*.ts",
+    "packages/*/export/**/*.ts",
     "packages/*/vite/**/*.ts",
     "packages/*/vite.config.ts",
     "vitest.config.ts",

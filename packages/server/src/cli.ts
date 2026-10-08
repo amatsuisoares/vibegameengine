@@ -15,6 +15,8 @@ const USAGE = `Usage: npm run vibe -- <command>
   history <project> [limit]
   format <project>                        rewrite project.json and scenes/*.json in the canonical format
   undo <project> | redo <project>
+  export <project> [outDir]               static web build that plays the game with no dev server
+                                          (default: build/<project>/web)
 
 <project> is a folder name under projects/ or a path.
 Examples:
@@ -111,6 +113,14 @@ async function main(argv: string[]): Promise<number> {
         }
       });
       print(r.seq === null ? 'Already formatted.' : `Formatted: ${r.files.map((f) => f.file).join(', ')} (history #${r.seq})`);
+      return 0;
+    }
+    case 'export': {
+      const store = openStore(rest[0]);
+      // Lives in the runtime package (it builds the player with Vite); loaded only for this command.
+      const { exportWeb } = await import('../../runtime/export/export');
+      const r = await exportWeb(store.dir, rest[1]);
+      print(`Exported to ${r.outDir}: ${r.files.length} files (${r.assets} assets)`);
       return 0;
     }
     case 'undo':

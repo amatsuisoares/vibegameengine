@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>VibeGame</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+      canvas {
+        position: absolute;
+        display: block;
+        outline: none;
+      }
+      canvas.pixelated {
+        image-rendering: pixelated;
+      }
+      #error {
+        position: absolute;
+        inset: 0;
+        padding: 24px;
+        color: #ffb4a8;
+        font: 14px/1.5 system-ui, sans-serif;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" tabindex="0"></canvas>
+    <div id="error" hidden></div>
+    <script type="module" src="./player.ts"></script>
+  </body>
+</html>

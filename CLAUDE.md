@@ -7,7 +7,8 @@ Plataforma de jogos 2D guiada por agente de IA. Leia ARCHITECTURE.md antes de mu
 - `npm run typecheck` — tsc sem emitir
 - `npm run dev` — runtime no browser (Vite, porta 5173)
 - `npm run vibe -- <cmd>` — CLI das tools (`tools`, `call <projeto> <tool> <json|@arquivo>`, `script <projeto> @passos.json`,
-  `history`, `undo`). Tools de runtime precisam de `script` (a run vive só durante o processo).
+  `history`, `undo`, `export`). Tools de runtime precisam de `script` (a run vive só durante o processo).
+  `export <projeto>` gera o jogo como site estático em `build/<projeto>/web` (player sem editor; ver V0.9).
 - `npm run test:e2e` — Chromium headless via Playwright (`packages/*/e2e/**/*.e2e.test.ts`); screenshots em
   `test-results/screenshots/` (fixture dos testes: `test-fixtures/demo-platformer`)
 

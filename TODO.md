@@ -412,7 +412,11 @@ Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` 
 `docs/V09_APP.md`.
 
 - [x] **Fase 1 — Análise e arquitetura** (`docs/V09_APP.md`)
-- [ ] **Fase 2 — Player standalone + `vibe export`** (projeto embutido, save no aparelho, escala com letterbox)
+- [x] **Fase 2 — Player standalone + `vibe export`**: `npm run vibe -- export <projeto>` → `build/<projeto>/web`
+  (página só de jogo, projeto validado e embutido no bundle, assets copiados); `SaveStore` (localStorage, gravação
+  adiada e ao esconder a página; backend trocável para o Android); letterbox em qualquer janela. e2e: a pasta
+  exportada num servidor estático qualquer, nomear o pet, recarregar e o save continua, nenhuma chamada a `/api`
+  (509 testes + 27 e2e)
 - [ ] **Fase 3 — Celular no navegador** (teclado virtual para texto, som no primeiro toque, paisagem, salvar ao ir
   para o fundo)
 - [ ] **Fase 4 — Desktop (Electron)**: `vibe package desktop` → `.exe`

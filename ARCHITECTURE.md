@@ -400,6 +400,13 @@ app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶
   envia `vibe:project-changed` pelo WebSocket do Vite; a página recarrega o projeto (debounce de 80 ms, só o
   reload mais recente vale). Projeto inválido: a versão anterior continua rodando e os erros vão para o console
   e para `window.__vibeError`. Arquivos em `.vibe/` são ignorados.
+- **Jogo exportado** (V0.9, `runtime/player/` + `runtime/export/export.ts`): `npm run vibe -- export <projeto>`
+  valida o projeto e faz um build do Vite da página `player/` (só o jogo, sem editor) com o projeto embutido no
+  bundle (módulo virtual `virtual:vibe-game`) e copia os assets declarados para `assets/` — saída em
+  `build/<projeto>/web` (fora do git), que qualquer servidor estático, o Electron ou um WebView abre, sem `/api`.
+  O player usa o mesmo `Runtime`, relógio real, seed nova por sessão, letterbox (`fitViewport`) e guarda o save
+  no aparelho pelo `SaveStore` (`src/save-store.ts`: backend chave/valor assíncrono — `localStorage` por padrão,
+  ou `window.__vibeSaveBackend` de um host —, gravação adiada 0,5 s e `flush()` ao esconder a página).
 
 ## ProjectStore e tools (`packages/server`)
 
