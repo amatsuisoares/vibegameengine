@@ -71,6 +71,11 @@ export class Input {
   private mousePressedSet = new Set<MouseButton>();
   /** Mouse position in viewport (screen) pixels. */
   mouse = { x: 0, y: 0 };
+  /**
+   * The player plays with a finger (touch screen) rather than a mouse: set by the host (the last
+   * pointer used). Games word their hints with it ("Toque" / "Clique"); it never changes the simulation.
+   */
+  touch = false;
 
   constructor(public actions: Record<string, string[]> = {}) {}
 

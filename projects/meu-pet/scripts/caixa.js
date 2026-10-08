@@ -40,7 +40,7 @@ function abrir(self, game) {
   });
   atualizar(game);
   const info = game.entity('caixaInfo');
-  if (info) info.get('Text').text = 'Clique para guardar ou pôr no quarto; numa cama, para usar essa. Arraste os brinquedos para mudar de lugar.';
+  if (info) info.get('Text').text = `${game.input.touch ? 'Toque' : 'Clique'} para guardar ou pôr no quarto; numa cama, para usar essa. Arraste os brinquedos para mudar de lugar.`;
 }
 
 function fechar(self, game) {

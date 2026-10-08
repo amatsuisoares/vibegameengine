@@ -23,7 +23,7 @@ function onUpdate(self, game, dt) {
   if (self.props.acao === 'loja') self.get('Text').text = `Loja · ${game.wallet.get(MOEDA)} 🪙`;
   if (self.props.acao === 'novoPet') {
     const confirming = time < confirmUntil;
-    self.get('Text').text = confirming ? 'Tem certeza? Clique de novo' : self.state.label;
+    self.get('Text').text = confirming ? `Tem certeza? ${game.input.touch ? 'Toque' : 'Clique'} de novo` : self.state.label;
     if (confirming) self.get('Sprite').color = '#c2410c';
   }
 }

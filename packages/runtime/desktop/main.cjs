@@ -53,6 +53,8 @@ function createWindow() {
     minWidth: 320,
     minHeight: 180,
     backgroundColor: '#000000',
+    // The game's icon (config.app.icon) in the title bar and taskbar; the .exe carries it too.
+    ...(fs.existsSync(path.join(__dirname, 'icon.png')) && { icon: path.join(__dirname, 'icon.png') }),
     show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true },
   });

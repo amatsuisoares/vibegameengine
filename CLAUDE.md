@@ -11,6 +11,7 @@ Plataforma de jogos 2D guiada por agente de IA. Leia ARCHITECTURE.md antes de mu
   `export <projeto>` gera o jogo como site estático em `build/<projeto>/web` (player sem editor; ver V0.9);
   `package desktop <projeto>` gera os `.exe` (Electron) em `build/<projeto>/desktop/dist`;
   `package android <projeto>` gera o `.apk` (Capacitor + Gradle) em `build/<projeto>/android`.
+  Nome do app = `config.name`; ícone = `config.app.icon` (asset de imagem) sobre `config.app.iconBackground`.
   O terminal do VS Code define `ELECTRON_RUN_AS_NODE=1`: para abrir o Electron à mão, remova essa variável.
 - `npm run test:e2e` — Chromium headless via Playwright (`packages/*/e2e/**/*.e2e.test.ts`); screenshots em
   `test-results/screenshots/` (fixture dos testes: `test-fixtures/demo-platformer`)

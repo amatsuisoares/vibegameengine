@@ -407,7 +407,7 @@ que pesa na evolução. Análise e fases em `docs/V08_DESEJOS.md`.
   (🧪, 20) aproxima o pet de você (vínculo +, até 0,15 por dia) e a da birra (⚗️, 8) o deixa arisco (vínculo −); vão
   pela bandeja de Comida, ele bebe na hora, com reação, aviso e página do diário na primeira vez
 
-## V0.9 — App (planejada, depois da V0.8)
+## V0.9 — App (concluída)
 Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` (Capacitor). Análise e fases em
 `docs/V09_APP.md`.
 
@@ -438,9 +438,18 @@ Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` 
   (`sensorLandscape`), esconde as barras do sistema (`MainActivity` gerada) e inclui o plugin Preferences. O player
   acha o plugin pela ponte nativa (`Capacitor.PluginHeaders` + `nativePromise`, sem o JS do Capacitor) e grava o save
   nele (`capacitorPreferencesBackend`), também no evento `pause` do Android. E2e simula a ponte no Chromium
-  (517 testes + 30 e2e). **Pendente:** jogar o `.apk` num aparelho — o emulador desta máquina não sobe sem a
-  aceleração de hardware do Windows
-- [ ] **Fase 6 — Polimento**: ícone e nome do app pelo projeto, tela de carregamento, guia de como gerar, playtest
+  (517 testes + 30 e2e). Jogado e aprovado num celular Android de verdade (o emulador desta máquina não sobe sem a
+  aceleração de hardware do Windows)
+- [x] **Fase 6 — Polimento**: `config.app = {icon, iconBackground}` no `project.json` (asset de imagem validado):
+  o export recorta a parte visível do sprite e gera os ícones sem biblioteca nova (`runtime/export/icon.ts`: leitor e
+  escritor de PNG 8 bits + reamostragem por média de área) — `icon.png` do site (aba e tela inicial do celular),
+  ícone da janela e do `.exe` (256 px) e, no Android, ícones quadrado, redondo e adaptativo (5 densidades), cor de
+  fundo e splash. O nome do app é o `name` do projeto. Tela de carregamento no player (ícone, título já no HTML e
+  barra pelas imagens carregadas, some num fade). `input.touch` na engine (o jogador usa o dedo: o último ponteiro
+  foi toque/caneta; começa por `(pointer: coarse)`) para o jogo escrever "Toque" em vez de "Clique": no meu-pet a
+  dica do nome, o "Tem certeza?", a caixa, a loja, as caixinhas e o minigame de pegar. README com o guia de como
+  gerar. Meu-pet: ícone = bebê sobre pêssego (`#ffd59e`) (526 testes + 30 e2e). Playtest nos dois aparelhos fica
+  com quem joga
 
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.

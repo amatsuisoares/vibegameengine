@@ -183,7 +183,7 @@ function onUpdate(self, game, dt) {
       espera = 0;
       self.state.desde = 0;
       dicaDada = false;
-      texto(game, 'Onde está o ossinho? Clique na caixa.');
+      texto(game, `Onde está o ossinho? ${game.input.touch ? 'Toque' : 'Clique'} na caixa.`);
       for (let k = 0; k < 3; k++) caixa(game, k).get('Text').text = '?';
     }
   }

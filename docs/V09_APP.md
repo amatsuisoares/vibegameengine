@@ -72,4 +72,4 @@ o `Runtime` e os módulos de `packages/runtime/src`. Nada no app fala com o dev 
 | 3 ✅ | celular no navegador: teclado virtual para texto, som no primeiro toque, paisagem, gestos desligados, salvar ao ir para o fundo | e2e com emulação de toque (Playwright mobile) digitando o nome; screenshot em tela de celular |
 | 4 ✅ | desktop: Electron + electron-builder, `vibe package desktop` | `.exe` gerado, abre o jogo, save sobrevive a fechar e abrir |
 | 5 ✅ | Android: Capacitor + Preferences + Gradle, `vibe package android` (precisa do Android Studio instalado) | `.apk` instalado no celular (ou emulador), nome, jogar, fechar, voltar outro dia |
-| 6 | polimento: ícones e nome do app a partir do projeto, tela de carregamento, docs (README de como gerar), playtest nos dois aparelhos | — |
+| 6 ✅ | polimento: ícones e nome do app a partir do projeto, tela de carregamento, docs (README de como gerar), playtest nos dois aparelhos | ícones gerados conferidos em imagem; e2e: título e ícone no HTML, carregamento some, dica "Toque" no celular |

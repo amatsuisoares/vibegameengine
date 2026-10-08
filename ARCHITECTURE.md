@@ -410,7 +410,16 @@ app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶
   No celular: `Input.wantsText` (algum script leu `input.text` no último frame) faz o `attachTextField`
   (`src/text-field.ts`) focar um `<input>` invisível ao fim de um toque — só assim o teclado virtual abre —, e o que
   é digitado nele entra como texto digitado normal; a página desliga os gestos do navegador e pede para girar o
-  aparelho quando o jogo é deitado e a tela está em pé.
+  aparelho quando o jogo é deitado e a tela está em pé. Enquanto as imagens carregam, a página mostra o ícone, o
+  título (escritos no HTML pelo export) e uma barra (`AssetStore.loadAll(onProgress)`). `Input.touch` diz ao jogo
+  que o jogador usa o dedo (o `attachDomInput` segue o `pointerType` do último toque; o player começa por
+  `(pointer: coarse)`), para as dicas dizerem "Toque" em vez de "Clique".
+- **Ícone do app** (V0.9, `runtime/export/icon.ts`): `config.app.icon` (asset de imagem) e `iconBackground`. Sem
+  biblioteca de imagem: um leitor/escritor de PNG 8 bits (com `node:zlib`) e `renderIcon`, que recorta a parte
+  visível do sprite, reduz por média de área (ponderada pelo alfa) e centraliza num quadrado ou retângulo da cor de
+  fundo (ou transparente, ou recortado em círculo). O export grava `icon.png` (192 px) e o põe no `<head>`; o desktop
+  usa 256 px na janela e no `.exe`; o Android troca os ícones do template (quadrado, redondo, frente do adaptativo
+  com fundo em `ic_launcher_background`) e as imagens de splash.
 - **App desktop** (V0.9, `runtime/desktop/` + `runtime/export/desktop.ts`): `npm run vibe -- package desktop <projeto>`
   exporta para `build/<projeto>/desktop/app/web`, junta a casca Electron (`main.cjs` + `preload.cjs` +
   `game.json` com nome, título e tamanho) e roda o electron-builder (`nsis` + `portable`, Electron do

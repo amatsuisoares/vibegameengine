@@ -2,6 +2,7 @@ import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exportWeb } from './export';
+import { iconPng } from './icon';
 
 /**
  * `vibe package desktop <project>`: the exported game inside an Electron shell (runtime/desktop/main.cjs:
@@ -47,6 +48,8 @@ export async function packageDesktop(projectDir: string, o: DesktopOptions = {})
   const slug = appSlug(web.game.name);
   for (const f of ['main.cjs', 'preload.cjs']) copyFileSync(repo(`packages/runtime/desktop/${f}`), join(appDir, f));
   writeFileSync(join(appDir, 'game.json'), JSON.stringify(web.game, null, 2));
+  // 256×256: what electron-builder needs to make the .exe's icon (and the window's).
+  if (web.icon) writeFileSync(join(appDir, 'icon.png'), iconPng(web.icon.sprite, { size: 256, background: web.icon.background }));
   writeFileSync(
     join(appDir, 'package.json'),
     JSON.stringify({ name: slug, productName: web.game.title, version: '1.0.0', description: web.game.title, main: 'main.cjs', private: true }, null, 2),
@@ -67,7 +70,7 @@ export async function packageDesktop(projectDir: string, o: DesktopOptions = {})
       directories: { output: join(outDir, 'dist') },
       files: ['**/*'],
       npmRebuild: false,
-      win: { target: ['nsis', 'portable'] },
+      win: { target: ['nsis', 'portable'], ...(web.icon && { icon: join(appDir, 'icon.png') }) },
       nsis: { oneClick: false, allowToChangeInstallationDirectory: true, artifactName: '${productName} Setup ${version}.${ext}' },
       portable: { artifactName: '${productName} ${version}.${ext}' },
     },

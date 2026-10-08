@@ -67,6 +67,17 @@ describe('typed text and onEvent', () => {
     expect(g.entity('field')!.components.Text!.text).toBe('Mimiã');
     expect(g.world.vars.petName).toBe('Mimiã');
   });
+
+  it('input.touch tells scripts the player uses a finger (for wording hints)', () => {
+    const g = game([{ id: 'hint', components: { Text: { text: '' }, Script: { src: 'scripts/hint.js' } } }], {
+      'scripts/hint.js': 'function onUpdate(self, game) { self.get("Text").text = game.input.touch ? "Toque" : "Clique"; }',
+    });
+    g.perform([{ type: 'wait', ms: 20 }]);
+    expect(g.entity('hint')!.components.Text!.text).toBe('Clique');
+    g.input.touch = true;
+    g.perform([{ type: 'wait', ms: 20 }]);
+    expect(g.entity('hint')!.components.Text!.text).toBe('Toque');
+  });
 });
 
 describe('clock', () => {

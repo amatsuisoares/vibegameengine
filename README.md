@@ -101,6 +101,29 @@ Parâmetros de URL: `?project=meu-pet&scene=quarto&seed=7&debug=1&paused=1&live=
 Com `paused=1` nada avança sozinho — o jogo só anda por `window.__vibe` (modo usado por hosts externos).
 Com `live=1` a página segue a run do agente (`.vibe/live.json`) em vez de ser jogada.
 
+## Gerar o jogo como app
+
+Qualquer projeto de `projects/` vira um app que roda sem o dev server, sem o editor e sem internet. O save fica no
+aparelho (no navegador, no arquivo do app no Windows, no armazenamento do app no Android).
+
+```bash
+npm run vibe -- export meu-pet              # site estático em build/meu-pet/web
+npm run vibe -- package desktop meu-pet     # Windows: instalador e .exe portátil em build/meu-pet/desktop/dist
+npm run vibe -- package android meu-pet     # Android: build/meu-pet/android/meu-pet.apk
+```
+
+- **Nome e ícone**: o nome do app é o `name` do `project.json`; o ícone vem de um sprite do projeto, em
+  `"app": { "icon": "<id do asset de imagem>", "iconBackground": "#ffd59e" }` (a parte visível do sprite, centralizada
+  na cor de fundo). Sem `app.icon`, ficam os ícones padrão do Electron e do Capacitor.
+- **Site**: a pasta `web` abre em qualquer servidor estático (não pelo `file://`). No celular, o teclado abre num
+  toque quando o jogo pede texto, o som começa no primeiro toque e o jogo pede para girar o aparelho.
+- **Windows**: precisa só do `npm install`. O `.exe` portátil roda sem instalar; o instalador cria atalho. F11 =
+  tela cheia. Para abrir o Electron à mão pelo terminal do VS Code, remova a variável `ELECTRON_RUN_AS_NODE`.
+- **Android**: precisa do [Android Studio](https://developer.android.com/studio) instalado (traz o SDK e o Java; ou
+  defina `ANDROID_HOME` e `JAVA_HOME`). O primeiro build baixa o Gradle (~1,5 min); os seguintes levam ~20 s. O
+  `.apk` é de teste (debug): no celular, abra o arquivo e permita "instalar apps desconhecidos". Para a Play Store
+  ainda falta assinar com uma chave própria.
+
 ## Estrutura
 
 ```
@@ -112,6 +135,9 @@ packages/
   runtime/  runtime no browser: renderer Canvas2D, assets, loop, teclado/mouse, window.__vibe
     app/    página Vite (index.html + main.ts)
     vite/   plugin do dev server: serve projects/ e avisa a página quando arquivos mudam
+    player/ página do jogo exportado (sem editor)
+    export/ vibe export / package: site, app Windows (Electron), app Android (Capacitor), ícones
+    desktop/ casca Electron (main.cjs + preload.cjs)
     e2e/    testes no Chromium (Playwright)
 projects/
   meu-pet/           o jogo de pet virtual (project.json + scenes/ + scripts/ + prefabs/ + assets/ + playbooks/)

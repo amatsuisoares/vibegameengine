@@ -48,8 +48,12 @@ export class AssetStore<I extends ImageLike & CanvasImageSource = HTMLImageEleme
     return this.baseUrl + asset.path.split('/').map(encodeURIComponent).join('/');
   }
 
-  async loadAll(): Promise<AssetLoadReport> {
+  /** Loads every image; `onProgress` hears (done, total) as each one finishes (e.g. a loading bar). */
+  async loadAll(onProgress?: (done: number, total: number) => void): Promise<AssetLoadReport> {
     const report: AssetLoadReport = { loaded: [], errors: [], skipped: [] };
+    const total = [...this.defs.values()].filter((a) => a.type !== 'audio').length;
+    let done = 0;
+    onProgress?.(0, total);
     await Promise.all(
       [...this.defs.values()].map(async (a) => {
         if (a.type === 'audio') {
@@ -64,6 +68,7 @@ export class AssetStore<I extends ImageLike & CanvasImageSource = HTMLImageEleme
           this.failures.set(a.id, message);
           report.errors.push({ id: a.id, message });
         }
+        onProgress?.(++done, total);
       }),
     );
     return report;

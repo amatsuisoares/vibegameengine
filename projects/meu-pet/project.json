@@ -31,5 +31,6 @@
   ],
   "gravity": 0,
   "pixelArt": false,
-  "notifications": { "minGapMs": 4000, "logSize": 50 }
+  "notifications": { "minGapMs": 4000, "logSize": 50 },
+  "app": { "icon": "bebe_1", "iconBackground": "#ffd59e" }
 }

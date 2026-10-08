@@ -1,8 +1,9 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ProjectStore } from '@vibe/server';
 import { build, type Plugin } from 'vite';
+import { decodePng, iconPng, type Rgba } from './icon';
 
 /**
  * `vibe export <project>`: turns a project into a static web folder that plays the game with no dev
@@ -20,7 +21,11 @@ export interface ExportResult {
   assets: number;
   /** Project folder name, window title and viewport size (for the app shells). */
   game: { name: string; title: string; width: number; height: number };
+  /** The app icon's sprite (config.app.icon) and background, for the app shells; null without one. */
+  icon: { sprite: Rgba; background: string } | null;
 }
+
+const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => `&${{ '&': 'amp', '<': 'lt', '>': 'gt', '"': 'quot' }[c]};`);
 
 export function defaultExportDir(projectDir: string) {
   return repo(`build/${basename(resolve(projectDir))}/web`);
@@ -74,6 +79,32 @@ export async function exportWeb(projectDir: string, outDir = defaultExportDir(pr
     copyFileSync(from, to);
     assets++;
   }
-  const { width, height } = status.project.config;
-  return { outDir, files: listFiles(outDir), assets, game: { name, title: game.title, width, height } };
+  const { width, height, app } = status.project.config;
+
+  // The page shows the title (tab and loading screen) before its script runs; the icon is the tab's/home screen's.
+  let icon: ExportResult['icon'] = null;
+  let head = `<title>${escapeHtml(game.title)}</title>`;
+  if (app?.icon) {
+    const asset = status.project.config.assets.find((a) => a.id === app.icon)!;
+    let sprite: Rgba;
+    try {
+      sprite = decodePng(readFileSync(join(assetsDir, asset.path)));
+    } catch (err) {
+      throw new Error(`config.app.icon: ${asset.path}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    icon = { sprite, background: app.iconBackground };
+    writeFileSync(join(outDir, 'icon.png'), iconPng(sprite, { size: 192, background: app.iconBackground }));
+    head += '\n    <link rel="icon" href="icon.png" />\n    <link rel="apple-touch-icon" href="icon.png" />';
+  }
+  const page = join(outDir, 'index.html');
+  writeFileSync(
+    page,
+    readFileSync(page, 'utf8')
+      .replace(/<title>.*<\/title>/, head)
+      .replace(
+        '<div id="loading-title"></div>',
+        `${icon ? '<img id="loading-icon" src="icon.png" alt="" />' : ''}<div id="loading-title">${escapeHtml(game.title)}</div>`,
+      ),
+  );
+  return { outDir, files: listFiles(outDir), assets, game: { name, title: game.title, width, height }, icon };
 }

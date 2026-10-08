@@ -103,6 +103,17 @@ export const ProjectConfigSchema = z.strictObject({
     })
     .default(() => ({ minGapMs: 0, logSize: 50 }))
     .describe('game.notify(): observations shown to the player, with cooldowns and priority.'),
+  app: z
+    .strictObject({
+      icon: IdSchema.optional().describe('Image asset shown as the icon of the exported apps (site, Windows, Android): its visible part, centered.'),
+      iconBackground: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/, 'a color like "#ffd59e"')
+        .default('#ffffff')
+        .describe('Color behind the icon (#rrggbb).'),
+    })
+    .optional()
+    .describe('The game as an installed app (vibe export / package): its icon. The app name is `name`.'),
 });
 
 export const ProjectSchema = z.strictObject({

@@ -89,6 +89,22 @@ describe('project schema', () => {
     expect(r.errors[1]).toContain('config.assets(evil).path');
   });
 
+  it('checks the app icon: an image asset that exists', () => {
+    const raw = (app: unknown) => ({
+      config: { name: 'p', startScene: 'main', assets: [{ id: 'pet', type: 'image', path: 'pet.png' }, { id: 'miau', type: 'audio', path: 'miau.wav' }], app },
+      scenes: { main: { id: 'main' } },
+    });
+    const ok = parseProject(raw({ icon: 'pet' }));
+    expect(ok.ok && ok.value.config.app).toEqual({ icon: 'pet', iconBackground: '#ffffff' });
+    const errors = (app: unknown) => {
+      const r = parseProject(raw(app));
+      return r.ok ? [] : r.errors;
+    };
+    expect(errors({ icon: 'nope' }).join()).toContain('config.app.icon: image asset "nope" does not exist');
+    expect(errors({ icon: 'miau' }).join()).toContain('config.app.icon: asset "miau" is not an image');
+    expect(errors({ icon: 'pet', iconBackground: 'pink' }).join()).toContain('iconBackground');
+  });
+
   it('warns about suspicious setups without failing', () => {
     const r = parseScene({ id: 's', entities: [{ id: 'p', components: { Body: {} } }] });
     expect(r.ok).toBe(true);

@@ -39,9 +39,12 @@ const canvas = document.getElementById('game') as HTMLCanvasElement;
 const errorEl = document.getElementById('error') as HTMLElement;
 const textEl = document.getElementById('text') as HTMLInputElement;
 const rotateEl = document.getElementById('rotate') as HTMLElement;
+const loadingEl = document.getElementById('loading') as HTMLElement;
+const loadingBar = document.querySelector('#loading-bar > div') as HTMLElement;
 const ASSETS = 'assets/';
 
 function fail(details: string[]) {
+  loadingEl.hidden = true;
   window.__vibeError = details;
   errorEl.textContent = `Não foi possível abrir o jogo:\n${details.join('\n')}`;
   errorEl.hidden = false;
@@ -49,6 +52,7 @@ function fail(details: string[]) {
 
 async function main() {
   document.title = game.title;
+  document.getElementById('loading-title')!.textContent = game.title;
   const parsed = parseProject(game.project);
   if (!parsed.ok) return fail(parsed.errors);
   const project = parsed.value;
@@ -56,7 +60,7 @@ async function main() {
   canvas.classList.toggle('pixelated', project.config.pixelArt);
 
   const assets = new AssetStore(project.config.assets, ASSETS, loadHtmlImage);
-  const report = await assets.loadAll();
+  const report = await assets.loadAll((done, total) => (loadingBar.style.width = `${total ? (100 * done) / total : 100}%`));
 
   // Where the save lives: the desktop app's files, the Android app's Preferences, else localStorage.
   const backend = window.__vibeSaveBackend ?? capacitorPreferencesBackend(window.Capacitor) ?? webStorageBackend(localStorage);
@@ -97,6 +101,7 @@ async function main() {
   });
   for (const e of report.errors) runtime.game.console.error(`Asset "${e.id}": ${e.message}`, 'assets');
 
+  const touchScreen = matchMedia('(pointer: coarse)').matches;
   attachDomInput(() => runtime.game.input, {
     keyTarget: window,
     canvas,
@@ -106,12 +111,12 @@ async function main() {
       runtime.setProject(project, undefined, { seed: seed(), clock: realClock(), storage, slots });
       return true;
     },
+    touch: touchScreen,
   });
 
   // Touch screens: the phone keyboard for names and other typed text.
   textField = attachTextField(() => runtime.game.input, canvas, textEl);
 
-  const touchScreen = matchMedia('(pointer: coarse)').matches;
   const layout = () => {
     const box = fitViewport(innerWidth, innerHeight, width, height);
     Object.assign(canvas.style, { width: `${box.width}px`, height: `${box.height}px`, left: `${box.left}px`, top: `${box.top}px` });
@@ -130,6 +135,7 @@ async function main() {
 
   window.__vibe = createVibeApi(runtime, game.name);
   runtime.start();
+  loadingEl.classList.add('done');
   canvas.focus();
 }
 

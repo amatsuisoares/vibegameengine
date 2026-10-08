@@ -35,7 +35,7 @@ function abrir(self, game) {
     c.get('Text').text = texto(game, item);
     c.props.item = item.id;
   });
-  info(game, 'Clique para comprar.');
+  info(game, `${game.input.touch ? 'Toque' : 'Clique'} para comprar.`);
 }
 
 function comprar(self, game, id) {

@@ -36,7 +36,7 @@ function onStart(self, game) {
   pet.x = 480;
   pet.y = CHAO - (p.pe || 0.3) * tamanho;
   const dica = game.entity('dica');
-  dica.get('Text').text = `Mova o mouse para guiar ${p.nome || 'o pet'}. Pegue o que cai!`;
+  dica.get('Text').text = `${game.input.touch ? 'Arraste o dedo' : 'Mova o mouse'} para guiar ${p.nome || 'o pet'}. Pegue o que cai!`;
   self.after(4500, () => dica.tween('opacity', 0, 800));
   self.state.voltar = () => voltar(game);
   self.state.resultado = resultado;

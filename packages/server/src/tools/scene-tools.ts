@@ -143,7 +143,7 @@ export const sceneTools = [
 
   defineTool({
     name: 'modify_project_config',
-    description: 'Changes project.json (name, width, height, gravity, startScene, actions, assets, sounds, pixelArt) with a merge patch. sounds maps event types to audio assets, e.g. {"sounds":{"jump":"sfx_jump","collect":"sfx_coin"}}.',
+    description: 'Changes project.json (name, width, height, gravity, startScene, actions, assets, sounds, pixelArt, app: {icon, iconBackground} = the exported app icon) with a merge patch. sounds maps event types to audio assets, e.g. {"sounds":{"jump":"sfx_jump","collect":"sfx_coin"}}.',
     mutates: true,
     input: z.object({ patch: Patch }),
     run: ({ store }, { patch }, meta) => {

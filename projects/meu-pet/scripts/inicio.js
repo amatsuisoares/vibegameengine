@@ -1,4 +1,5 @@
-// Tela inicial: com um pet salvo, vai direto ao quarto; senão, digite o nome e aperte Enter.
+// Tela inicial: com um pet salvo, vai direto ao quarto; senão, digite o nome e aperte Enter
+// (no celular: toque para abrir o teclado).
 const MAX = 14;
 let name = '';
 let blink = 0;
@@ -27,6 +28,9 @@ function onUpdate(self, game, dt) {
   const field = game.entity('campoNome');
   if (field) field.get('Text').text = name + (Math.floor(blink * 2) % 2 ? '|' : ' ');
   const hint = game.entity('dicaNome');
-  if (hint) hint.get('Text').color = name.trim() ? '#ffffff' : '#9aa3c7';
+  if (hint) {
+    hint.get('Text').text = game.input.touch ? 'Toque na tela para digitar o nome' : 'Digite o nome e aperte Enter';
+    hint.get('Text').color = name.trim() ? '#ffffff' : '#9aa3c7';
+  }
   self.state.start = () => start(game);
 }

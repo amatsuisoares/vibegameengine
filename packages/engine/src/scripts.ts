@@ -433,6 +433,8 @@ export interface ScriptGame {
     readonly drag: { entity: string | null; startX: number; startY: number; x: number; y: number } | null;
     /** Text typed since the previous frame, in order; "\b" = Backspace, "\n" = Enter (e.g. for a name field). */
     readonly text: string;
+    /** The player uses a touch screen (finger) instead of a mouse: for wording hints ("Toque" vs "Clique"). */
+    readonly touch: boolean;
   };
   /** Calendar date/time of the game: now (epoch ms), hour (0..24, local), speed (settable; 60 = 1 game minute per second). */
   readonly clock: { readonly now: number; readonly hour: number; readonly iso: string; speed: number };
@@ -576,6 +578,9 @@ class ScriptApi {
         },
         get text() {
           return input.typed();
+        },
+        get touch() {
+          return input.touch;
         },
       },
       clock: {

@@ -270,6 +270,12 @@ export function checkProject(project: Project): { errors: string[]; warnings: st
       errors.push(`config.assets(${a.id}).path: must be relative to the assets/ folder, without ".."`);
     }
   }
+  const icon = project.config.app?.icon;
+  if (icon !== undefined) {
+    const a = project.config.assets.find((x) => x.id === icon);
+    if (!a) errors.push(`config.app.icon: image asset "${icon}" does not exist`);
+    else if (a.type !== 'image') errors.push(`config.app.icon: asset "${icon}" is not an image`);
+  }
   const audio = new Set(project.config.assets.filter((a) => a.type === 'audio').map((a) => a.id));
   const checkSound = (ref: SoundRef | undefined, at: string) => {
     if (ref === undefined) return;

@@ -28,6 +28,13 @@ const requests: string[] = [];
 beforeAll(async () => {
   const r = await exportWeb(repo('projects/meu-pet'), OUT);
   expect(r.files).toContain('index.html');
+  // The app icon (config.app.icon) and the title are in the page before its script runs.
+  expect(r.files).toContain('icon.png');
+  expect(r.icon?.background).toBe('#ffd59e');
+  const html = readFileSync(join(OUT, 'index.html'), 'utf8');
+  expect(html).toContain('<title>Meu Pet</title>');
+  expect(html).toContain('<link rel="icon" href="icon.png" />');
+  expect(html).toContain('<img id="loading-icon" src="icon.png" alt="" /><div id="loading-title">Meu Pet</div>');
   server = createServer((req, res) => {
     const path = decodeURIComponent(new URL(req.url!, 'http://x').pathname);
     requests.push(path);
@@ -67,6 +74,11 @@ describe('exported game (static folder, Chromium)', () => {
     page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
     await open(page);
     expect(await page.title()).toBe('Meu Pet');
+    // The loading screen fades out once the game runs; the hint speaks of the keyboard.
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('loading')!).opacity)).toBe('0');
+    expect(await page.evaluate(() => document.getElementById('loading-bar')!.firstElementChild!.getAttribute('style'))).toContain('width: 100%');
+    const hint = () => page.evaluate(() => JSON.stringify(window.__vibe!.getState({ ids: ['dicaNome'], components: true }).entities));
+    await expect.poll(hint).toContain('Digite o nome e aperte Enter');
 
     // Letterbox: 960×540 scaled to the full width (1200 → 675 tall), centered vertically.
     const box = (await page.locator('canvas').boundingBox())!;
@@ -113,6 +125,11 @@ describe('exported game (static folder, Chromium)', () => {
     await open(page);
     const active = () => page.evaluate(() => document.activeElement?.id ?? '');
     expect(await page.locator('#rotate').isHidden()).toBe(true);
+    // A touch screen: the game words its hints for a finger (input.touch).
+    const hint = () => page.evaluate(() => JSON.stringify(window.__vibe!.getState({ ids: ['dicaNome'], components: true }).entities));
+    await expect.poll(hint).toContain('Toque na tela para digitar o nome');
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('loading')!).opacity)).toBe('0');
+    await page.screenshot({ path: `${SHOTS}/player-celular-dica.png` });
 
     // Tapping the screen while the game asks for a name focuses the text field (the phone keyboard).
     await page.locator('canvas').tap({ position: { x: 320, y: 120 } });

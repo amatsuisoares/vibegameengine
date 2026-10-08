@@ -4,7 +4,8 @@ import { createRequire } from 'node:module';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appSlug } from './desktop';
-import { exportWeb } from './export';
+import { exportWeb, type ExportResult } from './export';
+import { iconPng } from './icon';
 
 /**
  * `vibe package android <project>`: the exported game inside a Capacitor Android app, built with Gradle
@@ -137,6 +138,7 @@ export async function packageAndroid(projectDir: string, o: AndroidOptions = {})
   if (!activity) throw new Error('MainActivity.java not found in the Capacitor project');
   const pkg = /package\s+([\w.]+);/.exec(readFileSync(activity, 'utf8'))?.[1];
   writeFileSync(activity, mainActivity(pkg!));
+  if (web.icon) writeIcons(join(android, 'app/src/main/res'), web.icon);
 
   const gradle = ['assembleDebug', '--no-daemon', '--console=plain'];
   // Absolute path: cmd.exe may not look in the current folder (NoDefaultCurrentDirectoryInExePath).
@@ -148,6 +150,48 @@ export async function packageAndroid(projectDir: string, o: AndroidOptions = {})
   copyFileSync(built, apk);
   return { projectDir: outDir, apk, appId };
 }
+
+const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
+
+/**
+ * The game's icon in place of Capacitor's: launcher icons (square, round and the adaptive one's
+ * foreground over the background color) and the splash screen shown while the app opens.
+ */
+function writeIcons(res: string, icon: NonNullable<ExportResult['icon']>) {
+  const { sprite, background } = icon;
+  for (const [density, k] of Object.entries(DENSITIES)) {
+    const dir = join(res, `mipmap-${density}`);
+    writeFileSync(join(dir, 'ic_launcher.png'), iconPng(sprite, { size: 48 * k, background }));
+    writeFileSync(join(dir, 'ic_launcher_round.png'), iconPng(sprite, { size: 48 * k, background, round: true, fill: 0.7 }));
+    // Adaptive icon: 108dp, of which the launcher's mask may keep only the middle 66dp circle.
+    writeFileSync(join(dir, 'ic_launcher_foreground.png'), iconPng(sprite, { size: 108 * k, fill: 0.5 }));
+  }
+  writeFileSync(
+    join(res, 'values/ic_launcher_background.xml'),
+    `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">${background.toUpperCase()}</color>
+</resources>
+`,
+  );
+  // Splash images keep the template's sizes; Android 12+ draws its own splash (the icon on this color).
+  for (const d of readdirSync(res).filter((d) => d.startsWith('drawable'))) {
+    const file = join(res, d, 'splash.png');
+    if (!existsSync(file)) continue;
+    const { width, height } = pngSize(readFileSync(file));
+    writeFileSync(file, iconPng(sprite, { size: 0, width, height, background, fill: 0.4 }));
+  }
+  edit(join(res, 'values/styles.xml'), (t) =>
+    t.replace(
+      '<item name="android:background">@drawable/splash</item>',
+      `<item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>`,
+    ),
+  );
+}
+
+const pngSize = (png: Buffer) => ({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) });
 
 function mainActivity(pkg: string) {
   return `package ${pkg};

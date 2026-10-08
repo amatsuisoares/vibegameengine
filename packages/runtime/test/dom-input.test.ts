@@ -103,4 +103,18 @@ describe('attachDomInput', () => {
     next.beginFrame();
     expect(next.isDown('S')).toBe(false);
   });
+
+  it('input.touch: starts as told, then follows the last pointer (finger or pen = touch), also on a new Input', () => {
+    let input = new Input();
+    const canvas = Object.assign(new EventTarget(), { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 450 }) });
+    attachDomInput(() => input, { keyTarget: new EventTarget(), canvas, viewport: () => ({ width: 800, height: 450 }), touch: true });
+    expect(input.touch).toBe(true);
+    canvas.dispatchEvent(Object.assign(pointer('pointerdown', 5, 5), { pointerType: 'mouse' }));
+    expect(input.touch).toBe(false);
+    canvas.dispatchEvent(Object.assign(pointer('pointerdown', 5, 5), { pointerType: 'pen' }));
+    expect(input.touch).toBe(true);
+    input = new Input(); // the game restarted
+    canvas.dispatchEvent(pointer('pointermove', 9, 9));
+    expect(input.touch).toBe(true);
+  });
 });

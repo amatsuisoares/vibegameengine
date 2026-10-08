@@ -31,6 +31,7 @@ interface PointerEventLike extends Event {
   clientX: number;
   clientY: number;
   button: number;
+  pointerType?: string;
 }
 
 export interface DomInputOptions {
@@ -41,6 +42,8 @@ export interface DomInputOptions {
   viewport: () => { width: number; height: number };
   /** Runtime shortcuts (e.g. R to restart after game over). Return true to consume the key. */
   onShellKey?: (code: string) => boolean;
+  /** Whether the player starts on a touch screen (input.touch); afterwards the last pointer used decides. */
+  touch?: boolean;
 }
 
 function isEditable(target: EventTarget | null) {
@@ -55,6 +58,9 @@ function isEditable(target: EventTarget | null) {
  */
 export function attachDomInput(getInput: () => Input, o: DomInputOptions): () => void {
   const keyOf = (e: KeyEventLike) => e.code || e.key;
+  // Kept here and copied into the Input on every event: the runtime replaces its Input on restarts.
+  let touch = o.touch ?? false;
+  getInput().touch = touch;
 
   const onKeyDown = (ev: Event) => {
     const e = ev as KeyEventLike;
@@ -85,12 +91,16 @@ export function attachDomInput(getInput: () => Input, o: DomInputOptions): () =>
   };
   const onPointerMove = (ev: Event) => {
     const p = toViewport(ev as PointerEventLike);
-    getInput().mouseMove(p.x, p.y);
+    const input = getInput();
+    input.touch = touch;
+    input.mouseMove(p.x, p.y);
   };
   const onPointerDown = (ev: Event) => {
     const e = ev as PointerEventLike;
     const p = toViewport(e);
     const input = getInput();
+    if (e.pointerType) touch = e.pointerType === 'touch' || e.pointerType === 'pen';
+    input.touch = touch;
     input.mouseMove(p.x, p.y);
     const b = BUTTONS[e.button];
     if (b) input.mouseDown(b);
