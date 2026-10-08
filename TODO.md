@@ -417,8 +417,14 @@ Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` 
   adiada e ao esconder a página; backend trocável para o Android); letterbox em qualquer janela. e2e: a pasta
   exportada num servidor estático qualquer, nomear o pet, recarregar e o save continua, nenhuma chamada a `/api`
   (509 testes + 27 e2e)
-- [ ] **Fase 3 — Celular no navegador** (teclado virtual para texto, som no primeiro toque, paisagem, salvar ao ir
-  para o fundo)
+- [x] **Fase 3 — Celular no navegador**: engine `Input.wantsText` (um script leu `input.text` neste frame ou no
+  anterior); runtime `attachTextField` — um toque no canvas enquanto o jogo lê texto foca um `<input>` invisível
+  (abre o teclado do celular) e o que se digita nele vira o mesmo texto digitado do teclado físico (diferença do
+  campo → Backspaces + caracteres, Enter → `
+`); o teclado fecha quando o jogo para de ler texto. Som destravado
+  também em `touchend`/`click` (iOS) e suspenso com o app no fundo; página sem zoom, rolagem, seleção nem
+  puxar-para-recarregar (`touch-action: none`); celular em pé com jogo deitado mostra “gire o aparelho”. E2e com
+  toque emulado: tocar, digitar o nome no teclado virtual, Enter, teclado fecha (515 testes + 28 e2e)
 - [ ] **Fase 4 — Desktop (Electron)**: `vibe package desktop` → `.exe`
 - [ ] **Fase 5 — Android (Capacitor)**: `vibe package android` → `.apk` (requer Android Studio)
 - [ ] **Fase 6 — Polimento**: ícone e nome do app pelo projeto, tela de carregamento, guia de como gerar, playtest

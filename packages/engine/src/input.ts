@@ -59,6 +59,9 @@ export class Input {
 
   private pendingText = '';
   private text = '';
+  // Whether a script read the typed text this frame / the previous one (see wantsText).
+  private textRead = false;
+  private textReadBefore = false;
   /** Where the left button went down (the mouse may have moved again before the frame runs). */
   private pendingPressAt: { x: number; y: number } | null = null;
   private pressAt: { x: number; y: number } | null = null;
@@ -120,6 +123,8 @@ export class Input {
     this.pendingMousePressed = new Set();
     this.text = this.pendingText;
     this.pendingText = '';
+    this.textReadBefore = this.textRead;
+    this.textRead = false;
     this.pressAt = this.pendingPressAt;
     this.pendingPressAt = null;
   }
@@ -131,7 +136,16 @@ export class Input {
 
   /** Text typed since the previous frame. */
   typed(): string {
+    this.textRead = true;
     return this.text;
+  }
+
+  /**
+   * True while the game is reading typed text (a script read it in this frame or the previous one):
+   * a touch screen shows its virtual keyboard only then.
+   */
+  get wantsText() {
+    return this.textRead || this.textReadBefore;
   }
 
   isDown(key: string) {

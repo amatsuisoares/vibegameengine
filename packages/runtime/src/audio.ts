@@ -139,12 +139,21 @@ export class SoundPlayer<C = unknown> {
 
 /**
  * Web Audio backend. Browsers only start audio after a user gesture, so the context is
- * resumed on the first key press or click on the page.
+ * resumed on the first key press, click or touch on the page (iOS only accepts it on touchend/click).
+ * While the page is hidden (a phone app in the background) the sound is suspended.
  */
 export function createWebAudioBackend(target: EventTarget = window): AudioBackend<AudioBuffer> {
   const ctx = new AudioContext();
-  const resume = () => void ctx.resume().catch(() => {});
-  for (const type of ['keydown', 'pointerdown']) target.addEventListener(type, resume);
+  let hidden = false;
+  const resume = () => void (hidden ? undefined : ctx.resume().catch(() => {}));
+  for (const type of ['keydown', 'pointerdown', 'touchend', 'click']) target.addEventListener(type, resume);
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      hidden = document.visibilityState === 'hidden';
+      if (hidden) void ctx.suspend().catch(() => {});
+      else resume();
+    });
+  }
   return {
     async load(url) {
       const res = await fetch(url);

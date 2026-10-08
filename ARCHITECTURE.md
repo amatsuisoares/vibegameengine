@@ -407,6 +407,10 @@ app/hierarchy-panel.ts ── buildHierarchy(game, project) a cada 250 ms ─▶
   O player usa o mesmo `Runtime`, relógio real, seed nova por sessão, letterbox (`fitViewport`) e guarda o save
   no aparelho pelo `SaveStore` (`src/save-store.ts`: backend chave/valor assíncrono — `localStorage` por padrão,
   ou `window.__vibeSaveBackend` de um host —, gravação adiada 0,5 s e `flush()` ao esconder a página).
+  No celular: `Input.wantsText` (algum script leu `input.text` no último frame) faz o `attachTextField`
+  (`src/text-field.ts`) focar um `<input>` invisível ao fim de um toque — só assim o teclado virtual abre —, e o que
+  é digitado nele entra como texto digitado normal; a página desliga os gestos do navegador e pede para girar o
+  aparelho quando o jogo é deitado e a tela está em pé.
 
 ## ProjectStore e tools (`packages/server`)
 

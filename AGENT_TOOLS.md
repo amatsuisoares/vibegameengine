@@ -745,7 +745,8 @@ function onCollision(self, other, game) {
   `read_events`/`events('tipo')`), `random()`, `randomInt(a, b)`, `win()`, `lose()`, `loadScene(id)`.
 - `self` também tem `scaleX, scaleY, rotation` (visuais); `game` tem `entityAt(x, y)`, `input.mouseWorld`,
   `input.mouseDown/mousePressed(botão)`, `input.hovered` (o que um clique no mouse atingiria agora, ou `null` — para
-  efeitos de hover) e `input.text` (texto digitado no frame, em ordem; `\b` = Backspace, `\n` = Enter).
+  efeitos de hover) e `input.text` (texto digitado no frame, em ordem; `\b` = Backspace, `\n` = Enter; ler
+  `input.text` a cada frame é o que faz o jogo exportado abrir o teclado virtual num toque no celular).
 - **Relógio** `game.clock`: `now` (epoch ms), `hour` (0..24, local), `iso`, `speed` (alterável: 60 = 1 minuto de jogo por
   segundo). É a data/hora do calendário do jogo — no browser começa na data real; nas runs, em `clock.start` (padrão
   2026-01-01 09:00 UTC). Expressões leem `clock.hour`, `clock.now`.

@@ -7,6 +7,7 @@ import { audioVoices, type ClockOptions } from '@vibe/engine';
 import {
   AssetStore,
   attachDomInput,
+  attachTextField,
   createVibeApi,
   createWebAudioBackend,
   fitViewport,
@@ -32,6 +33,8 @@ declare global {
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const errorEl = document.getElementById('error') as HTMLElement;
+const textEl = document.getElementById('text') as HTMLInputElement;
+const rotateEl = document.getElementById('rotate') as HTMLElement;
 const ASSETS = 'assets/';
 
 function fail(details: string[]) {
@@ -63,6 +66,7 @@ async function main() {
   // Real date, the latest save and fresh randomness each session (a played game is never replayed).
   const realClock = (): ClockOptions => ({ start: Date.now(), utcOffsetMinutes: -new Date().getTimezoneOffset() });
   const seed = () => Math.floor(Math.random() * 2 ** 31);
+  let textField: ReturnType<typeof attachTextField> | undefined;
   const runtime = new Runtime(canvas, project, {
     assets,
     seed: seed(),
@@ -80,7 +84,10 @@ async function main() {
     },
     onLog: (e) => e.level === 'error' && console.error(e.message),
     onEvents: (events, g) => sound.handle(events, g.frame),
-    onFrame: (g) => sound.updateVoices(audioVoices(g.world)),
+    onFrame: (g) => {
+      sound.updateVoices(audioVoices(g.world));
+      textField?.sync();
+    },
   });
   for (const e of report.errors) runtime.game.console.error(`Asset "${e.id}": ${e.message}`, 'assets');
 
@@ -95,9 +102,15 @@ async function main() {
     },
   });
 
+  // Touch screens: the phone keyboard for names and other typed text.
+  textField = attachTextField(() => runtime.game.input, canvas, textEl);
+
+  const touchScreen = matchMedia('(pointer: coarse)').matches;
   const layout = () => {
     const box = fitViewport(innerWidth, innerHeight, width, height);
     Object.assign(canvas.style, { width: `${box.width}px`, height: `${box.height}px`, left: `${box.left}px`, top: `${box.top}px` });
+    // A landscape game on a phone held upright: ask to turn it (not while the keyboard squeezes the window).
+    rotateEl.hidden = !(touchScreen && width > height && innerHeight > innerWidth && !textField?.open);
   };
   addEventListener('resize', layout);
   layout();

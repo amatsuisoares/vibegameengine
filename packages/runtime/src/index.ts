@@ -10,3 +10,4 @@ export * from './hierarchy';
 export * from './viewport';
 export * from './save-store';
 export * from './fit';
+export * from './text-field';

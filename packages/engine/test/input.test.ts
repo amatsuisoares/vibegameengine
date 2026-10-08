@@ -53,4 +53,16 @@ describe('Input', () => {
     input.beginFrame();
     expect(input.actionReleased('jump')).toBe(true);
   });
+
+  it('wantsText: true while a script reads the typed text (this frame or the previous one)', () => {
+    const input = new Input();
+    expect(input.wantsText).toBe(false);
+    input.beginFrame();
+    input.typed(); // a name field reads it every frame
+    expect(input.wantsText).toBe(true);
+    input.beginFrame();
+    expect(input.wantsText).toBe(true); // still set before the scripts run again
+    input.beginFrame();
+    expect(input.wantsText).toBe(false); // nobody read it in the last frame
+  });
 });

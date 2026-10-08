@@ -104,4 +104,44 @@ describe('exported game (static folder, Chromium)', () => {
     expect(errors).toEqual([]);
     await context.close();
   });
+
+  it('on a phone (touch): a tap opens the virtual keyboard to name the pet, which closes after; upright asks to turn it', async () => {
+    const context = await browser.newContext({ viewport: { width: 800, height: 360 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await open(page);
+    const active = () => page.evaluate(() => document.activeElement?.id ?? '');
+    expect(await page.locator('#rotate').isHidden()).toBe(true);
+
+    // Tapping the screen while the game asks for a name focuses the text field (the phone keyboard).
+    await page.locator('canvas').tap({ position: { x: 320, y: 120 } });
+    expect(await active()).toBe('text');
+    await page.keyboard.type('Pipoca');
+    // The name field shows what was typed on the phone keyboard.
+    const field = () => page.evaluate(() => JSON.stringify(window.__vibe!.getState({ ids: ['campoNome'], components: true }).entities));
+    await expect.poll(field).toContain('Pipoca');
+    await page.screenshot({ path: `${SHOTS}/player-celular-nome.png` });
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('a');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => window.__vibe!.getState().vars.petName === 'Pipoca', undefined, { timeout: 10_000 });
+    // The game no longer reads text: the keyboard goes away.
+    await page.waitForFunction(() => document.activeElement?.id !== 'text', undefined, { timeout: 5000 });
+    await page.waitForTimeout(1000);
+    await page.screenshot({ path: `${SHOTS}/player-celular.png` });
+
+    // Taps play the game like clicks; the page itself does not zoom or scroll.
+    expect(await page.evaluate(() => getComputedStyle(document.body).touchAction)).toBe('none');
+    await page.locator('canvas').tap({ position: { x: 320, y: 300 } });
+    expect(await active()).not.toBe('text');
+
+    // Held upright: a landscape game asks to turn the phone.
+    await page.setViewportSize({ width: 360, height: 800 });
+    await expect.poll(() => page.locator('#rotate').isVisible()).toBe(true);
+    await page.setViewportSize({ width: 800, height: 360 });
+    await expect.poll(() => page.locator('#rotate').isHidden()).toBe(true);
+    expect(errors).toEqual([]);
+    await context.close();
+  });
 });
