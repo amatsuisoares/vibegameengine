@@ -1,8 +1,0 @@
-{
-  "name": "Cenoura",
-  "category": "comida",
-  "icon": "🥕",
-  "tags": ["vegetal", "crocante", "fresco"],
-  "props": { "artigo": "a", "fome": 12 },
-  "price": 2
-}

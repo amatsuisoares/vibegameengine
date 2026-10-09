@@ -1,0 +1,19 @@
+{
+  "id": "sala",
+  "background": "#1f3b2d",
+  "entities": [
+    {
+      "id": "saudacao",
+      "transform": { "x": 320, "y": 160 },
+      "components": {
+        "Text": { "text": "", "fontSize": 32, "align": "center" },
+        "Script": { "src": "scripts/sala.js" }
+      }
+    },
+    {
+      "id": "mascote",
+      "transform": { "x": 320, "y": 250 },
+      "components": { "Sprite": { "asset": "mascote", "width": 96, "height": 96 } }
+    }
+  ]
+}

@@ -16,7 +16,7 @@ declare global {
 
 // The exported game (vibe export) served by a plain static server: no Vite, no /api.
 const repo = (p: string) => fileURLToPath(new URL(`../../../${p}`, import.meta.url));
-const OUT = repo('test-results/export-meu-pet');
+const OUT = repo('test-results/export-demo-app');
 const SHOTS = repo('test-results/screenshots');
 const TYPES: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.wav': 'audio/wav', '.json': 'application/json' };
 
@@ -26,15 +26,15 @@ let baseUrl: string;
 const requests: string[] = [];
 
 beforeAll(async () => {
-  const r = await exportWeb(repo('projects/meu-pet'), OUT);
+  const r = await exportWeb(repo('test-fixtures/demo-app'), OUT);
   expect(r.files).toContain('index.html');
   // The app icon (config.app.icon) and the title are in the page before its script runs.
   expect(r.files).toContain('icon.png');
-  expect(r.icon?.background).toBe('#ffd59e');
+  expect(r.icon?.background).toBe('#bfe3ff');
   const html = readFileSync(join(OUT, 'index.html'), 'utf8');
-  expect(html).toContain('<title>Meu Pet</title>');
+  expect(html).toContain('<title>Demo App</title>');
   expect(html).toContain('<link rel="icon" href="icon.png" />');
-  expect(html).toContain('<img id="loading-icon" src="icon.png" alt="" /><div id="loading-title">Meu Pet</div>');
+  expect(html).toContain('<img id="loading-icon" src="icon.png" alt="" /><div id="loading-title">Demo App</div>');
   server = createServer((req, res) => {
     const path = decodeURIComponent(new URL(req.url!, 'http://x').pathname);
     requests.push(path);
@@ -73,14 +73,14 @@ describe('exported game (static folder, Chromium)', () => {
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
     await open(page);
-    expect(await page.title()).toBe('Meu Pet');
+    expect(await page.title()).toBe('Demo App');
     // The loading screen fades out once the game runs; the hint speaks of the keyboard.
     await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('loading')!).opacity)).toBe('0');
     expect(await page.evaluate(() => document.getElementById('loading-bar')!.firstElementChild!.getAttribute('style'))).toContain('width: 100%');
     const hint = () => page.evaluate(() => JSON.stringify(window.__vibe!.getState({ ids: ['dicaNome'], components: true }).entities));
     await expect.poll(hint).toContain('Digite o nome e aperte Enter');
 
-    // Letterbox: 960×540 scaled to the full width (1200 → 675 tall), centered vertically.
+    // Letterbox: 640×360 scaled to the full width (1200 → 675 tall), centered vertically.
     const box = (await page.locator('canvas').boundingBox())!;
     expect(box.width).toBe(1200);
     expect(box.height).toBe(675);
@@ -91,18 +91,18 @@ describe('exported game (static folder, Chromium)', () => {
     await page.keyboard.type('Bolinha');
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => window.__vibe!.getState().vars.petName === 'Bolinha', undefined, { timeout: 10_000 });
-    expect(await page.evaluate(() => window.__vibe!.getState().scene)).toBe('quarto');
+    expect(await page.evaluate(() => window.__vibe!.getState().scene)).toBe('sala');
     await page.waitForTimeout(1500);
-    await page.screenshot({ path: `${SHOTS}/player-meu-pet.png` });
+    await page.screenshot({ path: `${SHOTS}/player-demo-app.png` });
     // The save went to the device (localStorage), not to a server.
-    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('vibe:meu-pet:save') ?? '{}'));
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('vibe:demo-app:save') ?? '{}'));
     expect(saved.pet?.name).toBe('Bolinha');
 
     // Closing and opening again: straight back to the room with the same pet.
     await page.reload();
     await open(page);
     await page.waitForFunction(() => window.__vibe!.getState().vars.petName === 'Bolinha', undefined, { timeout: 10_000 });
-    expect(await page.evaluate(() => window.__vibe!.getState().scene)).toBe('quarto');
+    expect(await page.evaluate(() => window.__vibe!.getState().scene)).toBe('sala');
 
     // A phone-shaped window: the game keeps its proportions (bars at the sides).
     await page.setViewportSize({ width: 800, height: 360 });
@@ -191,9 +191,9 @@ describe('exported game (static folder, Chromium)', () => {
     await page.waitForFunction(() => window.__vibe!.getState().vars.petName === 'Nina', undefined, { timeout: 10_000 });
     // Capacitor fires "pause" on the document when the app goes to the background: the save is written at once.
     await page.evaluate(() => document.dispatchEvent(new Event('pause')));
-    const saved = await page.evaluate(() => (window as unknown as { __prefs: Map<string, string> }).__prefs.get('vibe:meu-pet:save'));
+    const saved = await page.evaluate(() => (window as unknown as { __prefs: Map<string, string> }).__prefs.get('vibe:demo-app:save'));
     expect(JSON.parse(saved!).pet?.name).toBe('Nina');
-    expect(await page.evaluate(() => localStorage.getItem('vibe:meu-pet:save'))).toBeNull();
+    expect(await page.evaluate(() => localStorage.getItem('vibe:demo-app:save'))).toBeNull();
     expect(await page.evaluate(() => (window as unknown as { __prefCalls: string[] }).__prefCalls[0])).toBe('Preferences.get');
     await context.close();
   });

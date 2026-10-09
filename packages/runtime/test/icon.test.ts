@@ -20,12 +20,12 @@ describe('PNG reader/writer', () => {
     expect(decodePng(encodePng(img))).toEqual(img);
   });
 
-  it('reads the meu-pet sprites (8-bit RGBA, filtered rows)', () => {
-    const img = decodePng(readFileSync(repo('projects/meu-pet/assets/pet/bebe_1.png')));
-    expect([img.width, img.height]).toEqual([1024, 1024]);
+  it('reads a sprite saved by Chromium (8-bit RGBA, filtered rows)', () => {
+    const img = decodePng(readFileSync(repo('test-fixtures/demo-app/assets/mascote.png')));
+    expect([img.width, img.height]).toEqual([96, 96]);
     expect(px(img, 0, 0)[3]).toBe(0); // transparent corner
     const box = visibleBounds(img);
-    expect(box.width).toBeLessThan(1024);
+    expect(box.width).toBeLessThan(96);
     expect(px(img, box.x + Math.floor(box.width / 2), box.y + Math.floor(box.height / 2))[3]).toBe(255);
   });
 

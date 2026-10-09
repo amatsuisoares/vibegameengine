@@ -1,0 +1,14 @@
+{
+  "formatVersion": 1,
+  "name": "Demo App",
+  "width": 640,
+  "height": 360,
+  "pixelArt": false,
+  "startScene": "inicio",
+  "assets": [
+    { "id": "mascote", "type": "image", "path": "mascote.png" },
+    { "id": "sfx_ok", "type": "audio", "path": "sfx_ok.wav" }
+  ],
+  "sounds": { "nomeado": "sfx_ok" },
+  "app": { "icon": "mascote", "iconBackground": "#bfe3ff" }
+}

@@ -28,6 +28,17 @@ Plataforma de criação de jogos 2D em que um agente de IA **constrói, executa,
 > - **planos do agente** (`update_plan`: objetivo → tarefas → verificação por playbooks).
 > Veja [TODO.md](TODO.md) para o roadmap e [ARCHITECTURE.md](ARCHITECTURE.md) para o desenho.
 
+## Jogos
+
+Os jogos não ficam neste repositório: cada um tem o seu e é clonado dentro de `projects/` (que o git da engine
+ignora). Por exemplo, o Meu Pet, o jogo de pet virtual feito com a engine:
+
+```bash
+git clone <url do repositório do Meu Pet> projects/meu-pet
+```
+
+Os exemplos abaixo usam `meu-pet`; troque pelo nome da pasta do seu jogo.
+
 ## Requisitos
 
 - Node.js 24+ (npm 11+)
@@ -139,8 +150,9 @@ packages/
     export/ vibe export / package: site, app Windows (Electron), app Android (Capacitor), ícones
     desktop/ casca Electron (main.cjs + preload.cjs)
     e2e/    testes no Chromium (Playwright)
-projects/
-  meu-pet/           o jogo de pet virtual (project.json + scenes/ + scripts/ + prefabs/ + assets/ + playbooks/)
+projects/            os jogos (cada um no seu próprio repositório, clonado aqui; ignorado pelo git da engine —
+                     ver projects/README.md). Ex.: meu-pet/, o jogo de pet virtual
+test-fixtures/       jogos pequenos usados pelos testes da engine (demo-platformer, demo-app)
 docs/
   PROMPT_ORIGINAL.md pedido original do projeto (escopo e prioridades)
 ```

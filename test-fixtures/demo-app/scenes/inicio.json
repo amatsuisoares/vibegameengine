@@ -1,0 +1,29 @@
+{
+  "id": "inicio",
+  "background": "#2b2545",
+  "entities": [
+    {
+      "id": "titulo",
+      "transform": { "x": 320, "y": 60 },
+      "components": {
+        "Text": { "text": "Demo App", "fontSize": 36, "align": "center", "color": "#ffe28a" },
+        "Script": { "src": "scripts/inicio.js" }
+      }
+    },
+    {
+      "id": "mascote",
+      "transform": { "x": 320, "y": 150 },
+      "components": { "Sprite": { "asset": "mascote", "width": 96, "height": 96 } }
+    },
+    {
+      "id": "campoNome",
+      "transform": { "x": 320, "y": 240 },
+      "components": { "Text": { "text": "", "fontSize": 24, "align": "center" } }
+    },
+    {
+      "id": "dicaNome",
+      "transform": { "x": 320, "y": 320 },
+      "components": { "Text": { "text": "", "fontSize": 14, "align": "center", "color": "#9aa3c7" } }
+    }
+  ]
+}

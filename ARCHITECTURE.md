@@ -55,6 +55,8 @@ Project
                   components: { Sprite?, Body?, Collider?, PlatformerController?, ... }
 ```
 
+Cada jogo é um repositório próprio clonado em `projects/<nome>` (o repositório da engine ignora essa pasta; testes
+do jogo em `projects/<nome>/tests/` entram no `npm test`); os testes da engine usam os jogos de `test-fixtures/`.
 Em disco: `projects/<nome>/project.json` (config) + `scenes/<id>.json` + `scripts/**/*.js` + `prefabs/<id>.json`
 + `items/<id>.json` (catálogo de itens, V0.7) (+ `playbooks/<id>.json`: cenários de verificação, fora do jogo em si).
 Memória do agente em `.vibe/memory.json`: itens (features, todos, issues, notas) e **planos** (V0.6, `update_plan`).

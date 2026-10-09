@@ -33,4 +33,7 @@ Plataforma de jogos 2D guiada por agente de IA. Leia ARCHITECTURE.md antes de mu
   replay do screenshot diverge.
 - Config do Vite importa `@vibe/server` (TS sem build): sempre carregar com `configLoader: 'runner'`.
 - Escopo e prioridades do projeto: `docs/PROMPT_ORIGINAL.md`.
+- Jogos ficam em `projects/<jogo>`, cada um com **o seu próprio repositório git** (o da engine ignora `projects/`).
+  Commits do jogo são feitos dentro da pasta dele; testes do jogo em `projects/<jogo>/tests/` rodam no `npm test`.
+  Os testes da engine usam só `test-fixtures/` (`demo-platformer`, `demo-app`), nunca um jogo de `projects/`.
 - Cada etapa só avança com testes passando; atualize TODO.md ao concluir itens.

@@ -13,6 +13,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/*/test/**/*.test.ts'],
+    // Games kept in projects/ (each its own repository) may bring tests that run against this engine.
+    include: ['packages/*/test/**/*.test.ts', 'projects/*/tests/**/*.test.ts'],
   },
 });

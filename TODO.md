@@ -451,6 +451,13 @@ Jogo exportado como app instalável, sem dev server: `.exe` (Electron) e `.apk` 
   gerar. Meu-pet: ícone = bebê sobre pêssego (`#ffd59e`) (526 testes + 30 e2e). Playtest nos dois aparelhos fica
   com quem joga
 
+## Separação engine × jogo
+- [x] O Meu Pet saiu deste repositório: vive no seu próprio, clonado em `projects/meu-pet` (o git da engine ignora
+  `projects/`, menos `projects/README.md`). O histórico do jogo foi extraído (`git subtree split`, 29 commits) e o
+  teste de regressão dele foi junto (`projects/meu-pet/tests/`, roda no `npm test` quando o jogo está presente). Os
+  testes da engine que usavam o jogo (player, desktop, ícone) usam o novo `test-fixtures/demo-app` (nome digitado,
+  save, som e ícone)
+
 ## ~~Etapa 9 — Teste final~~ — descartada
 O jogo de plataforma do enunciado não será feito como teste final; o próximo jogo será definido pelo usuário.
 

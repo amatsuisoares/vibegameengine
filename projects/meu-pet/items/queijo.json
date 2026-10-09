@@ -1,8 +1,0 @@
-{
-  "name": "Queijo",
-  "category": "comida",
-  "icon": "🧀",
-  "tags": ["laticinio", "salgado"],
-  "props": { "artigo": "o", "fome": 18 },
-  "price": 6
-}

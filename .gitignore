@@ -4,19 +4,10 @@ coverage/
 *.log
 .env
 .env.*
-# runtime artifacts produced by agent runs (screenshots, run logs)
-projects/*/.vibe/runs/
-# change history written by the ProjectStore (local undo log)
-projects/*/.vibe/history.jsonl
-# temporary copy made by the e2e tests
-projects/e2e-tmp/
-# published agent run mirrored by the runtime page (follow mode)
-projects/*/.vibe/live.json
-# saved data of played games (game.storage)
-projects/*/.vibe/save.json
+# games: each one lives in its own repository, cloned into projects/ (see projects/README.md)
+/projects/*
+!/projects/README.md
 # screenshots written by the e2e tests
 test-results/
-# entity selected in the hierarchy panel (editor state)
-projects/*/.vibe/selection.json
 # exported / packaged games (vibe export, vibe package)
 build/
